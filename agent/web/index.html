@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0e0f13">
+<title>Phone Remote</title>
+<style>
+  :root { --bg:#0e0f13; --card:#181a21; --fg:#eef0f6; --dim:#8b90a0; --acc:#5b8cff; --ok:#3ecf8e; --bad:#ff6b6b; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f3f4f8; --card:#fff; --fg:#14161c; --dim:#666b7a; } }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px system-ui,sans-serif;
+         min-height:100dvh; display:flex; flex-direction:column; padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+  header { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
+  #status { font-size:13px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+  #dot { width:9px; height:9px; border-radius:50%; background:var(--bad); }
+  #dot.on { background:var(--ok); }
+  select { background:var(--card); color:var(--fg); border:0; border-radius:10px; padding:8px 10px; font-size:14px; max-width:55%; }
+  .card { background:var(--card); border-radius:20px; padding:20px; margin-bottom:16px; }
+  #title { font-size:22px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #artist { color:var(--dim); margin-top:4px; min-height:1.3em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #bar { width:100%; margin:18px 0 4px; accent-color:var(--acc); height:28px; }
+  .times { display:flex; justify-content:space-between; font-size:13px; color:var(--dim); font-variant-numeric:tabular-nums; }
+  .row { display:grid; gap:12px; margin-bottom:12px; }
+  .r3 { grid-template-columns:repeat(3,1fr); } .r5 { grid-template-columns:repeat(5,1fr); }
+  button { border:0; border-radius:18px; background:var(--card); color:var(--fg); font-size:18px; font-weight:600;
+           min-height:72px; cursor:pointer; user-select:none; }
+  button:active { transform:scale(.96); background:var(--acc); color:#fff; }
+  #pp { background:var(--acc); color:#fff; min-height:96px; font-size:34px; }
+  .small { font-size:15px; min-height:56px; }
+  #msg { text-align:center; color:var(--bad); min-height:1.4em; font-size:14px; }
+  #gate { position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px; gap:12px; }
+  #gate.show { display:flex; }
+  #gate h2 { margin:0; } #gate p { color:var(--dim); max-width:28em; }
+</style>
+</head>
+<body>
+<header>
+  <div id="status"><span id="dot"></span><span id="stxt">Connecting…</span></div>
+  <select id="players" aria-label="Player"></select>
+</header>
+
+<div class="card">
+  <div id="title">Nothing playing</div>
+  <div id="artist"></div>
+  <input id="bar" type="range" min="0" max="1" value="0" step="1" disabled>
+  <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+</div>
+
+<div class="row r3">
+  <button data-c="prev" aria-label="Previous">⏮</button>
+  <button id="pp" data-c="play_pause" aria-label="Play or pause">⏯</button>
+  <button data-c="next" aria-label="Next">⏭</button>
+</div>
+<div class="row r3">
+  <button data-c="seek" data-d="-30" class="small">−30s</button>
+  <button data-c="seek" data-d="-10" class="small">−10s</button>
+  <button data-c="seek" data-d="10" class="small">+10s</button>
+</div>
+<div class="row r5">
+  <button data-c="volume" data-d="-3" class="small">🔉</button>
+  <button data-c="volume" data-d="3" class="small">🔊</button>
+  <button data-c="mute" class="small">🔇</button>
+  <button data-c="seek" data-d="30" class="small">+30s</button>
+  <button id="forget" class="small" title="Forget this PC">⛔</button>
+</div>
+<div id="msg"></div>
+
+<div id="gate">
+  <h2>Not paired</h2>
+  <p>On your PC run <b>phone-remote pair</b> (or open <b>http://127.0.0.1:8765/pair</b>) and scan the QR code with this phone's camera.</p>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'pr.token';
+  let token = null;
+  try {
+    const m = /[#&]k=([^&]+)/.exec(location.hash);
+    if (m) { localStorage.setItem(KEY, m[1]); history.replaceState(null, '', location.pathname); }
+    token = localStorage.getItem(KEY);
+  } catch (e) {}
+  if (!token) { $('gate').classList.add('show'); return; }
+
+  let ws, state = null, recvAt = 0, retry = 500, seeking = false, hb;
+  const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600);
+    const m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
+  const cur = () => state && state.players.find(p => p.id === state.current);
+  const setStatus = (on, t) => { $('dot').classList.toggle('on', on); $('stxt').textContent = t; };
+
+  function connect() {
+    setStatus(false, 'Connecting…');
+    ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token }));
+    ws.onmessage = e => {
+      const m = JSON.parse(e.data);
+      if (m.t === 'auth') {
+        if (m.ok) { retry = 500; clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); }
+        else { $('gate').classList.add('show'); localStorage.removeItem(KEY); ws.close(); }
+      } else if (m.t === 'state') { state = m; recvAt = performance.now(); setStatus(true, m.host); render(true); }
+      else if (m.t === 'ack') { $('msg').textContent = m.ok ? '' : (m.err || 'Failed'); if (!m.ok) navigator.vibrate && navigator.vibrate(80); }
+    };
+    ws.onclose = () => { clearInterval(hb); setStatus(false, 'Reconnecting…'); setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000); };
+    ws.onerror = () => ws.close();
+  }
+  const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+
+  function render(full) {
+    const p = cur();
+    if (full) {
+      const sel = $('players');
+      sel.innerHTML = '';
+      (state.players).forEach(pl => { const o = document.createElement('option'); o.value = pl.id; o.textContent = pl.app; o.selected = pl.id === state.current; sel.appendChild(o); });
+      sel.style.display = state.players.length > 1 ? '' : 'none';
+      $('title').textContent = p ? (p.title || p.app) : 'Nothing playing';
+      $('artist').textContent = p ? p.artist : '';
+      $('pp').textContent = p && p.playing ? '⏸' : '▶';
+      $('bar').disabled = !p || !p.can_seek;
+      $('bar').max = p ? p.dur_ms : 1;
+      $('dur').textContent = p ? fmt(p.dur_ms) : '0:00';
+    }
+    if (p && !seeking) {
+      const pos = Math.min(p.dur_ms, p.pos_ms + (p.playing ? performance.now() - recvAt : 0));
+      $('bar').value = pos; $('cur').textContent = fmt(pos);
+    }
+  }
+  setInterval(() => state && render(false), 250);
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    navigator.vibrate && navigator.vibrate(15);
+    if (b.id === 'forget') { if (confirm('Forget this PC?')) { localStorage.removeItem(KEY); location.reload(); } return; }
+    if (b.dataset.c === 'seek') send({ t: 'cmd', c: 'seek_rel', d: +b.dataset.d });
+    else if (b.dataset.c === 'volume') send({ t: 'cmd', c: 'volume', d: +b.dataset.d });
+    else send({ t: 'cmd', c: b.dataset.c });
+  });
+  $('players').onchange = e => send({ t: 'cmd', c: 'select', id: e.target.value });
+  const bar = $('bar');
+  bar.oninput = () => { seeking = true; $('cur').textContent = fmt(+bar.value); };
+  bar.onchange = () => { send({ t: 'cmd', c: 'seek_abs', pos_ms: +bar.value }); setTimeout(() => seeking = false, 600); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ws && ws.readyState > 1) connect(); });
+  connect();
+})();
+</script>
+</body>
+</html>
