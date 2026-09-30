@@ -113,7 +113,6 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = C.BG
         window.navigationBarColor = C.BG
-        styleSystemBars()
         applyKeepAwake(Theme.keepAwakeOf(savedSettings))
         // Edge-to-edge is enforced on targetSdk 35; fitsSystemWindows keeps content below the status bar.
         val root = LinearLayout(this).apply {
@@ -171,6 +170,7 @@ class MainActivity : Activity() {
             v.onApplyWindowInsets(insets)
         }
         setContentView(root)
+        styleSystemBars()
 
         discovery = Discovery(this) { id, host, port -> runOnUiThread { onSighting(id, host, port) } }
         showMode(false)
@@ -408,10 +408,10 @@ class MainActivity : Activity() {
     }
 
     /** Light icons on dark bars and dark icons on light bars. */
-    private fun styleSystemBars() {
+    private fun styleSystemBars() = runCatching {
         if (Build.VERSION.SDK_INT >= 30) {
             val mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-            window.insetsController?.setSystemBarsAppearance(if (dark) 0 else mask, mask)
+            window.decorView.windowInsetsController?.setSystemBarsAppearance(if (dark) 0 else mask, mask)
         } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = if (dark) 0 else {
