@@ -17,7 +17,8 @@ class Discovery(ctx: Context, private val onFound: (host: String, port: Int) -> 
                 nsd.resolveService(s, object : NsdManager.ResolveListener {
                     override fun onResolveFailed(s: NsdServiceInfo, code: Int) {}
                     override fun onServiceResolved(s: NsdServiceInfo) {
-                        val host = s.host?.hostAddress ?: return
+                        val addr = s.host as? java.net.Inet4Address ?: return // IPv6 link-local breaks the URL
+                        val host = addr.hostAddress ?: return
                         onFound(host, s.port)
                     }
                 })

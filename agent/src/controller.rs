@@ -4,16 +4,19 @@
 use crate::backend::{Backend, Key, Transport};
 use crate::protocol::{Command, PlayerInfo, State};
 use anyhow::{bail, Result};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+const BROKEN_TTL: Duration = Duration::from_secs(600);
 
 pub struct Controller {
     backend: Arc<dyn Backend>,
     host: String,
     selected: Mutex<Option<String>>,
-    /// Apps whose session seek returned true but did not move the position.
-    seek_broken: Mutex<HashSet<String>>,
+    /// Apps whose session seek returned true but did not move the position; retried after
+    /// BROKEN_TTL so one transient miss (track change, buffering) is not permanent.
+    seek_broken: Mutex<HashMap<String, Instant>>,
     verify_delay: Duration,
 }
 
@@ -23,7 +26,7 @@ impl Controller {
             backend,
             host,
             selected: Mutex::new(None),
-            seek_broken: Mutex::new(HashSet::new()),
+            seek_broken: Mutex::new(HashMap::new()),
             verify_delay: Duration::from_millis(350),
         }
     }
@@ -100,7 +103,12 @@ impl Controller {
         let Some(p) = self.pick(&players) else {
             return self.keys_or_err(delta_s);
         };
-        let broken = self.seek_broken.lock().unwrap().contains(&p.app);
+        let broken = self
+            .seek_broken
+            .lock()
+            .unwrap()
+            .get(&p.app)
+            .is_some_and(|t| t.elapsed() < BROKEN_TTL);
         if p.can_seek && !broken {
             let dur = p.dur_ms.max(0);
             let target = (p.pos_ms + delta_s * 1000).clamp(0, dur);
@@ -122,7 +130,7 @@ impl Controller {
                     return Ok(());
                 }
             }
-            self.seek_broken.lock().unwrap().insert(p.app.clone());
+            self.seek_broken.lock().unwrap().insert(p.app.clone(), Instant::now());
         }
         self.keys_or_err(delta_s)
     }

@@ -83,7 +83,7 @@
   } catch (e) {}
   if (!token) { $('gate').classList.add('show'); return; }
 
-  let ws, state = null, recvAt = 0, retry = 500, seeking = false, hb;
+  let rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb;
   const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600);
     const m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
@@ -98,11 +98,17 @@
       const m = JSON.parse(e.data);
       if (m.t === 'auth') {
         if (m.ok) { retry = 500; clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); }
-        else { $('gate').classList.add('show'); localStorage.removeItem(KEY); ws.close(); }
+        else {
+          // Only a wrong secret unpairs; a lockout is temporary and must not wipe a valid pairing.
+          rejected = true;
+          if (m.err === 'bad token') { $('gate').classList.add('show'); localStorage.removeItem(KEY); }
+          else setStatus(false, 'Locked out — retry in a minute');
+          ws.close();
+        }
       } else if (m.t === 'state') { state = m; recvAt = performance.now(); setStatus(true, m.host); render(true); }
       else if (m.t === 'ack') { $('msg').textContent = m.ok ? '' : (m.err || 'Failed'); if (!m.ok) navigator.vibrate && navigator.vibrate(80); }
     };
-    ws.onclose = () => { clearInterval(hb); setStatus(false, 'Reconnecting…'); setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000); };
+    ws.onclose = () => { clearInterval(hb); if (rejected) { rejected = false; if ($('gate').classList.contains('show')) return; retry = 60000; } else setStatus(false, 'Reconnecting…'); setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000); };
     ws.onerror = () => ws.close();
   }
   const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
@@ -111,8 +117,13 @@
     const p = cur();
     if (full) {
       const sel = $('players');
-      sel.innerHTML = '';
-      (state.players).forEach(pl => { const o = document.createElement('option'); o.value = pl.id; o.textContent = pl.app; o.selected = pl.id === state.current; sel.appendChild(o); });
+      const ids = state.players.map(pl => pl.id).join('|');
+      if (sel.dataset.ids !== ids) {   // rebuilding every push would close the open dropdown
+        sel.dataset.ids = ids;
+        sel.innerHTML = '';
+        state.players.forEach(pl => { const o = document.createElement('option'); o.value = pl.id; o.textContent = pl.app; sel.appendChild(o); });
+      }
+      if (document.activeElement !== sel && state.current) sel.value = state.current;
       sel.style.display = state.players.length > 1 ? '' : 'none';
       $('title').textContent = p ? (p.title || p.app) : 'Nothing playing';
       $('artist').textContent = p ? p.artist : '';
