@@ -3,6 +3,7 @@
 use crate::protocol::PlayerInfo;
 use anyhow::Result;
 
+pub mod keys;
 pub mod mock;
 #[cfg_attr(not(windows), allow(dead_code))]
 pub mod http;
@@ -28,6 +29,30 @@ pub enum Key {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MouseButton {
+    Left,
+    Right,
+    Middle,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ButtonAction {
+    Click,
+    Down,
+    Up,
+}
+
+/// Validated mouse/keyboard input, already clamped by the controller.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Input {
+    Move(i32, i32),
+    Button(MouseButton, ButtonAction),
+    Scroll(i32, i32),
+    Text(String),
+    Key { name: String, mods: Vec<String> },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Transport {
     PlayPause,
     Next,
@@ -47,6 +72,10 @@ pub trait Backend: Send + Sync {
     /// Send Left/Right arrows to the foreground window if it is a known player.
     /// Returns the number of seconds actually skipped (0 = nothing sent).
     fn focused_seek(&self, secs: i64) -> Result<i64>;
+    /// Mouse and keyboard input. Backends without support refuse it.
+    fn input(&self, _input: Input) -> Result<()> {
+        Err(anyhow::anyhow!("mouse and keyboard control is not supported on this system"))
+    }
     /// Human-readable dump for the /debug page.
     fn debug(&self) -> String {
         format!("backend: {}\n{:#?}", self.name(), self.snapshot())

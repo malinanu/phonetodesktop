@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <title>Phone Remote</title>
 <link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/pad.css">
 <style>
   html,body { height:100%; }
   body { display:flex; flex-direction:column; max-width:520px; margin:0 auto; user-select:none; touch-action:manipulation;
@@ -16,6 +17,16 @@
   #dot { width:8px; height:8px; border-radius:50%; background:var(--bad); flex:none; transition:background .3s var(--ease); }
   #dot.on { background:var(--good); }
   .hdr-r { display:flex; gap:4px; align-items:center; }
+  .seg { display:inline-flex; background:var(--surface); border-radius:99px; padding:3px; }
+  .seg button { font:600 13px var(--font); border:0; background:transparent; color:var(--ink-dim); padding:7px 12px; border-radius:99px; cursor:pointer; }
+  .seg button.on { background:var(--surface-2); color:var(--ink); }
+  #media { display:flex; flex-direction:column; flex:1; min-height:0; }
+  #touch { display:none; flex:1; min-height:0; flex-direction:column; padding-bottom:4px; }
+  #touchHost { flex:1; min-height:0; }
+  body.touchmode #media { display:none; } body.touchmode #touch { display:flex; }
+  body.off #touch { opacity:.35; pointer-events:none; }
+  #noInput { display:none; margin:auto 0; text-align:left; } #noInput h2 { font-size:26px; margin-bottom:8px; } #noInput p { color:var(--ink-dim); margin:0; }
+  body.noinput #touchHost { display:none; } body.noinput #noInput { display:block; }
   select { font:500 13px var(--font); background:var(--surface); color:var(--ink); border:0; border-radius:99px; padding:9px 12px; max-width:130px; }
   .ib { width:44px; height:44px; border-radius:50%; border:0; background:transparent; color:var(--ink-dim); display:grid; place-items:center; font-size:22px; text-decoration:none; }
   .ib:active { background:var(--surface); }
@@ -81,6 +92,7 @@
 
 <header>
   <div id="status"><span id="dot"></span><span id="stxt">Connecting…</span></div>
+  <div class="seg" id="tabs"><button data-v="media" class="on">Media</button><button data-v="touch">Touchpad</button></div>
   <div class="hdr-r">
     <select id="players" aria-label="Player" style="display:none"></select>
     <a class="ib" href="/guide" aria-label="Guide"><svg class="i"><use href="#i-help"/></svg></a>
@@ -88,6 +100,7 @@
   </div>
 </header>
 
+<div id="media">
 <section class="now">
   <div class="app"><span class="eq" id="eq"><i></i><i></i><i></i><i></i></span><span class="kicker" id="app">Idle</span></div>
   <div id="title">Nothing playing</div>
@@ -118,6 +131,13 @@
   </div>
 </div>
 
+</div>
+
+<div id="touch">
+  <div id="touchHost"></div>
+  <div id="noInput"><span class="kicker">Turned off</span><h2>Mouse and keyboard are off</h2><p>Switch them on for this phone in the PC app: Phones, then “Mouse &amp; keyboard”.</p></div>
+</div>
+
 <div id="toast" role="status"></div>
 <div id="menu"><div class="sheet">
   <h3 id="mhost">This PC</h3><p>Connected over your local network. <span id="mver"></span></p>
@@ -133,6 +153,7 @@
   <a class="btn primary" href="/guide">Show me how</a>
 </div>
 
+<script src="/pad.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -141,7 +162,7 @@
   const q = {};
   (location.hash.slice(1).split('&')).forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
   const bridge = window.AndroidBridge;
-  let retryNow = false, legacy = null, deviceId = null, token = null, pairCode = null, triedLegacy = false;
+  let inputOk = false, padMounted = false, retryNow = false, legacy = null, deviceId = null, token = null, pairCode = null, triedLegacy = false;
   const ua = navigator.userAgent, model = (/Android [\d.]+; ([^)]+)\)/.exec(ua) || [])[1];
   const deviceName = q.dn || (model && model.replace(/ Build.*/, '')) || (/iPhone|iPad/.test(ua) ? 'iPhone' : 'Browser');
   try {
@@ -193,7 +214,7 @@
           else { rejected = true; showGate('Not valid', 'That code did not work', 'Scan the QR code shown on the PC again.'); }
         }
       } else if (m.t === 'auth') {
-        if (m.ok) { retry = 500; if (legacy) { try { localStorage.setItem('pr.legacy', legacy); } catch (e) {} } clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); $('gate').classList.remove('show'); }
+        if (m.ok) { inputOk = !!m.input; document.body.classList.toggle('noinput', !inputOk); retry = 500; if (legacy) { try { localStorage.setItem('pr.legacy', legacy); } catch (e) {} } clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); $('gate').classList.remove('show'); }
         else {
           // Only a wrong or removed key unpairs; a lockout is temporary and must not wipe a valid pairing.
           rejected = true;
@@ -276,6 +297,22 @@
   const bar = $('bar');
   bar.oninput = () => { seeking = true; $('cur').textContent = fmt(+bar.value); bar.style.setProperty('--p', (100 * bar.value / bar.max) + '%'); };
   bar.onchange = () => { send({ t: 'cmd', c: 'seek_abs', pos_ms: +bar.value }); setTimeout(() => seeking = false, 700); };
+
+  // ---- Media | Touchpad ----
+  const padApi = {
+    move: (dx, dy) => send({ t: 'cmd', c: 'mouse_move', dx, dy }),
+    button: (button, action) => send({ t: 'cmd', c: 'mouse_button', button, action }),
+    scroll: (dx, dy) => send({ t: 'cmd', c: 'scroll', dx, dy }),
+    text: s => send({ t: 'cmd', c: 'text', s }),
+    key: (name, mods) => send({ t: 'cmd', c: 'key', name, mods: mods || [] }),
+  };
+  function showView(v) {
+    document.body.classList.toggle('touchmode', v === 'touch');
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    if (v === 'touch' && !padMounted) { padMounted = true; window.mountPad($('touchHost'), padApi, {}); }
+    buzz(10);
+  }
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.v));
 
   $('more').onclick = () => $('menu').classList.add('show');
   $('close').onclick = () => $('menu').classList.remove('show');

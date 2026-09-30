@@ -194,7 +194,7 @@ impl Auth {
         if approve {
             let token = config::new_token();
             i.cfg.devices.retain(|d| d.id != p.id);
-            i.cfg.devices.push(Device { id: p.id.clone(), name: p.name, token: token.clone(), created: now_s(), last_seen: now_s() });
+            i.cfg.devices.push(Device { id: p.id.clone(), name: p.name, token: token.clone(), created: now_s(), last_seen: now_s(), input_allowed: true });
             i.decisions.insert(p.id, Decision::Approved(token));
             self.save(&i);
         } else {
@@ -224,6 +224,20 @@ impl Auth {
             self.save(&i);
         }
         changed
+    }
+
+    /// Live check (so the dashboard switch takes effect at once). Shared-secret phones cannot be
+    /// identified, so they never get mouse and keyboard.
+    pub fn input_allowed(&self, device: &str) -> bool {
+        self.inner.lock().unwrap().cfg.devices.iter().find(|d| d.id == device).is_some_and(|d| d.input_allowed)
+    }
+
+    pub fn set_input_allowed(&self, device: &str, on: bool) -> bool {
+        let mut i = self.inner.lock().unwrap();
+        let Some(d) = i.cfg.devices.iter_mut().find(|d| d.id == device) else { return false };
+        d.input_allowed = on;
+        self.save(&i);
+        true
     }
 
     pub fn revoke_all(&self) {
@@ -346,6 +360,19 @@ mod tests {
         a.revoke_all();
         assert_eq!(a.check_legacy("legacy-secret"), Err(AuthErr::LegacyOff));
         assert!(!a.legacy_enabled());
+    }
+
+    #[test]
+    fn input_permission_is_per_phone_and_live() {
+        let a = auth(false);
+        let code = a.code();
+        a.request_pairing(&code, "p", "x", "ip").unwrap();
+        a.decide("p", true);
+        assert!(a.input_allowed("p"), "on by default");
+        assert!(a.set_input_allowed("p", false));
+        assert!(!a.input_allowed("p"));
+        assert!(!a.input_allowed("unknown"));
+        assert!(!a.set_input_allowed("unknown", true));
     }
 
     #[test]

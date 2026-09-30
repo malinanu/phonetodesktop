@@ -72,7 +72,7 @@
 
 <main>
   <div class="approval" id="approval">
-    <span><b id="apName"></b><br>wants to control this PC's media.</span>
+    <span><b id="apName"></b><br>wants to control this PC's media, mouse and keyboard.</span>
     <button class="btn" id="apAllow">Allow</button><button class="btn ghost" id="apDeny">Deny</button>
   </div>
 
@@ -183,7 +183,11 @@
       const g = el('div', 'grow'); g.append(el('b', null, d.name), el('span', null, d.online ? 'Connected now' : 'Last seen ' + ago(d.last_seen)));
       const b = el('button', 'btn small danger', removing === d.id ? 'Click again to remove' : 'Remove');
       b.onclick = async () => { if (removing !== d.id) { removing = d.id; renderPhones(); setTimeout(() => { if (removing === d.id) { removing = null; renderPhones(); } }, 4000); return; } removing = null; await api('/api/devices/' + encodeURIComponent(d.id), 'DELETE'); refresh(); };
-      r.append(dot, g, b); list.append(r);
+      const sw = el('label', 'switch'), inp = el('input'); inp.type = 'checkbox'; inp.checked = d.input; sw.title = 'Mouse & keyboard';
+      inp.onchange = async () => { await api(`/api/devices/${encodeURIComponent(d.id)}/input`, 'POST', { enabled: inp.checked }); refresh(); };
+      sw.append(inp, el('i'));
+      const lab = el('span', 'dim', 'Mouse & keyboard'); lab.style.cssText = 'font-size:13px;white-space:nowrap';
+      r.append(dot, g, lab, sw, b); list.append(r);
     });
     const lb = $('legacyBox'); lb.textContent = '';
     if (data.legacy) {

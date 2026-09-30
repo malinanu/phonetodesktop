@@ -1,0 +1,20 @@
+/* Touchpad + keyboard. Uses the tokens from base.css. */
+.pad { display:flex; flex-direction:column; gap:10px; height:100%; min-height:0; }
+.pad-surface { flex:1; min-height:160px; border-radius:24px; background:var(--surface); position:relative; touch-action:none; user-select:none; -webkit-user-select:none; overflow:hidden; }
+.pad-surface .hint { position:absolute; inset:0; display:grid; place-content:center; text-align:center; color:var(--ink-dim); font-size:14px; line-height:1.6; padding:20px; pointer-events:none; transition:opacity .4s var(--ease); }
+.pad-surface.used .hint { opacity:0; }
+.pad-surface.scrolling { background:var(--surface-2); }
+.pad-row { display:flex; gap:8px; }
+.pad-row > * { flex:1; min-width:0; }
+.pad-row > .primary { flex:2.4; white-space:nowrap; }
+.pad button { font:600 15px var(--font); border:0; border-radius:16px; background:var(--surface); color:var(--ink); min-height:50px; padding:0 6px; touch-action:manipulation; transition:transform .12s var(--ease), background .15s var(--ease); user-select:none; -webkit-user-select:none; }
+.pad button:active, .pad button.on { transform:scale(.96); background:var(--surface-2); }
+.pad button.mouse { min-height:58px; font-size:16px; }
+.pad button.primary { background:var(--accent); color:var(--on-accent); }
+.pad button.mod.on { background:var(--accent); color:var(--on-accent); }
+.pad button.small { font-size:13px; min-height:44px; }
+.pad-more { display:none; flex-direction:column; gap:8px; }
+.pad-more.open { display:flex; }
+.pad-kb { position:absolute; left:0; bottom:0; width:1px; height:1px; opacity:.01; border:0; padding:0; font-size:16px; background:transparent; color:transparent; caret-color:transparent; }
+.pad-note { color:var(--ink-dim); font-size:12px; text-align:center; min-height:1.2em; }
+.pad svg { width:1.3em; height:1.3em; fill:currentColor; vertical-align:-.3em; }

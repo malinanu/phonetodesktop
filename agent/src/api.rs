@@ -23,6 +23,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/qr/refresh", post(qr_refresh))
         .route("/api/pending/{id}/{verb}", post(decide))
         .route("/api/devices/{id}", delete(remove_device))
+        .route("/api/devices/{id}/input", post(set_input))
         .route("/api/legacy", post(set_legacy))
         .route("/api/unpair-all", post(unpair_all))
         .route("/api/players", get(players))
@@ -59,7 +60,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         .auth
         .devices()
         .into_iter()
-        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online}))
+        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online, "input": d.input_allowed}))
         .collect();
     Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -116,6 +117,18 @@ async fn remove_device(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
     };
     if app.auth.revoke(&id) {
         crate::log::log(&format!("device removed: {id}"));
+        ok()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
+}
+
+async fn set_input(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Path(id): Path<String>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    if app.auth.set_input_allowed(&id, body["enabled"].as_bool().unwrap_or(false)) {
         ok()
     } else {
         StatusCode::NOT_FOUND.into_response()

@@ -95,7 +95,7 @@ pub fn opt_out_of_throttling() {
 pub fn ask_allow(name: &str, ip: &str) -> bool {
     use windows::core::HSTRING;
     use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, IDYES, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO};
-    let msg = format!("\"{name}\" ({ip}) wants to control this PC's media.\n\nAllow it?");
+    let msg = format!("\"{name}\" ({ip}) wants to control this PC's media, mouse and keyboard.\n\nAllow it?");
     unsafe {
         MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from("Phone Remote: new phone"), MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND) == IDYES
     }

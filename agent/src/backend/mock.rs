@@ -1,6 +1,6 @@
 //! Simulated player for development and tests on machines without a supported OS layer.
 
-use super::{Backend, Key, Transport};
+use super::{Backend, Input, Key, Transport};
 use crate::protocol::PlayerInfo;
 use anyhow::Result;
 use std::sync::Mutex;
@@ -103,6 +103,11 @@ impl Backend for MockBackend {
 
     fn media_key(&self, key: Key) -> Result<()> {
         self.inner.lock().unwrap().log.push(format!("key {key:?}"));
+        Ok(())
+    }
+
+    fn input(&self, input: Input) -> Result<()> {
+        self.inner.lock().unwrap().log.push(format!("input {input:?}"));
         Ok(())
     }
 

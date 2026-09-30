@@ -1,7 +1,7 @@
 //! Backend-independent policy: pick the target player, and make seeks reliable by
 //! verifying the effect and escalating to keyboard fallback when a session lies.
 
-use crate::backend::{Backend, Key, Transport};
+use crate::backend::{keys, Backend, ButtonAction, Input, Key, MouseButton, Transport};
 use crate::protocol::{Command, PlayerInfo, State};
 const STATE_TTL: Duration = Duration::from_millis(750);
 use anyhow::{bail, Result};
@@ -10,6 +10,44 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 const BROKEN_TTL: Duration = Duration::from_secs(600);
+
+pub const MAX_TEXT_CHARS: usize = 256;
+const MAX_MOVE: i32 = 300;
+const MAX_SCROLL: i32 = 1200;
+
+/// Validate and clamp a phone's mouse/keyboard command. Nothing from the network reaches the OS
+/// without passing through here.
+pub fn to_input(cmd: &Command) -> Result<Input> {
+    Ok(match cmd {
+        Command::MouseMove { dx, dy } => Input::Move((*dx).clamp(-MAX_MOVE, MAX_MOVE), (*dy).clamp(-MAX_MOVE, MAX_MOVE)),
+        Command::Scroll { dx, dy } => Input::Scroll((*dx).clamp(-MAX_SCROLL, MAX_SCROLL), (*dy).clamp(-MAX_SCROLL, MAX_SCROLL)),
+        Command::MouseButton { button, action } => Input::Button(
+            match button.as_str() {
+                "left" => MouseButton::Left,
+                "right" => MouseButton::Right,
+                "middle" => MouseButton::Middle,
+                other => bail!("unknown mouse button {other:?}"),
+            },
+            match action.as_str() {
+                "click" => ButtonAction::Click,
+                "down" => ButtonAction::Down,
+                "up" => ButtonAction::Up,
+                other => bail!("unknown mouse action {other:?}"),
+            },
+        ),
+        Command::Text { s } => Input::Text(s.chars().filter(|c| *c != '\u{0}').take(MAX_TEXT_CHARS).collect()),
+        Command::Key { name, mods } => {
+            if keys::key(name).is_none() {
+                bail!("unknown key {name:?}");
+            }
+            if mods.len() > 4 || mods.iter().any(|m| keys::modifier(m).is_none()) {
+                bail!("unknown modifier in {mods:?}");
+            }
+            Input::Key { name: name.to_ascii_lowercase(), mods: mods.iter().map(|m| m.to_ascii_lowercase()).collect() }
+        }
+        _ => bail!("not an input command"),
+    })
+}
 
 pub struct Controller {
     backend: Arc<dyn Backend>,
@@ -78,9 +116,17 @@ impl Controller {
         })
     }
 
+    /// Mouse/keyboard path: no state-cache reset, no seek logic, no blocking bookkeeping.
+    pub fn execute_input(&self, cmd: &Command) -> Result<()> {
+        self.backend.input(to_input(cmd)?)
+    }
+
     pub fn execute(&self, cmd: Command) -> Result<()> {
         // Whatever this command does, the next state must be read fresh.
         *self.cached.lock().unwrap() = None;
+        if cmd.is_input() {
+            return self.execute_input(&cmd);
+        }
         match cmd {
             Command::Select { id } => {
                 *self.selected.lock().unwrap() = Some(id);
@@ -94,6 +140,7 @@ impl Controller {
                 Ok(())
             }
             Command::Mute => self.backend.media_key(Key::Mute),
+            Command::MouseMove { .. } | Command::MouseButton { .. } | Command::Scroll { .. } | Command::Text { .. } | Command::Key { .. } => unreachable!("handled above"),
             Command::PlayPause => self.transport(Transport::PlayPause, Key::PlayPause),
             Command::Next => self.transport(Transport::Next, Key::Next),
             Command::Prev => self.transport(Transport::Prev, Key::Prev),
@@ -202,6 +249,33 @@ mod tests {
         c.execute(Command::SeekRel { d: 10 }).unwrap();
         let seeks = b.log().iter().filter(|l| l.starts_with("seek_abs")).count();
         assert_eq!(seeks, 1);
+    }
+
+    #[test]
+    fn input_is_clamped_and_validated() {
+        assert_eq!(to_input(&Command::MouseMove { dx: 5000, dy: -5000 }).unwrap(), Input::Move(300, -300));
+        assert_eq!(to_input(&Command::Scroll { dx: 0, dy: -99999 }).unwrap(), Input::Scroll(0, -1200));
+        let long: String = "é".repeat(1000);
+        let Input::Text(t) = to_input(&Command::Text { s: long }).unwrap() else { panic!() };
+        assert_eq!(t.chars().count(), MAX_TEXT_CHARS);
+        assert!(to_input(&Command::MouseButton { button: "thumb".into(), action: "click".into() }).is_err());
+        assert!(to_input(&Command::MouseButton { button: "left".into(), action: "hold".into() }).is_err());
+        assert!(to_input(&Command::Key { name: "f13".into(), mods: vec![] }).is_err());
+        assert!(to_input(&Command::Key { name: "c".into(), mods: vec!["meta".into()] }).is_err());
+        assert_eq!(
+            to_input(&Command::Key { name: "C".into(), mods: vec!["CTRL".into()] }).unwrap(),
+            Input::Key { name: "c".into(), mods: vec!["ctrl".into()] }
+        );
+    }
+
+    #[test]
+    fn input_reaches_the_backend_without_touching_seek_state() {
+        let (c, b) = ctl(false);
+        c.execute(Command::MouseMove { dx: 3, dy: 4 }).unwrap();
+        c.execute(Command::Text { s: "héllo".into() }).unwrap();
+        let log = b.log();
+        assert!(log.contains(&"input Move(3, 4)".to_string()));
+        assert!(log.iter().any(|l| l.contains("Text(\"héllo\")")));
     }
 
     #[test]

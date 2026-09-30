@@ -42,6 +42,9 @@ pub struct Device {
     pub created: u64,
     #[serde(default)]
     pub last_seen: u64,
+    /// May this phone move the mouse and type? Switchable per phone in the dashboard.
+    #[serde(default = "yes")]
+    pub input_allowed: bool,
 }
 
 fn path() -> Result<PathBuf> {

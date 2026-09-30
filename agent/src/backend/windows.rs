@@ -1,7 +1,7 @@
 //! Windows backend: GSMTC (Windows.Media.Control) for sessions, SendInput for media keys,
 //! and arrow-key injection into the foreground window as the last-resort seek.
 
-use super::{mpc, mpv, vlc, Backend, Key, Transport};
+use super::{keys, mpc, mpv, vlc, Backend, ButtonAction, Input, Key, MouseButton, Transport};
 use crate::protocol::PlayerInfo;
 use anyhow::{anyhow, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,7 +17,9 @@ use windows::Win32::System::Threading::{
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LEFT, VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE,
+    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
+    MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSE_EVENT_FLAGS, MOUSEINPUT,
+    INPUT_MOUSE, VIRTUAL_KEY, VK_LEFT, VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE,
     VK_MEDIA_PREV_TRACK, VK_RIGHT, VK_VOLUME_DOWN, VK_VOLUME_MUTE, VK_VOLUME_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
@@ -419,6 +421,36 @@ impl Backend for WindowsBackend {
         tap(vk, true)
     }
 
+    fn input(&self, input: Input) -> Result<()> {
+        match input {
+            Input::Move(dx, dy) => send(&[mouse(MOUSEEVENTF_MOVE, dx, dy, 0)]),
+            Input::Button(b, action) => {
+                let (down, up) = match b {
+                    MouseButton::Left => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+                    MouseButton::Right => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+                    MouseButton::Middle => (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+                };
+                match action {
+                    ButtonAction::Click => send(&[mouse(down, 0, 0, 0), mouse(up, 0, 0, 0)]),
+                    ButtonAction::Down => send(&[mouse(down, 0, 0, 0)]),
+                    ButtonAction::Up => send(&[mouse(up, 0, 0, 0)]),
+                }
+            }
+            Input::Scroll(dx, dy) => {
+                let mut ev = vec![];
+                if dy != 0 {
+                    ev.push(mouse(MOUSEEVENTF_WHEEL, 0, 0, dy));
+                }
+                if dx != 0 {
+                    ev.push(mouse(MOUSEEVENTF_HWHEEL, 0, 0, dx));
+                }
+                if ev.is_empty() { Ok(()) } else { send(&ev) }
+            }
+            Input::Text(text) => type_text(&text),
+            Input::Key { name, mods } => chord(&name, &mods),
+        }
+    }
+
     fn focused_seek(&self, secs: i64) -> Result<i64> {
         let Some(exe) = foreground_exe() else { return Ok(0) };
         let Some(&(_, step)) = KEY_SEEK_TABLE.iter().find(|(n, _)| exe.eq_ignore_ascii_case(n)) else {
@@ -432,6 +464,68 @@ impl Backend for WindowsBackend {
         }
         Ok(secs.signum() * presses * step)
     }
+}
+
+fn mouse(flags: MOUSE_EVENT_FLAGS, dx: i32, dy: i32, data: i32) -> INPUT {
+    INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 { mi: MOUSEINPUT { dx, dy, mouseData: data as u32, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+    }
+}
+
+fn send(inputs: &[INPUT]) -> Result<()> {
+    let sent = unsafe { SendInput(inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent as usize != inputs.len() {
+        return Err(anyhow!("Windows blocked the input (an elevated window or the lock screen has focus)"));
+    }
+    Ok(())
+}
+
+/// Type any Unicode text: each UTF-16 unit is sent as a Unicode key event, so no keyboard layout is involved.
+fn type_text(text: &str) -> Result<()> {
+    let mut ev = Vec::new();
+    for unit in text.encode_utf16() {
+        match unit {
+            0x000A | 0x000D => {
+                // Enter is a real key, not a Unicode character.
+                ev.push(key_event(VIRTUAL_KEY(0x0D), KEYBD_EVENT_FLAGS(0)));
+                ev.push(key_event(VIRTUAL_KEY(0x0D), KEYEVENTF_KEYUP));
+            }
+            0x0009 => {
+                ev.push(key_event(VIRTUAL_KEY(0x09), KEYBD_EVENT_FLAGS(0)));
+                ev.push(key_event(VIRTUAL_KEY(0x09), KEYEVENTF_KEYUP));
+            }
+            u => {
+                for up in [false, true] {
+                    ev.push(INPUT {
+                        r#type: INPUT_KEYBOARD,
+                        Anonymous: INPUT_0 {
+                            ki: KEYBDINPUT {
+                                wVk: VIRTUAL_KEY(0),
+                                wScan: u,
+                                dwFlags: KEYEVENTF_UNICODE | if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    });
+                }
+            }
+        }
+    }
+    if ev.is_empty() { Ok(()) } else { send(&ev) }
+}
+
+/// Press the modifiers, tap the key, release the modifiers in reverse order.
+fn chord(name: &str, mods: &[String]) -> Result<()> {
+    let (vk, ext) = keys::key(name).ok_or_else(|| anyhow!("unknown key {name}"))?;
+    let ext_flag = if ext { KEYEVENTF_EXTENDEDKEY } else { KEYBD_EVENT_FLAGS(0) };
+    let mvk: Vec<VIRTUAL_KEY> = mods.iter().filter_map(|m| keys::modifier(m)).map(VIRTUAL_KEY).collect();
+    let mut ev: Vec<INPUT> = mvk.iter().map(|m| key_event(*m, KEYBD_EVENT_FLAGS(0))).collect();
+    ev.push(key_event(VIRTUAL_KEY(vk), ext_flag));
+    ev.push(key_event(VIRTUAL_KEY(vk), ext_flag | KEYEVENTF_KEYUP));
+    ev.extend(mvk.iter().rev().map(|m| key_event(*m, KEYEVENTF_KEYUP)));
+    send(&ev)
 }
 
 fn key_event(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {

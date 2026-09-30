@@ -21,6 +21,8 @@ const PAIR_PAGE: &str = include_str!("../web/pair.html");
 const GUIDE: &str = include_str!("../../shared/guide.html");
 const BASE_CSS: &str = include_str!("../../shared/base.css");
 const FONT: &[u8] = include_bytes!("../../shared/font.woff2");
+const PAD_JS: &str = include_str!("../../shared/pad.js");
+const PAD_CSS: &str = include_str!("../../shared/pad.css");
 
 /// Called when a new phone asks to pair (the tray shows an Allow/Deny prompt).
 pub type PendingHook = Arc<dyn Fn(Arc<App>, Pending) + Send + Sync>;
@@ -124,6 +126,8 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/debug", get(debug_page))
         .route("/guide", get(|| async { Html(GUIDE) }))
         .route("/base.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "max-age=3600")], BASE_CSS) }))
+        .route("/pad.js", get(|| async { ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], PAD_JS) }))
+        .route("/pad.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], PAD_CSS) }))
         .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
         .route("/dashboard", get(dashboard_page))
         .route("/health", get(|| async {
@@ -197,6 +201,27 @@ async fn ws_upgrade(ws: WebSocketUpgrade, ConnectInfo(peer): ConnectInfo<SocketA
     ws.on_upgrade(move |s| session(s, app, peer))
 }
 
+/// Allows `per_sec` events per second; the excess is dropped.
+struct Bucket {
+    per_sec: u32,
+    window: Instant,
+    used: u32,
+}
+
+impl Bucket {
+    fn new(per_sec: u32) -> Self {
+        Bucket { per_sec, window: Instant::now(), used: 0 }
+    }
+    fn allow(&mut self) -> bool {
+        if self.window.elapsed() >= Duration::from_secs(1) {
+            self.window = Instant::now();
+            self.used = 0;
+        }
+        self.used += 1;
+        self.used <= self.per_sec
+    }
+}
+
 fn text(s: impl Into<String>) -> Message {
     Message::Text(s.into().into())
 }
@@ -213,8 +238,11 @@ async fn session(mut sock: WebSocket, app: Arc<App>, peer: SocketAddr) {
         app.auth.set_online(d, true);
     }
     let mut rx = app.tx.subscribe();
+    let mut bucket = Bucket::new(400);
+    let mut last_input_err = Instant::now() - Duration::from_secs(5);
     crate::log::log(&format!("phone connected: {}", login.name));
-    let _ = sock.send(text(r#"{"t":"auth","ok":true}"#)).await;
+    let caps = login.device.as_deref().is_some_and(|d| app.auth.input_allowed(d));
+    let _ = sock.send(text(serde_json::json!({"t":"auth","ok":true,"input":caps}).to_string())).await;
     app.notify.notify_one();
     let initial = rx.borrow().clone();
     if !initial.is_empty() {
@@ -238,6 +266,25 @@ async fn session(mut sock: WebSocket, app: Arc<App>, peer: SocketAddr) {
                 let Some(Ok(msg)) = msg else { break };
                 let Message::Text(t) = msg else { if matches!(msg, Message::Close(_)) { break } else { continue } };
                 match serde_json::from_str::<ClientMsg>(t.as_str()) {
+                    Ok(ClientMsg::Cmd(cmd)) if cmd.is_input() => {
+                        // Mouse/keyboard: checked live, run inline, answer only on failure.
+                        let allowed = login.device.as_deref().is_some_and(|d| app.auth.input_allowed(d));
+                        let problem = if !allowed {
+                            Some("Mouse and keyboard are turned off for this phone (PC dashboard → Phones).".to_string())
+                        } else if !bucket.allow() {
+                            None // over the rate limit: drop silently, the phone coalesces anyway
+                        } else {
+                            app.controller.execute_input(&cmd).err().map(|e| e.to_string())
+                        };
+                        if let Some(err) = problem {
+                            // One error per second at most, so a blocked window cannot flood the phone.
+                            if last_input_err.elapsed() > Duration::from_secs(1) {
+                                last_input_err = Instant::now();
+                                let m = serde_json::json!({"t":"ack","ok":false,"err":err}).to_string();
+                                if sock.send(text(m)).await.is_err() { break; }
+                            }
+                        }
+                    }
                     Ok(ClientMsg::Cmd(cmd)) => {
                         // A device removed from the PC loses control immediately.
                         if let Some(d) = &login.device {
@@ -378,6 +425,17 @@ pub async fn poll_state(app: Arc<App>) {
                 app.tx.send_replace(json);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bucket_limits_per_second() {
+        let mut b = Bucket::new(3);
+        assert_eq!((0..5).filter(|_| b.allow()).count(), 3);
     }
 }
 

@@ -55,4 +55,21 @@ pub enum Command {
     Volume { d: i32 },
     Mute,
     Select { id: String },
+    // ---- mouse and keyboard (need the phone's "mouse & keyboard" permission) ----
+    /// Relative cursor move in pixels.
+    MouseMove { dx: i32, dy: i32 },
+    /// `button`: left|right|middle. `action`: click|down|up.
+    MouseButton { button: String, action: String },
+    /// Wheel units: 120 is one notch. Positive `dy` scrolls up.
+    Scroll { dx: i32, dy: i32 },
+    /// Typed text (any Unicode).
+    Text { s: String },
+    /// A named key with optional modifiers: ctrl, alt, shift, win.
+    Key { name: String, #[serde(default)] mods: Vec<String> },
+}
+
+impl Command {
+    pub fn is_input(&self) -> bool {
+        matches!(self, Command::MouseMove { .. } | Command::MouseButton { .. } | Command::Scroll { .. } | Command::Text { .. } | Command::Key { .. })
+    }
 }
