@@ -41,7 +41,7 @@
   .row .grow { flex:1; min-width:0; } .row .grow b { font-size:16px; font-weight:650; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .row .grow span { color:var(--ink-dim); font-size:14px; }
   .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; } .dot.on { background:var(--good); }
   .chip { font-size:13px; font-weight:650; padding:5px 11px; border-radius:99px; background:var(--surface-2); color:var(--ink-dim); }
-  .chip.ready { background:color-mix(in oklab,var(--good) 18%,transparent); color:var(--good); } .chip.restart { background:color-mix(in oklab,var(--accent) 20%,transparent); color:var(--accent); }
+  .chip.ready { background:color-mix(in oklab,var(--good) 18%,transparent); color:var(--good); } .chip.restart { background:color-mix(in oklab,var(--accent) 20%,transparent); color:var(--accent-text); }
   .btn.small { padding:8px 14px; font-size:14px; } .btn.danger { color:var(--bad); } .btn.primary:active { filter:brightness(.92); }
   .empty { color:var(--ink-dim); padding:22px 0; }
   .qrbox { display:grid; grid-template-columns:minmax(0,260px) 1fr; gap:28px; align-items:center; margin-top:10px; }
@@ -60,7 +60,7 @@
   .okline { display:none; align-items:center; gap:10px; margin-top:16px; padding:12px 14px; border-radius:14px; background:color-mix(in oklab,var(--good) 16%,transparent); color:var(--good); font-weight:650; }
   .okline.on { display:flex; animation:in .3s var(--ease); }
   .waiting { display:flex; align-items:center; gap:10px; margin-top:16px; color:var(--ink-dim); font-size:15px; }
-  .waiting .sp { width:16px; height:16px; border-radius:50%; border:2.5px solid var(--surface-2); border-top-color:var(--accent); animation:spin .9s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
+  .waiting .sp { width:16px; height:16px; border-radius:50%; border:2.5px solid var(--surface-2); border-top-color:var(--accent-text); animation:spin .9s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
   #toast { position:fixed; right:24px; bottom:24px; background:var(--ink); color:var(--bg); padding:12px 18px; border-radius:14px; font-weight:600; font-size:15px; opacity:0; transform:translateY(12px); transition:.25s var(--ease); pointer-events:none; z-index:20; max-width:min(420px,90vw); }
   #toast.show { opacity:1; transform:none; }
   .emptybox { padding:26px 0; color:var(--ink-dim); } .emptybox b { display:block; color:var(--ink); font-size:17px; margin-bottom:4px; }

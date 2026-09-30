@@ -3,7 +3,7 @@ package app.phoneremote
 /** One colour set for the native shell. Values match the tokens in shared/base.css. */
 data class Palette(
     val bg: Int, val card: Int, val card2: Int, val fg: Int, val dim: Int,
-    val acc: Int, val onAcc: Int, val bad: Int, val good: Int,
+    val acc: Int, val accText: Int, val onAcc: Int, val bad: Int, val good: Int,
 )
 
 /** Pure theme logic (no Android classes), so it is covered by plain JVM tests. */
@@ -11,12 +11,12 @@ object Theme {
     val DARK = Palette(
         bg = 0xFF15110E.toInt(), card = 0xFF1F1A16.toInt(), card2 = 0xFF2A231D.toInt(),
         fg = 0xFFF5EBDD.toInt(), dim = 0xFFB3A594.toInt(),
-        acc = 0xFFFF9A3C.toInt(), onAcc = 0xFF1B1006.toInt(), bad = 0xFFFF8A7A.toInt(), good = 0xFF86D9A6.toInt(),
+        acc = 0xFFFF9A3C.toInt(), accText = 0xFFFF9A3C.toInt(), onAcc = 0xFF1B1006.toInt(), bad = 0xFFFF8A7A.toInt(), good = 0xFF86D9A6.toInt(),
     )
     val LIGHT = Palette(
         bg = 0xFFF7F1E8.toInt(), card = 0xFFFFFAF2.toInt(), card2 = 0xFFEFE6D8.toInt(),
         fg = 0xFF241C14.toInt(), dim = 0xFF6C6050.toInt(),
-        acc = 0xFFE8710A.toInt(), onAcc = 0xFF1B1006.toInt(), bad = 0xFFC2402F.toInt(), good = 0xFF1F8A52.toInt(),
+        acc = 0xFFE8710A.toInt(), accText = 0xFFA04A00.toInt(), onAcc = 0xFF1B1006.toInt(), bad = 0xFFB0352A.toInt(), good = 0xFF17703F.toInt(),
     )
 
     /** `setting` is "system", "dark" or "light" (anything else counts as system). */

@@ -35,6 +35,9 @@ class ThemeTest {
                 Triple("dim text on card", p.dim, p.card),
                 Triple("button text on accent", p.onAcc, p.acc),
                 Triple("error text on background", p.bad, p.bg),
+                Triple("accent text on background", p.accText, p.bg),
+                Triple("accent text on card", p.accText, p.card),
+                Triple("success text on background", p.good, p.bg),
             )) {
                 val c = Theme.contrast(fg, bg)
                 assertTrue("$name: $label has contrast $c", c >= 4.5)

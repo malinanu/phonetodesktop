@@ -43,13 +43,14 @@ class MainActivity : Activity() {
         var FG = 0
         var DIM = 0
         var ACC = 0
+        var ACC_TEXT = 0
         var ON_ACC = 0
         var BAD = 0
         var GOOD = 0
 
         fun apply(p: Palette) {
             BG = p.bg; CARD = p.card; CARD2 = p.card2; FG = p.fg; DIM = p.dim
-            ACC = p.acc; ON_ACC = p.onAcc; BAD = p.bad; GOOD = p.good
+            ACC = p.acc; ACC_TEXT = p.accText; ON_ACC = p.onAcc; BAD = p.bad; GOOD = p.good
         }
     }
 
@@ -205,7 +206,7 @@ class MainActivity : Activity() {
             "Scan the code, then tap Allow on the PC",
         ).forEachIndexed { i, t ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
-            row.addView(label("${i + 1}", 26f, C.ACC, bold = true), lp(dp(36), WRAP_CONTENT))
+            row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
             row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
             col.addView(row)
         }
@@ -401,7 +402,7 @@ class MainActivity : Activity() {
     }
 
     private fun styleNav(item: LinearLayout, selected: Boolean) {
-        val color = if (selected) C.ACC else C.DIM
+        val color = if (selected) C.ACC_TEXT else C.DIM
         (item.getChildAt(0) as android.widget.ImageView).setColorFilter(color)
         (item.getChildAt(1) as TextView).setTextColor(color)
     }
@@ -445,7 +446,7 @@ class MainActivity : Activity() {
 
     private fun card(title: String, body: String, action: String?, onAction: () -> Unit): LinearLayout {
         val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = bg(C.CARD, 18); setPadding(dp(16), dp(14), dp(16), dp(14)) }
-        c.addView(label(title, 13f, C.ACC, bold = true))
+        c.addView(label(title, 13f, C.ACC_TEXT, bold = true))
         c.addView(label(body, 14f).apply { setPadding(0, dp(4), 0, if (action != null) dp(10) else 0) })
         if (action != null) c.addView(button(action) { onAction() }.apply { background = bg(C.CARD2); minHeight = dp(44) })
         return c

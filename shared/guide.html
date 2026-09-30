@@ -25,7 +25,7 @@
   .seg button[aria-pressed=true] { background:var(--surface-2); color:var(--ink); }
   ol.steps { list-style:none; padding:0; margin:18px 0 0; counter-reset:s; }
   ol.steps li { counter-increment:s; display:grid; grid-template-columns:44px 1fr; gap:4px 12px; padding:18px 0; border-top:1px solid var(--line); }
-  ol.steps li::before { content:counter(s); grid-row:span 2; font-size:34px; font-weight:800; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums; }
+  ol.steps li::before { content:counter(s); grid-row:span 2; font-size:34px; font-weight:800; line-height:1; color:var(--accent-text); font-variant-numeric:tabular-nums; }
   ol.steps b { font-size:17px; font-weight:650; }
   ol.steps span { color:var(--ink-dim); }
   .path { display:none; } .path.on { display:block; }
@@ -33,7 +33,7 @@
   details { border-top:1px solid var(--line); padding:14px 0; }
   details:last-of-type { border-bottom:1px solid var(--line); }
   summary { cursor:pointer; font-weight:600; font-size:16px; list-style:none; display:flex; justify-content:space-between; gap:12px; }
-  summary::after { content:"+"; color:var(--accent); font-size:22px; line-height:1; transition:transform .2s var(--ease); }
+  summary::after { content:"+"; color:var(--accent-text); font-size:22px; line-height:1; transition:transform .2s var(--ease); }
   details[open] summary::after { transform:rotate(45deg); }
   details p { color:var(--ink-dim); margin:10px 0 2px; }
   figure { margin:26px 0 8px; }
@@ -42,7 +42,7 @@
   .flow li b { font-size:17px; } .flow li span { color:var(--ink-dim); font-size:14px; text-align:right; }
   .flow li.hot { background:var(--accent); color:var(--on-accent); } .flow li.hot span { color:var(--on-accent); opacity:.8; }
   .flow li.link { background:none; padding:6px 0 6px 20px; color:var(--ink-dim); font-size:13px; border-left:2px dotted var(--line); margin-left:18px; border-radius:0; display:block; }
-  .flow li.link::before { content:"↓  "; color:var(--accent); font-weight:700; }
+  .flow li.link::before { content:"↓  "; color:var(--accent-text); font-weight:700; }
   figcaption { color:var(--ink-dim); font-size:14px; margin-top:8px; }
   .layers { list-style:none; padding:0; margin:14px 0 0; }
   .layers li { padding:16px 0; border-top:1px solid var(--line); }
@@ -51,7 +51,7 @@
   table { width:100%; border-collapse:collapse; font-size:14px; margin-top:14px; }
   th,td { text-align:left; padding:10px 8px 10px 0; border-top:1px solid var(--line); vertical-align:top; }
   th { color:var(--ink-dim); font-weight:600; font-size:12px; letter-spacing:.08em; text-transform:uppercase; border-top:0; }
-  .yes { color:var(--good); font-weight:600; } .maybe { color:var(--accent); font-weight:600; }
+  .yes { color:var(--good); font-weight:600; } .maybe { color:var(--accent-text); font-weight:600; }
   .cta { margin:40px 0 0; }
 </style>
 </head>

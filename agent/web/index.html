@@ -80,7 +80,7 @@
   .banner.show { display:flex; animation:in .25s var(--ease); } @keyframes in { from { opacity:0; transform:translateY(-6px); } }
   .banner .acts { display:flex; gap:8px; flex-wrap:wrap; } .btn.small { padding:9px 14px; font-size:14px; min-height:44px; }
   .now { position:relative; }
-  .badge { position:absolute; right:0; top:30%; font-size:34px; font-weight:800; letter-spacing:-.03em; color:var(--accent); opacity:0; transform:translateY(8px); pointer-events:none; font-variant-numeric:tabular-nums; }
+  .badge { position:absolute; right:0; top:30%; font-size:34px; font-weight:800; letter-spacing:-.03em; color:var(--accent-text); opacity:0; transform:translateY(8px); pointer-events:none; font-variant-numeric:tabular-nums; }
   .badge.show { animation:pop .9s var(--ease) forwards; }
   @keyframes pop { 0% { opacity:0; transform:translateY(10px); } 15% { opacity:1; transform:translateY(0); } 70% { opacity:1; } 100% { opacity:0; transform:translateY(-6px); } }
   .volrow { display:flex; align-items:center; gap:12px; margin-top:12px; }
@@ -90,7 +90,7 @@
   .volrow input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:4px; background:linear-gradient(to right,var(--accent) var(--p,0%),var(--surface-2) var(--p,0%)); }
   .volrow input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; margin-top:-8px; border-radius:50%; background:var(--accent); border:0; }
   .volval { width:3em; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-dim); font-size:14px; }
-  #gate .spin { display:none; width:28px; height:28px; border-radius:50%; border:3px solid var(--surface-2); border-top-color:var(--accent); animation:spin .9s linear infinite; }
+  #gate .spin { display:none; width:28px; height:28px; border-radius:50%; border:3px solid var(--surface-2); border-top-color:var(--accent-text); animation:spin .9s linear infinite; }
   #gate.busy .spin { display:block; } @keyframes spin { to { transform:rotate(360deg); } }
   #gate .btn { align-self:flex-start; min-height:48px; }
   #gate .btn[hidden] { display:none; }
