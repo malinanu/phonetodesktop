@@ -3,122 +3,130 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#0e0f13">
+<meta name="theme-color" content="#15110e">
 <title>Phone Remote</title>
+<link rel="stylesheet" href="/base.css">
 <style>
-  :root { --bg:#0e0f13; --card:#181a21; --card2:#20232c; --fg:#eef0f6; --dim:#8b90a0; --acc:#5b8cff; --ok:#3ecf8e; --bad:#ff6b6b; --r:22px; }
-  @media (prefers-color-scheme: light) { :root { --bg:#f3f4f8; --card:#fff; --card2:#eceef5; --fg:#14161c; --dim:#666b7a; } }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   html,body { height:100%; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px system-ui,sans-serif; display:flex; flex-direction:column;
-         padding:max(12px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom)); max-width:520px; margin:0 auto; user-select:none; }
+  body { display:flex; flex-direction:column; max-width:520px; margin:0 auto; user-select:none; touch-action:manipulation;
+         padding:max(12px,env(safe-area-inset-top)) 22px max(18px,env(safe-area-inset-bottom)); }
   header { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:44px; }
-  .pill { display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border-radius:99px; background:var(--card); font-size:13px; color:var(--dim); max-width:60%; }
-  .pill span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #dot { width:8px; height:8px; border-radius:50%; background:var(--bad); flex:none; }
-  #dot.on { background:var(--ok); }
-  .hdr-r { display:flex; gap:8px; align-items:center; }
-  select { background:var(--card); color:var(--fg); border:0; border-radius:99px; padding:8px 12px; font-size:13px; max-width:140px; }
-  .icon-btn { width:40px; height:40px; border-radius:50%; border:0; background:var(--card); color:var(--dim); display:grid; place-items:center; }
-  svg { width:1em; height:1em; fill:currentColor; display:block; }
+  #status { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:500; color:var(--ink-dim); min-width:0; }
+  #status span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #dot { width:8px; height:8px; border-radius:50%; background:var(--bad); flex:none; transition:background .3s var(--ease); }
+  #dot.on { background:var(--good); }
+  .hdr-r { display:flex; gap:4px; align-items:center; }
+  select { font:500 13px var(--font); background:var(--surface); color:var(--ink); border:0; border-radius:99px; padding:9px 12px; max-width:130px; }
+  .ib { width:44px; height:44px; border-radius:50%; border:0; background:transparent; color:var(--ink-dim); display:grid; place-items:center; font-size:22px; text-decoration:none; }
+  .ib:active { background:var(--surface); }
 
-  .now { flex:1; display:flex; flex-direction:column; justify-content:center; min-height:0; padding:12px 0; }
-  .art { width:min(46vw,190px); aspect-ratio:1; margin:0 auto 20px; border-radius:28px; background:linear-gradient(140deg,var(--acc),#8a5bff);
-         display:grid; place-items:center; color:#fff; font-size:64px; box-shadow:0 12px 32px rgba(91,140,255,.28); }
-  .art.idle { background:var(--card); color:var(--dim); box-shadow:none; }
-  #title { font-size:22px; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #artist { color:var(--dim); text-align:center; margin-top:4px; min-height:1.4em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
-  .seek { margin-top:22px; }
-  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:32px; background:transparent; margin:0; }
-  input[type=range]::-webkit-slider-runnable-track { height:6px; border-radius:6px; background:linear-gradient(to right,var(--acc) var(--p,0%),var(--card2) var(--p,0%)); }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; margin-top:-8px; border-radius:50%; background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.4); }
-  input[type=range]:disabled { opacity:.35; }
-  .times { display:flex; justify-content:space-between; font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; margin-top:-2px; }
+  .now { flex:1; display:flex; flex-direction:column; justify-content:flex-end; min-height:0; padding:8px 0 28px; }
+  .app { display:flex; align-items:center; gap:10px; margin-bottom:14px; min-height:14px; }
+  #title { font-size:clamp(30px,9vw,40px); font-weight:750; letter-spacing:-.03em; line-height:1.05; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; text-wrap:balance; }
+  #artist { color:var(--ink-dim); margin-top:8px; font-size:17px; min-height:1.5em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .seek { margin-top:30px; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:30px; background:transparent; margin:0; }
+  input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:4px; background:linear-gradient(to right,var(--accent) var(--p,0%),var(--surface-2) var(--p,0%)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; margin-top:-6px; border-radius:50%; background:var(--accent); border:0; transition:transform .15s var(--ease); }
+  input[type=range]:active::-webkit-slider-thumb { transform:scale(1.35); }
+  input[type=range]:disabled { opacity:.3; }
+  .times { display:flex; justify-content:space-between; font-size:13px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
 
-  .controls { display:grid; grid-template-columns:1fr 1fr 1.5fr 1fr 1fr; gap:10px; align-items:center; margin-top:8px; }
-  button.c { border:0; border-radius:var(--r); background:var(--card); color:var(--fg); aspect-ratio:1; display:grid; place-items:center; font-size:26px; cursor:pointer; position:relative; transition:transform .08s, background .15s; }
-  button.c:active { transform:scale(.92); background:var(--card2); }
-  button.c .lbl { position:absolute; font-size:10px; font-weight:800; }
-  button.c.main { background:var(--acc); color:#fff; font-size:38px; border-radius:50%; box-shadow:0 8px 24px rgba(91,140,255,.4); }
-  button.c.main:active { background:#4677f0; }
-  .sub { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
-  button.s { border:0; border-radius:16px; background:var(--card); color:var(--fg); height:52px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
-  button.s:active { background:var(--card2); transform:scale(.96); }
-  button.s svg { font-size:20px; }
-  body.off .controls, body.off .sub, body.off .seek { opacity:.4; pointer-events:none; }
+  .transport { display:grid; grid-template-columns:1fr 1fr 1.7fr 1fr 1fr; gap:10px; align-items:center; }
+  .t { border:0; border-radius:20px; background:var(--surface); color:var(--ink); aspect-ratio:1; display:grid; place-items:center; font-size:24px; cursor:pointer; position:relative; transition:transform .12s var(--ease), background .15s var(--ease); }
+  .t:active { transform:scale(.95); background:var(--surface-2); }
+  .t .n { position:absolute; font-size:9px; font-weight:800; margin-top:2px; }
+  .t.main { background:var(--accent); color:var(--on-accent); border-radius:50%; font-size:40px; }
+  .t.main:active { background:var(--accent); filter:brightness(.92); }
+  .tools { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .grp { display:flex; background:var(--surface); border-radius:16px; overflow:hidden; }
+  .grp button { flex:1; height:54px; border:0; background:transparent; color:var(--ink); font:600 14px var(--font); display:grid; place-items:center; font-size:20px; cursor:pointer; transition:background .15s var(--ease); }
+  .grp button + button { border-left:1px solid var(--bg); }
+  .grp button:active { background:var(--surface-2); }
+  .grp button.txt { font-size:14px; }
+  body.off .transport, body.off .tools, body.off .seek { opacity:.35; pointer-events:none; }
+  .transport, .tools, .seek { transition:opacity .3s var(--ease); }
 
-  #toast { position:fixed; left:50%; bottom:max(24px,env(safe-area-inset-bottom)); transform:translate(-50%,20px); background:#2b2f3a; color:#fff; padding:12px 18px; border-radius:14px; font-size:14px; opacity:0; transition:.2s; pointer-events:none; max-width:88vw; text-align:center; }
+  #toast { position:fixed; left:50%; bottom:max(28px,env(safe-area-inset-bottom)); transform:translate(-50%,16px); background:var(--ink); color:var(--bg); padding:12px 18px; border-radius:14px; font-size:14px; font-weight:500; opacity:0; transition:.25s var(--ease); pointer-events:none; max-width:88vw; text-align:center; }
   #toast.show { opacity:1; transform:translate(-50%,0); }
-  #menu { position:fixed; inset:0; display:none; background:rgba(0,0,0,.5); align-items:flex-end; justify-content:center; }
+  #menu { position:fixed; inset:0; display:none; background:rgba(10,7,4,.6); align-items:flex-end; justify-content:center; }
   #menu.show { display:flex; }
-  #menu .sheet { background:var(--card); width:100%; max-width:520px; border-radius:24px 24px 0 0; padding:20px 20px max(24px,env(safe-area-inset-bottom)); }
-  #menu h3 { margin:0 0 4px; } #menu p { margin:0 0 16px; color:var(--dim); font-size:14px; }
-  #menu button { width:100%; height:50px; border:0; border-radius:14px; font-size:16px; font-weight:600; margin-top:8px; background:var(--card2); color:var(--fg); }
-  #menu button.danger { color:var(--bad); }
-  #gate { position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px; gap:12px; }
-  #gate.show { display:flex; } #gate h2 { margin:0; } #gate p { color:var(--dim); max-width:26em; margin:0; line-height:1.5; }
-  #gate .art { font-size:44px; width:110px; margin-bottom:8px; }
+  .sheet { background:var(--surface); width:100%; max-width:520px; border-radius:26px 26px 0 0; padding:24px 22px max(24px,env(safe-area-inset-bottom)); animation:up .28s var(--ease); }
+  @keyframes up { from { transform:translateY(30px); opacity:0; } }
+  .sheet h3 { font-size:22px; } .sheet p { margin:4px 0 14px; color:var(--ink-dim); font-size:15px; }
+  .sheet .btn { width:100%; justify-content:center; margin-top:8px; }
+  .sheet .danger { color:var(--bad); }
+  #gate { position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; justify-content:center; padding:32px 28px; gap:14px; max-width:520px; margin:0 auto; }
+  #gate.show { display:flex; } #gate h2 { font-size:34px; } #gate p { color:var(--ink-dim); margin:0; font-size:17px; }
+  #gate .btn { align-self:flex-start; margin-top:10px; }
 </style>
 </head>
 <body class="off">
-<svg width="0" height="0" style="position:absolute">
-  <defs>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
-    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></symbol>
-    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zM9.5 12 18 18V6z"/></symbol>
-    <symbol id="i-next" viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></symbol>
-    <symbol id="i-back" viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></symbol>
-    <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M12 5V2l5 4-5 4V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/></symbol>
-    <symbol id="i-volup" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></symbol>
-    <symbol id="i-voldn" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></symbol>
-    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.5 2.5c0-.2 0-.5 0-.7zM19 12c0 .9-.2 1.8-.5 2.6l1.5 1.5A9 9 0 0 0 21 12a9 9 0 0 0-7-8.8v2.1A7 7 0 0 1 19 12zM4.3 3 3 4.3 7.7 9H3v6h4l5 5v-6.7l4.2 4.2c-.7.5-1.4.9-2.2 1.1v2.1a9 9 0 0 0 3.6-1.8l2 2 1.3-1.3L12 8zM12 4 9.900 6.100 12 8.200z"/></symbol>
-    <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></symbol>
-  </defs>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zM9.5 12 18 18V6z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M12 5V2l5 4-5 4V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/></symbol>
+  <symbol id="i-volup" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></symbol>
+  <symbol id="i-voldn" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.5 2.5c0-.2 0-.5 0-.7zM19 12c0 .9-.2 1.8-.5 2.6l1.5 1.5A9 9 0 0 0 21 12a9 9 0 0 0-7-8.8v2.1A7 7 0 0 1 19 12zM4.3 3 3 4.3 7.7 9H3v6h4l5 5v-6.7l4.2 4.2c-.7.5-1.4.9-2.2 1.1v2.1a9 9 0 0 0 3.6-1.8l2 2 1.3-1.3L12 8zM12 4 9.9 6.1 12 8.2z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 17h-2v-2h2zm2.100-7.700-.9.9c-.7.7-1.200 1.300-1.200 2.800h-2v-.5c0-1.100.5-2.100 1.200-2.800l1.200-1.300c.4-.3.600-.8.600-1.400 0-1.100-.9-2-2-2s-2 .9-2 2H8a4 4 0 1 1 7.100 2.500z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></symbol>
 </svg>
 
 <header>
-  <div class="pill"><span id="dot"></span><span id="stxt">Connecting…</span></div>
+  <div id="status"><span id="dot"></span><span id="stxt">Connecting…</span></div>
   <div class="hdr-r">
     <select id="players" aria-label="Player" style="display:none"></select>
-    <button class="icon-btn" id="more" aria-label="Menu"><svg><use href="#i-more"/></svg></button>
+    <a class="ib" href="/guide" aria-label="Guide"><svg class="i"><use href="#i-help"/></svg></a>
+    <button class="ib" id="more" aria-label="Menu"><svg class="i"><use href="#i-more"/></svg></button>
   </div>
 </header>
 
 <section class="now">
-  <div class="art idle" id="art">♪</div>
+  <div class="app"><span class="eq" id="eq"><i></i><i></i><i></i><i></i></span><span class="kicker" id="app">Idle</span></div>
   <div id="title">Nothing playing</div>
-  <div id="artist">Start a video or song on your PC</div>
+  <div id="artist">Start a video or a song on your PC.</div>
   <div class="seek">
     <input id="bar" type="range" min="0" max="1" value="0" step="1" disabled aria-label="Seek">
-    <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div class="times"><span id="cur">0:00</span><span id="dur"></span></div>
   </div>
 </section>
 
-<div class="controls">
-  <button class="c" data-c="seek" data-d="-10" aria-label="Back 10 seconds"><svg><use href="#i-back"/></svg><span class="lbl">10</span></button>
-  <button class="c" data-c="prev" aria-label="Previous"><svg><use href="#i-prev"/></svg></button>
-  <button class="c main" id="pp" data-c="play_pause" aria-label="Play or pause"><svg><use href="#i-play"/></svg></button>
-  <button class="c" data-c="next" aria-label="Next"><svg><use href="#i-next"/></svg></button>
-  <button class="c" data-c="seek" data-d="10" aria-label="Forward 10 seconds"><svg><use href="#i-fwd"/></svg><span class="lbl">10</span></button>
+<div class="transport">
+  <button class="t" data-c="seek" data-d="-10" aria-label="Back 10 seconds"><svg class="i"><use href="#i-back"/></svg><span class="n">10</span></button>
+  <button class="t" data-c="prev" aria-label="Previous"><svg class="i"><use href="#i-prev"/></svg></button>
+  <button class="t main" id="pp" data-c="play_pause" aria-label="Play or pause"><svg class="i"><use href="#i-play"/></svg></button>
+  <button class="t" data-c="next" aria-label="Next"><svg class="i"><use href="#i-next"/></svg></button>
+  <button class="t" data-c="seek" data-d="10" aria-label="Forward 10 seconds"><svg class="i"><use href="#i-fwd"/></svg><span class="n">10</span></button>
 </div>
-<div class="sub">
-  <button class="s" data-c="volume" data-d="-2" data-repeat aria-label="Volume down"><svg><use href="#i-voldn"/></svg></button>
-  <button class="s" data-c="volume" data-d="2" data-repeat aria-label="Volume up"><svg><use href="#i-volup"/></svg></button>
-  <button class="s" data-c="mute" aria-label="Mute"><svg><use href="#i-mute"/></svg></button>
-  <button class="s" data-c="seek" data-d="30" aria-label="Forward 30 seconds">+30s</button>
+<div class="tools">
+  <div class="grp">
+    <button data-c="volume" data-d="-2" data-repeat aria-label="Volume down"><svg class="i"><use href="#i-voldn"/></svg></button>
+    <button data-c="mute" aria-label="Mute"><svg class="i"><use href="#i-mute"/></svg></button>
+    <button data-c="volume" data-d="2" data-repeat aria-label="Volume up"><svg class="i"><use href="#i-volup"/></svg></button>
+  </div>
+  <div class="grp">
+    <button class="txt" data-c="seek" data-d="-30" aria-label="Back 30 seconds">−30s</button>
+    <button class="txt" data-c="seek" data-d="30" aria-label="Forward 30 seconds">+30s</button>
+  </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 <div id="menu"><div class="sheet">
   <h3 id="mhost">This PC</h3><p>Connected over your local network.</p>
-  <button id="reconnect">Reconnect</button>
-  <button id="forget" class="danger">Forget this PC</button>
-  <button id="close">Close</button>
+  <a class="btn" href="/guide" style="width:100%;justify-content:center">Guide: how it works</a>
+  <button class="btn" id="reconnect">Reconnect</button>
+  <button class="btn danger" id="forget">Forget this PC</button>
+  <button class="btn" id="close">Close</button>
 </div></div>
 <div id="gate">
-  <div class="art">♪</div>
+  <span class="kicker">Not paired</span>
   <h2>Pair with your PC</h2>
-  <p>On the PC, open the <b>Phone Remote</b> tray icon and choose <b>Pair a phone</b>, then scan the QR code with this phone's camera.</p>
+  <p>On the PC, right-click the Phone Remote tray icon, choose <b>Pair a phone</b>, then scan the QR code with this phone's camera.</p>
+  <a class="btn primary" href="/guide">Show me how</a>
 </div>
 
 <script>
@@ -155,7 +163,7 @@
           // Only a wrong secret unpairs; a lockout is temporary and must not wipe a valid pairing.
           rejected = true;
           if (m.err === 'bad token') { $('gate').classList.add('show'); localStorage.removeItem(KEY); }
-          else setStatus(false, 'Locked out — retry in a minute');
+          else setStatus(false, 'Locked out, retry in a minute');
           ws.close();
         }
       } else if (m.t === 'state') { state = m; recvAt = performance.now(); setStatus(true, m.host); render(true); }
@@ -184,9 +192,9 @@
       if (document.activeElement !== sel && state.current) sel.value = state.current;
       sel.style.display = state.players.length > 1 ? '' : 'none';
       $('title').textContent = p ? (p.title || p.app) : 'Nothing playing';
-      $('artist').textContent = p ? (p.artist || p.app) : 'Start a video or song on your PC';
-      $('art').className = 'art' + (p ? '' : ' idle');
-      $('art').textContent = p ? '♪' : '♪';
+      $('artist').textContent = p ? p.artist : 'Start a video or a song on your PC.';
+      $('app').textContent = p ? p.app + (p.playing ? ' · playing' : ' · paused') : 'Idle';
+      $('eq').classList.toggle('on', !!(p && p.playing));
       setIcon($('pp'), p && p.playing ? 'i-pause' : 'i-play');
       $('bar').disabled = !p || !p.can_seek;
       $('bar').max = p ? Math.max(1, p.dur_ms) : 1;

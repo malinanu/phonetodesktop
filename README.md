@@ -3,9 +3,13 @@
 Control media on a Windows PC from an Android phone, over the local network (Wi-Fi) or Bluetooth.
 
 ```
-agent/     Rust desktop agent (Windows GSMTC backend), serves the phone UI + WebSocket
+agent/     Rust desktop agent (Windows GSMTC backend, tray app), serves the phone UI + WebSocket
+shared/    Design system (base.css, font) and the in-app Guide page, used by both the PC agent and the Android app
 android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
 ```
+
+## Guide pages
+`shared/guide.html` holds two pages, *Get connected in 60 seconds* and *What happens when you tap play*. The PC serves it at `/guide` (tray menu → Guide) and the Android app bundles it (top bar → Guide).
 
 ## Windows agent
 Download `phone-remote.exe` from the CI artifacts (or `cargo build --release` in `agent/`), then:

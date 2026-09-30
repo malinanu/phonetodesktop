@@ -69,16 +69,19 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
 
     let menu = Menu::new();
     let pair = MenuItem::new("Pair a phone (show QR code)", true, None);
+    let guide = MenuItem::new("Guide: how it works and connecting", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&pair, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
-    let (pair_id, auto_id, quit_id) = (pair.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&pair, &auto, &quit); // menu items must outlive the tray on this thread
+    menu.append_items(&[&pair, &guide, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    let (pair_id, guide_id, auto_id, quit_id) = (pair.id().clone(), guide.id().clone(), auto.id().clone(), quit.id().clone());
+    let _keep = (&pair, &guide, &auto, &quit); // menu items must outlive the tray on this thread
 
     let page = pair_page.clone();
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
         if e.id == pair_id {
             crate::open_url(&page);
+        } else if e.id == guide_id {
+            crate::open_url(&page.replace("/pair", "/guide"));
         } else if e.id == auto_id {
             // The checkbox flips itself natively; make the registry match the new state.
             set_autostart(!autostart_enabled());

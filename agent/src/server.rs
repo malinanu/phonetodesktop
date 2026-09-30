@@ -13,6 +13,10 @@ use std::{net::SocketAddr, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use tokio::sync::{watch, Notify};
 
 const INDEX: &str = include_str!("../web/index.html");
+// Shared with the Android app (bundled there as assets).
+const GUIDE: &str = include_str!("../../shared/guide.html");
+const BASE_CSS: &str = include_str!("../../shared/base.css");
+const FONT: &[u8] = include_bytes!("../../shared/font.woff2");
 
 pub struct App {
     pub controller: Arc<Controller>,
@@ -58,6 +62,9 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/", get(|| async { Html(INDEX) }))
         .route("/ws", get(ws_upgrade))
         .route("/pair", get(pair_page))
+        .route("/guide", get(|| async { Html(GUIDE) }))
+        .route("/base.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "max-age=3600")], BASE_CSS) }))
+        .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
         .route("/health", get(|| async { "ok" }))
         .layer(middleware::from_fn(lan_only))
         .with_state(app)
@@ -79,7 +86,7 @@ async fn pair_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, State(app): State
     }
     let qr = |url: &str| {
         qrcode::QrCode::new(url.as_bytes())
-            .map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(300, 300).quiet_zone(true).build())
+            .map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(340, 340).quiet_zone(true).build())
             .unwrap_or_default()
     };
     let main = app.pair_urls.first().cloned().unwrap_or_default();

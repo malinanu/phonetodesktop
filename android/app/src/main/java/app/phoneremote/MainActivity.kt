@@ -36,25 +36,32 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
  */
 class MainActivity : Activity() {
     private object C {
-        val BG = Color.parseColor("#0E0F13")
-        val CARD = Color.parseColor("#181A21")
-        val CARD2 = Color.parseColor("#20232C")
-        val FG = Color.parseColor("#EEF0F6")
-        val DIM = Color.parseColor("#8B90A0")
-        val ACC = Color.parseColor("#5B8CFF")
-        val BAD = Color.parseColor("#FF6B6B")
+        val BG = Color.parseColor("#15110E")
+        val CARD = Color.parseColor("#1F1A16")
+        val CARD2 = Color.parseColor("#2A231D")
+        val FG = Color.parseColor("#F5EBDD")
+        val DIM = Color.parseColor("#B3A594")
+        val ACC = Color.parseColor("#FF9A3C")
+        val ON_ACC = Color.parseColor("#1B1006")
+        val BAD = Color.parseColor("#FF8A7A")
     }
 
     private val prefs by lazy { getSharedPreferences("pr", Context.MODE_PRIVATE) }
     private lateinit var web: WebView
     private lateinit var welcome: View
     private lateinit var banner: TextView
+    private lateinit var guide: WebView
+    private lateinit var guideBtn: Button
+    private var guideOpen = false
     private lateinit var btView: View
     private lateinit var tabWifi: Button
     private lateinit var tabBt: Button
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
     private var loadedHost: String? = null
+
+    private val bold: Typeface by lazy { resources.getFont(R.font.bricolage_bold) }
+    private val medium: Typeface by lazy { resources.getFont(R.font.bricolage_medium) }
 
     private fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
@@ -64,8 +71,8 @@ class MainActivity : Activity() {
         text = t
         isAllCaps = false
         textSize = 15f
-        typeface = Typeface.DEFAULT_BOLD
-        setTextColor(if (filled) Color.WHITE else C.FG)
+        typeface = bold
+        setTextColor(if (filled) C.ON_ACC else C.FG)
         background = bg(if (filled) C.ACC else C.CARD)
         stateListAnimator = null
         minHeight = dp(52)
@@ -77,7 +84,7 @@ class MainActivity : Activity() {
         text = t
         textSize = size
         setTextColor(color)
-        if (bold) typeface = Typeface.DEFAULT_BOLD
+        typeface = if (bold) this@MainActivity.bold else medium
     }
 
     private fun lp(w: Int = MATCH_PARENT, h: Int = WRAP_CONTENT, weight: Float = 0f, m: Int = 0) =
@@ -97,10 +104,12 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(8), dp(12), dp(8))
         }
         top.addView(label("Phone Remote", 20f, bold = true), lp(0, WRAP_CONTENT, 1f))
+        guideBtn = button("Guide") { toggleGuide() }.apply { minHeight = dp(40); textSize = 13f; background = null; setTextColor(C.DIM) }
+        top.addView(guideBtn, lp(WRAP_CONTENT, dp(40)))
         top.addView(button("Scan QR") { scanQr() }.apply { minHeight = dp(40); textSize = 13f }, lp(WRAP_CONTENT, dp(40)))
         root.addView(top)
 
-        banner = label("", 14f, Color.WHITE).apply {
+        banner = label("", 14f, C.ON_ACC, bold = true).apply {
             background = bg(C.BAD, 12)
             setPadding(dp(16), dp(12), dp(16), dp(12))
             visibility = View.GONE
@@ -121,10 +130,18 @@ class MainActivity : Activity() {
                 override fun onPageFinished(v: WebView, url: String) { banner.visibility = View.GONE }
             }
         }
+        guide = WebView(this).apply {
+            setBackgroundColor(C.BG)
+            overScrollMode = View.OVER_SCROLL_NEVER
+            settings.javaScriptEnabled = true
+            visibility = View.GONE
+            loadUrl("file:///android_asset/guide.html")
+        }
         welcome = buildWelcome()
         btView = buildBluetoothView()
         content.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(welcome, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        content.addView(guide, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(btView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content, lp(h = 0, weight = 1f))
 
@@ -158,17 +175,24 @@ class MainActivity : Activity() {
     private fun buildWelcome(): View {
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(28), dp(16), dp(28), dp(16))
+            gravity = Gravity.BOTTOM
+            setPadding(dp(24), dp(16), dp(24), dp(20))
         }
-        col.addView(label("Control your PC's media", 24f, bold = true).apply { gravity = Gravity.CENTER })
-        col.addView(label("Pause, skip and seek from your couch. Pair once and it reconnects by itself.", 15f, C.DIM).apply {
-            gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(24))
-        })
-        col.addView(label("1  Install and run Phone Remote on your PC\n2  Right-click its tray icon → Pair a phone\n3  Tap the button below and scan the code", 15f, C.FG).apply {
-            background = bg(C.CARD, 20); setPadding(dp(20), dp(18), dp(20), dp(18)); setLineSpacing(0f, 1.3f)
-        }, lp())
-        col.addView(button("Scan QR code", filled = true) { scanQr() }, lp(m = 0).apply { topMargin = dp(20) })
+        col.addView(label("SETUP", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
+        col.addView(label("Take the remote.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
+        col.addView(label("Pause, skip and seek your PC's media from the couch. Pair once; it reconnects by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
+        listOf(
+            "Open Phone Remote on your PC",
+            "Right-click its tray icon, then Pair a phone",
+            "Tap the button below and scan the code",
+        ).forEachIndexed { i, t ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
+            row.addView(label("${i + 1}", 26f, C.ACC, bold = true), lp(dp(36), WRAP_CONTENT))
+            row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
+            col.addView(row)
+        }
+        col.addView(button("Scan QR code", filled = true) { scanQr() }, lp().apply { topMargin = dp(20) })
+        col.addView(button("How it works and troubleshooting") { toggleGuide(true, "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
     }
 
@@ -198,23 +222,39 @@ class MainActivity : Activity() {
     }
 
     private fun showMode(bluetooth: Boolean) {
+        guideOpen = false
+        guideBtn.text = "Guide"
         updateVisibility(bluetooth)
         if (bluetooth) startBluetooth()
     }
 
+    private fun toggleGuide(open: Boolean = !guideOpen, anchor: String = "connect") {
+        guideOpen = open
+        guideBtn.text = if (open) "Close" else "Guide"
+        if (open) guide.loadUrl("file:///android_asset/guide.html#$anchor")
+        updateVisibility(btView.visibility == View.VISIBLE)
+    }
+
     private fun updateVisibility(bluetooth: Boolean) {
-        btView.visibility = if (bluetooth) View.VISIBLE else View.GONE
-        web.visibility = if (!bluetooth && paired()) View.VISIBLE else View.GONE
-        welcome.visibility = if (!bluetooth && !paired()) View.VISIBLE else View.GONE
+        guide.visibility = if (guideOpen) View.VISIBLE else View.GONE
+        btView.visibility = if (bluetooth && !guideOpen) View.VISIBLE else View.GONE
+        web.visibility = if (!bluetooth && !guideOpen && paired()) View.VISIBLE else View.GONE
+        welcome.visibility = if (!bluetooth && !guideOpen && !paired()) View.VISIBLE else View.GONE
         tabWifi.background = bg(if (!bluetooth) C.ACC else C.CARD)
         tabBt.background = bg(if (bluetooth) C.ACC else C.CARD)
-        tabWifi.setTextColor(if (!bluetooth) Color.WHITE else C.DIM)
-        tabBt.setTextColor(if (bluetooth) Color.WHITE else C.DIM)
+        tabWifi.setTextColor(if (!bluetooth) C.ON_ACC else C.DIM)
+        tabBt.setTextColor(if (bluetooth) C.ON_ACC else C.DIM)
         if (bluetooth) banner.visibility = View.GONE
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() { if (web.visibility == View.VISIBLE && web.canGoBack()) web.goBack() else super.onBackPressed() }
+    override fun onBackPressed() {
+        when {
+            guideOpen -> toggleGuide(false)
+            web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
+            else -> super.onBackPressed()
+        }
+    }
 
     // ---- Bluetooth HID mode -------------------------------------------------------------
 
@@ -223,7 +263,7 @@ class MainActivity : Activity() {
 
     private fun buildBluetoothView(): View {
         val v = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(4), dp(16), dp(16)) }
-        btStatus = label("Bluetooth remote — no PC software needed", 14f, C.DIM).apply { setPadding(dp(4), dp(4), dp(4), dp(12)) }
+        btStatus = label("Bluetooth remote. No PC software needed.", 14f, C.DIM).apply { setPadding(dp(4), dp(4), dp(4), dp(12)) }
         v.addView(btStatus)
 
         val setup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = bg(C.CARD, 20); setPadding(dp(16), dp(16), dp(16), dp(16)) }

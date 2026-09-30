@@ -1,0 +1,38 @@
+/* Shared design tokens + primitives for the PC pages, the phone remote and the Android guide.
+   Warm-tinted neutrals (a dim living room), one amber accent, one typeface, flat surfaces. */
+@font-face { font-family:"Bricolage Grotesque"; src:url(font.woff2) format("woff2"); font-weight:400 800; font-display:swap; }
+
+:root {
+  --bg:#15110e; --surface:#1f1a16; --surface-2:#2a231d; --line:#372e26;
+  --ink:#f5ebdd; --ink-dim:#b3a594; --accent:#ff9a3c; --on-accent:#1b1006;
+  --good:#86d9a6; --bad:#ff8a7a;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --font:"Bricolage Grotesque",ui-rounded,"Segoe UI Variable Display","Trebuchet MS",sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light) {
+  :root { --bg:#f7f1e8; --surface:#fffaf2; --surface-2:#efe6d8; --line:#e0d3c0;
+          --ink:#241c14; --ink-dim:#6c6050; --accent:#e8710a; --good:#1f8a52; --bad:#c2402f; color-scheme:light; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html { -webkit-text-size-adjust:100%; }
+body { margin:0; background:var(--bg); color:var(--ink); font:400 16px/1.5 var(--font); font-optical-sizing:auto; }
+h1,h2,h3 { font-weight:700; letter-spacing:-.02em; line-height:1.1; margin:0; text-wrap:balance; }
+p { text-wrap:pretty; }
+a { color:var(--accent); text-underline-offset:3px; }
+svg.i { width:1em; height:1em; fill:currentColor; display:block; }
+.kicker { font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim); }
+.dim { color:var(--ink-dim); }
+
+.btn { font:600 16px var(--font); border:0; border-radius:14px; padding:13px 20px; background:var(--surface-2); color:var(--ink);
+       cursor:pointer; transition:transform .12s var(--ease), background .15s var(--ease); text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+.btn:active { transform:scale(.97); }
+.btn.primary { background:var(--accent); color:var(--on-accent); }
+
+/* Equalizer glyph: animates only while something plays. */
+.eq { display:inline-flex; gap:2px; align-items:flex-end; height:14px; }
+.eq i { width:3px; height:30%; background:var(--accent); border-radius:1px; }
+.eq.on i { animation:eq 1s var(--ease) infinite alternate; }
+.eq.on i:nth-child(2) { animation-delay:-.3s; } .eq.on i:nth-child(3) { animation-delay:-.6s; } .eq.on i:nth-child(4) { animation-delay:-.15s; }
+@keyframes eq { from { height:25%; } to { height:100%; } }
+@media (prefers-reduced-motion:reduce) { .eq.on i { animation:none; height:70%; } * { transition:none !important; } }

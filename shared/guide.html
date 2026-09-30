@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15110e">
+<title>Guide · Phone Remote</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { padding:0 20px max(40px,env(safe-area-inset-bottom)); }
+  .wrap { max-width:640px; margin:0 auto; }
+  nav.top { position:sticky; top:0; z-index:5; background:var(--bg); padding:max(14px,env(safe-area-inset-top)) 0 12px; display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--line); }
+  nav.top a.back { margin-right:auto; padding:9px 0; color:var(--ink-dim); text-decoration:none; font-weight:600; font-size:15px; }
+  nav.top button { font:600 14px var(--font); border:0; background:transparent; color:var(--ink-dim); padding:9px 14px; border-radius:99px; cursor:pointer; transition:background .15s var(--ease),color .15s var(--ease); }
+  nav.top button[aria-selected=true] { background:var(--accent); color:var(--on-accent); }
+  section { display:none; padding-top:36px; }
+  section.on { display:block; animation:in .35s var(--ease); }
+  @keyframes in { from { opacity:0; transform:translateY(8px); } }
+  h1 { font-size:clamp(34px,9vw,46px); margin:10px 0 14px; }
+  h2 { font-size:22px; margin:44px 0 6px; }
+  .lead { font-size:18px; color:var(--ink-dim); margin:0 0 8px; }
+  .seg { display:inline-flex; background:var(--surface); border-radius:99px; padding:4px; margin:26px 0 6px; }
+  .seg button { font:600 14px var(--font); border:0; background:transparent; color:var(--ink-dim); padding:9px 18px; border-radius:99px; cursor:pointer; }
+  .seg button[aria-pressed=true] { background:var(--surface-2); color:var(--ink); }
+  ol.steps { list-style:none; padding:0; margin:18px 0 0; counter-reset:s; }
+  ol.steps li { counter-increment:s; display:grid; grid-template-columns:44px 1fr; gap:4px 12px; padding:18px 0; border-top:1px solid var(--line); }
+  ol.steps li::before { content:counter(s); grid-row:span 2; font-size:34px; font-weight:800; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums; }
+  ol.steps b { font-size:17px; font-weight:650; }
+  ol.steps span { color:var(--ink-dim); }
+  .path { display:none; } .path.on { display:block; }
+  .note { border-left:3px solid var(--accent); padding:4px 0 4px 14px; margin:20px 0; color:var(--ink-dim); }
+  details { border-top:1px solid var(--line); padding:14px 0; }
+  details:last-of-type { border-bottom:1px solid var(--line); }
+  summary { cursor:pointer; font-weight:600; font-size:16px; list-style:none; display:flex; justify-content:space-between; gap:12px; }
+  summary::after { content:"+"; color:var(--accent); font-size:22px; line-height:1; transition:transform .2s var(--ease); }
+  details[open] summary::after { transform:rotate(45deg); }
+  details p { color:var(--ink-dim); margin:10px 0 2px; }
+  figure { margin:26px 0 8px; }
+  .flow { list-style:none; margin:0; padding:0; display:grid; gap:0; }
+  .flow li { background:var(--surface); border-radius:16px; padding:14px 18px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .flow li b { font-size:17px; } .flow li span { color:var(--ink-dim); font-size:14px; text-align:right; }
+  .flow li.hot { background:var(--accent); color:var(--on-accent); } .flow li.hot span { color:var(--on-accent); opacity:.8; }
+  .flow li.link { background:none; padding:6px 0 6px 20px; color:var(--ink-dim); font-size:13px; border-left:2px dotted var(--line); margin-left:18px; border-radius:0; display:block; }
+  .flow li.link::before { content:"↓  "; color:var(--accent); font-weight:700; }
+  figcaption { color:var(--ink-dim); font-size:14px; margin-top:8px; }
+  .layers { list-style:none; padding:0; margin:14px 0 0; }
+  .layers li { padding:16px 0; border-top:1px solid var(--line); }
+  .layers b { display:block; font-size:17px; font-weight:650; margin-bottom:2px; }
+  .layers span { color:var(--ink-dim); }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin-top:14px; }
+  th,td { text-align:left; padding:10px 8px 10px 0; border-top:1px solid var(--line); vertical-align:top; }
+  th { color:var(--ink-dim); font-weight:600; font-size:12px; letter-spacing:.08em; text-transform:uppercase; border-top:0; }
+  .yes { color:var(--good); font-weight:600; } .maybe { color:var(--accent); font-weight:600; }
+  .cta { margin:40px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="top" role="tablist">
+  <a class="back" id="back" href="/" hidden>← Back</a>
+  <button role="tab" data-t="connect" aria-selected="true">Connect</button>
+  <button role="tab" data-t="how" aria-selected="false">How it works</button>
+</nav>
+
+<!-- PAGE 1 -->
+<section id="connect" class="on">
+  <span class="kicker">Setup</span>
+  <h1>Get connected in 60&nbsp;seconds</h1>
+  <p class="lead">Pair your phone once. After that it finds your PC on its own, even when the PC's address changes.</p>
+
+  <div class="seg" role="group" aria-label="Connection type">
+    <button data-p="wifi" aria-pressed="true">Wi-Fi · recommended</button>
+    <button data-p="bt" aria-pressed="false">Bluetooth</button>
+  </div>
+
+  <div class="path on" id="wifi">
+    <ol class="steps">
+      <li><b>Start Phone Remote on the PC</b><span>Look for the orange play icon near the clock (it may hide under the ^ arrow). No icon? Open Phone Remote from the Start menu.</span></li>
+      <li><b>Put both devices on the same Wi-Fi</b><span>The phone and the PC must share one network. A guest network usually will not work.</span></li>
+      <li><b>Show the pairing code</b><span>Right-click the tray icon and choose <em>Pair a phone</em>. A page with a QR code opens.</span></li>
+      <li><b>Scan it with your phone</b><span>In the Android app tap <em>Scan QR code</em>. Without the app, point the camera at the code and open the link.</span></li>
+      <li><b>Play something on the PC</b><span>Start a video or song. The title appears on your phone and the buttons come alive.</span></li>
+    </ol>
+    <p class="note">Next time there is nothing to do. Open the app and you are connected.</p>
+  </div>
+
+  <div class="path" id="bt">
+    <p class="dim" style="margin:18px 0 0">Bluetooth needs no software on the PC and works without Wi-Fi. The phone acts as a small Bluetooth keyboard, so you get play, pause, skip and volume, but no track title or progress bar.</p>
+    <ol class="steps">
+      <li><b>Open the Bluetooth tab in the app</b><span>Allow the Bluetooth permission when asked.</span></li>
+      <li><b>Make the phone visible</b><span>Tap <em>Make phone visible</em>. It stays visible for two minutes.</span></li>
+      <li><b>Pair from Windows</b><span>Settings → Bluetooth &amp; devices → Add device → Bluetooth. Pick your phone and confirm the code.</span></li>
+      <li><b>Connect from the app</b><span>Under <em>Paired computers</em>, tap your PC. The status line says Connected.</span></li>
+      <li><b>Use the pad</b><span>Media buttons work anywhere. The Back and Fwd buttons send arrow keys, so the video player must be the active window.</span></li>
+    </ol>
+  </div>
+
+  <h2>Still stuck?</h2>
+  <details><summary>The phone says it can't reach the PC</summary><p>Check that both are on the same Wi-Fi, not a guest network or a VPN. On the PC, make sure Windows calls the network <em>Private</em> (Settings → Network → your Wi-Fi → Private). Then tap the message on the phone to retry.</p></details>
+  <details><summary>Windows asked about the firewall</summary><p>Allow access on <em>Private networks</em>. If you clicked Cancel, run the installer again or allow "Phone Remote" under Windows Security → Firewall → Allow an app.</p></details>
+  <details><summary>Nothing shows as playing</summary><p>Phone Remote sees anything that reports to Windows' media panel: browsers (YouTube, Netflix), Spotify, Media Player and most music apps. Start playback on the PC once, and check the player picker in the top corner if several apps are open.</p></details>
+  <details><summary>Skip 10 seconds does nothing in one app</summary><p>A few apps accept the command and ignore it. Phone Remote notices, and next time it sends arrow keys to that player instead, as long as it is the window in front. See <a href="#how">How it works</a>.</p></details>
+  <details><summary>Remove a phone I no longer use</summary><p>On the phone, open the menu and choose <em>Forget this PC</em>. To lock out every phone at once, run <code>phone-remote rotate</code> on the PC; all phones must pair again.</p></details>
+  <details><summary>The PC's address changed</summary><p>The Android app finds the PC by name on the network, so this fixes itself. In a browser, scan the pairing QR again.</p></details>
+
+  <p class="cta"><a class="btn primary" href="#how">See how it works</a></p>
+</section>
+
+<!-- PAGE 2 -->
+<section id="how">
+  <span class="kicker">Under the hood</span>
+  <h1>What happens when you tap&nbsp;play</h1>
+  <p class="lead">Your phone sends a tiny message over your home network. The PC passes it to whatever is playing.</p>
+
+  <figure>
+    <ol class="flow" aria-label="Phone to Phone Remote agent to Windows media session to your player">
+      <li><b>Your phone</b><span>You tap ▶</span></li>
+      <li class="link">over your Wi-Fi</li>
+      <li class="hot"><b>Phone Remote</b><span>the small agent on the PC</span></li>
+      <li class="link">asks the media session</li>
+      <li><b>Windows media</b><span>the "now playing" panel</span></li>
+      <li class="link">sends the command</li>
+      <li><b>Your player</b><span>YouTube, Spotify, VLC…</span></li>
+    </ol>
+    <figcaption>The agent is the only piece in the middle. Nothing goes through the internet.</figcaption>
+  </figure>
+
+  <h2>Three ways to reach a player</h2>
+  <p class="dim" style="margin:0">Phone Remote tries them in order and uses the first one that works.</p>
+  <ol class="layers">
+    <li><b>1 · Windows media session</b><span>The same "now playing" panel that drives your keyboard's media keys. Apps that appear there can be paused, skipped and seeked precisely, and they report the title and position shown on your phone.</span></li>
+    <li><b>2 · Check, then retry</b><span>Some apps say "done" to a seek and do nothing. About a third of a second later we look at the position. If it did not move, we remember that app and use the next method for it.</span></li>
+    <li><b>3 · Keyboard fallback</b><span>For known players in front of you (browsers, VLC, mpv and similar) we press the Left or Right arrow the right number of times. It only fires when one of those players is the active window, so it never types into your chat app.</span></li>
+  </ol>
+  <p class="dim">Volume and mute use the same system keys as your keyboard, so they change the PC's master volume.</p>
+
+  <h2>What to expect from common players</h2>
+  <table>
+    <tr><th>Player</th><th>Play/skip</th><th>Seek ±10s</th></tr>
+    <tr><td>Browsers: YouTube, Netflix…</td><td class="yes">Yes</td><td class="yes">Yes, when the site supports it</td></tr>
+    <tr><td>Media Player, Movies &amp; TV</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+    <tr><td>Spotify</td><td class="yes">Yes</td><td class="maybe">May need the window in front</td></tr>
+    <tr><td>VLC, mpv, MPC</td><td class="yes">Yes, if it reports a session</td><td class="maybe">Arrow keys, window in front</td></tr>
+  </table>
+  <p class="dim" style="font-size:14px">This table reflects how each player is documented to behave. Results vary by version.</p>
+
+  <h2>Bluetooth mode, in one line</h2>
+  <p class="dim" style="margin:0">Your phone pretends to be a keyboard with media keys. Windows needs nothing installed, but the PC cannot send anything back, so there is no title or progress bar.</p>
+
+  <h2>Privacy and safety</h2>
+  <ol class="layers">
+    <li><b>Stays at home</b><span>Commands travel only across your local network. The PC refuses connections from outside your home network.</span></li>
+    <li><b>One secret, in the QR code</b><span>The code holds a long random key. Only a phone that scanned it can send commands, and repeated wrong guesses are locked out.</span></li>
+    <li><b>You stay in control</b><span>Quit from the tray icon at any time, or forget a phone from its menu.</span></li>
+  </ol>
+
+  <p class="cta"><a class="btn primary" href="#connect">Back to setup</a></p>
+</section>
+</div>
+
+<script>
+(() => {
+  const tabs = [...document.querySelectorAll('nav.top [data-t]')];
+  const show = () => {
+    const id = location.hash.slice(1) === 'how' ? 'how' : 'connect';
+    document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id));
+    tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.t === id));
+    scrollTo(0, 0);
+  };
+  tabs.forEach(t => t.onclick = () => { location.hash = t.dataset.t; });
+  addEventListener('hashchange', show);
+  document.querySelectorAll('.seg [data-p]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.seg [data-p]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    document.querySelectorAll('.path').forEach(p => p.classList.toggle('on', p.id === b.dataset.p));
+  });
+  // Show a back link only when we were opened from another page of the agent (the phone remote or the PC pairing page).
+  if (document.referrer && new URL(document.referrer).origin === location.origin) { const b = document.getElementById('back'); b.hidden = false; b.href = document.referrer.split('#')[0]; }
+  show();
+})();
+</script>
+</body>
+</html>

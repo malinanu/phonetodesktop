@@ -37,6 +37,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // The guide page, stylesheet and font are shared with the PC agent (repo /shared).
+    sourceSets["main"].assets.srcDir("../../shared")
 }
 
 dependencies {
