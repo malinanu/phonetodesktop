@@ -69,6 +69,8 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "legacy": app.auth.legacy_enabled(),
         "autostart": autostart_enabled(),
         "phones_online": app.auth.online_count(),
+        "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
+        "last_exit": std::env::var("PR_LAST_EXIT").unwrap_or_default(),
         "devices": devices,
         "pending": app.auth.pending(),
         "now": now,

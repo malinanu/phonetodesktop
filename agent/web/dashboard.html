@@ -76,6 +76,8 @@
     <button class="btn" id="apAllow">Allow</button><button class="btn ghost" id="apDeny">Deny</button>
   </div>
 
+  <div class="note" id="restartNote" hidden></div>
+
   <section id="home">
     <span class="kicker">Overview</span>
     <h1 id="hState">Running</h1>
@@ -205,6 +207,9 @@
     $('ver').textContent = `Agent v${data.version} · ${data.host}`;
     $('setName').textContent = data.host; $('setAddr').textContent = `${data.ips.join(', ') || '127.0.0.1'} · port ${data.port}`;
     $('autostart').checked = data.autostart;
+    const rn = $('restartNote');
+    rn.hidden = !data.restarts;
+    if (data.restarts) rn.textContent = `Phone Remote restarted itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} after an unexpected stop (last exit: ${data.last_exit || 'unknown'}). Details are in Activity.`;
     renderApproval(); renderHome(); renderPhones();
   }
 

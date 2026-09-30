@@ -7,6 +7,23 @@ jobs:
       - uses: actions/checkout@v4
       - run: cargo test --manifest-path agent/Cargo.toml
       - run: cargo build --release --manifest-path agent/Cargo.toml
+      - name: guardian smoke (kill the agent, expect it back)
+        continue-on-error: true   # a headless runner may have no notification area for the tray icon
+        shell: pwsh
+        run: |
+          $exe = "$PWD\agent\target\release\phone-remote.exe"
+          Start-Process $exe -ArgumentList "--mock","--no-mdns","--port","18799","--background"
+          function Health { try { (Invoke-WebRequest http://127.0.0.1:18799/health -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 } catch { $false } }
+          for ($i=0; $i -lt 20 -and -not (Health); $i++) { Start-Sleep 1 }
+          if (-not (Health)) { throw "agent never came up" }
+          $workers = Get-CimInstance Win32_Process -Filter "Name='phone-remote.exe'" | Where-Object { $_.CommandLine -like '*--worker*' }
+          if (-not $workers) { throw "no worker process found" }
+          $workers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+          Start-Sleep 1
+          for ($i=0; $i -lt 15 -and -not (Health); $i++) { Start-Sleep 1 }
+          if (-not (Health)) { throw "agent did not come back after being killed" }
+          Get-Content "$env:LOCALAPPDATA\PhoneRemote\agent.log" | Select-Object -Last 15
+          Stop-Process -Name phone-remote -Force
       - uses: actions/upload-artifact@v4
         with: { name: phone-remote-windows, path: agent/target/release/phone-remote.exe }
   android-app:

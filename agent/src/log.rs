@@ -40,9 +40,49 @@ pub fn log(msg: &str) {
     }
 }
 
+/// Log every panic (any thread) with its location and a backtrace, and on Windows also log
+/// native crashes (access violation etc.) with the exception code before the process dies.
+pub fn install_hooks() {
+    std::panic::set_hook(Box::new(|info| {
+        let thread = std::thread::current();
+        let bt = std::backtrace::Backtrace::force_capture();
+        log(&format!("PANIC in thread '{}': {info}\n{bt}", thread.name().unwrap_or("?")));
+    }));
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Diagnostics::Debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS};
+        unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
+            if !info.is_null() {
+                let rec = unsafe { (*info).ExceptionRecord };
+                if !rec.is_null() {
+                    let (code, addr) = unsafe { ((*rec).ExceptionCode.0 as u32, (*rec).ExceptionAddress as usize) };
+                    log(&format!("CRASH: native exception {code:#010X} at {addr:#x}"));
+                }
+            }
+            0 // EXCEPTION_CONTINUE_SEARCH: let Windows terminate the process as usual
+        }
+        SetUnhandledExceptionFilter(Some(filter));
+    }
+}
+
+fn marker() -> PathBuf {
+    dir().join("running.lock")
+}
+
+/// Called when the agent starts. If the marker of a previous run is still there, that run did
+/// not quit cleanly.
+pub fn mark_running() {
+    if let Ok(prev) = std::fs::read_to_string(marker()) {
+        log(&format!("previous run ended unexpectedly (it was pid {})", prev.trim()));
+    }
+    let _ = std::fs::create_dir_all(dir());
+    let _ = std::fs::write(marker(), std::process::id().to_string());
+}
+
+/// Called on a clean Quit.
 #[cfg_attr(not(windows), allow(dead_code))]
-pub fn install_panic_hook() {
-    std::panic::set_hook(Box::new(|info| log(&format!("PANIC: {info}"))));
+pub fn clear_marker() {
+    let _ = std::fs::remove_file(marker());
 }
 
 #[cfg(test)]

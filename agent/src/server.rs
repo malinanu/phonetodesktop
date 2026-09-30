@@ -25,6 +25,9 @@ const FONT: &[u8] = include_bytes!("../../shared/font.woff2");
 /// Called when a new phone asks to pair (the tray shows an Allow/Deny prompt).
 pub type PendingHook = Arc<dyn Fn(Arc<App>, Pending) + Send + Sync>;
 
+/// Test hook (see `--simulate-crash hang`): make /health stop answering.
+pub static HANG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 static HOOK: std::sync::OnceLock<PendingHook> = std::sync::OnceLock::new();
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -123,7 +126,12 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/base.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "max-age=3600")], BASE_CSS) }))
         .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
         .route("/dashboard", get(dashboard_page))
-        .route("/health", get(|| async { "ok" }))
+        .route("/health", get(|| async {
+            if HANG.load(std::sync::atomic::Ordering::SeqCst) {
+                std::future::pending::<()>().await;
+            }
+            "ok"
+        }))
         .merge(crate::api::routes())
         .layer(middleware::from_fn(lan_only))
         .with_state(app)

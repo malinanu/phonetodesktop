@@ -47,9 +47,16 @@ pub struct WindowsBackend {
     pub vlc_password: String,
 }
 
+thread_local! {
+    /// COM/WinRT is set up once per thread (pool threads live long), never per call.
+    static COM_READY: () = {
+        // S_FALSE / RPC_E_CHANGED_MODE just mean the thread is already set up.
+        let _ = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
+    };
+}
+
 fn init_winrt() {
-    // Idempotent; S_FALSE / RPC_E_CHANGED_MODE just mean the thread is already set up.
-    let _ = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
+    COM_READY.with(|_| {});
 }
 
 fn manager() -> Result<Manager> {
@@ -151,10 +158,10 @@ fn audio_apps() -> Result<Vec<(String, u32)>> {
         eMultimedia, eRender, AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
         MMDeviceEnumerator,
     };
-    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
     let mut out = vec![];
     unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        init_winrt();
         let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
         let dev = en.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
         let mgr: IAudioSessionManager2 = dev.Activate(CLSCTX_ALL, None)?;
@@ -185,6 +192,11 @@ fn window_title(pid: u32) -> Option<String> {
     use windows::Win32::Foundation::LPARAM;
     use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
     unsafe extern "system" fn cb(hwnd: HWND, lp: LPARAM) -> BOOL {
+        // A panic must not unwind through the Windows callback boundary.
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe { visit(hwnd, lp) }));
+        BOOL(1)
+    }
+    unsafe fn visit(hwnd: HWND, lp: LPARAM) {
         let data = unsafe { &mut *(lp.0 as *mut (u32, String)) };
         let mut wpid = 0u32;
         unsafe { GetWindowThreadProcessId(hwnd, Some(&mut wpid)) };
@@ -198,7 +210,6 @@ fn window_title(pid: u32) -> Option<String> {
                 }
             }
         }
-        BOOL(1)
     }
     let mut data = (pid, String::new());
     let _ = unsafe { EnumWindows(Some(cb), LPARAM(&mut data as *mut _ as isize)) };

@@ -63,6 +63,34 @@ fn icon() -> Icon {
     Icon::from_rgba(px, N as u32, N as u32).expect("valid icon")
 }
 
+pub fn info(title: &str, msg: &str) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+    unsafe { MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from(title), MB_OK | MB_ICONINFORMATION) };
+}
+
+/// Keep the background agent out of Windows 11 "efficiency mode": throttled timers would make
+/// it look frozen to the phone.
+pub fn opt_out_of_throttling() {
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, ProcessPowerThrottling, SetProcessInformation, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_POWER_THROTTLING_STATE,
+    };
+    let state = PROCESS_POWER_THROTTLING_STATE {
+        Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+        StateMask: 0, // 0 = do not throttle
+    };
+    let _ = unsafe {
+        SetProcessInformation(
+            GetCurrentProcess(),
+            ProcessPowerThrottling,
+            &state as *const _ as *const core::ffi::c_void,
+            std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+        )
+    };
+}
+
 /// Modal Allow/Deny question for a phone that scanned the QR. Call from a worker thread.
 pub fn ask_allow(name: &str, ip: &str) -> bool {
     use windows::core::HSTRING;
@@ -101,6 +129,7 @@ pub fn open_dashboard(url: &str) {
 }
 
 pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {
+    opt_out_of_throttling();
     // First run: start with Windows by default; the tray checkbox decides from then on.
     if !cfg.autostart_initialized {
         set_autostart(true);
@@ -111,37 +140,52 @@ pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {
     let menu = Menu::new();
     let open = MenuItem::new("Open Phone Remote", true, None);
     let add = MenuItem::new("Add a phone", true, None);
+    let logm = MenuItem::new("Open log folder", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&open, &add, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
-    let (open_id, add_id, auto_id, quit_id) = (open.id().clone(), add.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&open, &add, &auto, &quit); // menu items must outlive the tray on this thread
+    menu.append_items(&[&open, &add, &logm, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    let (open_id, add_id, log_id, auto_id, quit_id) = (open.id().clone(), add.id().clone(), logm.id().clone(), auto.id().clone(), quit.id().clone());
+    let _keep = (&open, &add, &logm, &auto, &quit); // menu items must outlive the tray on this thread
 
     let (d1, d2, d3) = (dashboard.clone(), dashboard.clone(), dashboard.clone());
+    // These closures run inside the tray window's procedure: a panic must never unwind out of it.
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
-        if e.id == open_id {
-            open_dashboard(&d1);
-        } else if e.id == add_id {
-            open_dashboard(&format!("{d2}#add"));
-        } else if e.id == auto_id {
-            // The checkbox flips itself natively; make the registry match the new state.
-            set_autostart(!autostart_enabled());
-        } else if e.id == quit_id {
-            crate::log::log("quit requested from tray");
-            std::process::exit(0);
-        }
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if e.id == open_id {
+                open_dashboard(&d1);
+            } else if e.id == add_id {
+                open_dashboard(&format!("{d2}#add"));
+            } else if e.id == log_id {
+                crate::open_url(&crate::log::dir().display().to_string());
+            } else if e.id == auto_id {
+                // The checkbox flips itself natively; make the registry match the new state.
+                set_autostart(!autostart_enabled());
+            } else if e.id == quit_id {
+                crate::log::log("quit requested from tray");
+                crate::log::clear_marker();
+                std::process::exit(crate::guardian::EXIT_QUIT);
+            }
+        }));
     }));
     TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
-        if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = e {
-            open_dashboard(&d3);
-        }
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = e {
+                open_dashboard(&d3);
+            }
+        }));
     }));
 
-    let tray = TrayIconBuilder::new()
-        .with_menu(Box::new(menu))
-        .with_tooltip("Phone Remote")
-        .with_icon(icon())
-        .build()?;
+    // Right after sign-in Explorer's notification area may not exist yet. Keep retrying rather than
+    // giving up: the server must stay up even if the icon takes a while to appear.
+    let tray = loop {
+        match TrayIconBuilder::new().with_menu(Box::new(menu.clone())).with_tooltip("Phone Remote").with_icon(icon()).build() {
+            Ok(t) => break t,
+            Err(e) => {
+                crate::log::log(&format!("tray icon not ready ({e}); retrying"));
+                std::thread::sleep(std::time::Duration::from_secs(3));
+            }
+        }
+    };
 
     // The tray's hidden window needs this thread's message loop; menu callbacks fire from it.
     // Poll (rather than block) so the tooltip can follow the server's state.

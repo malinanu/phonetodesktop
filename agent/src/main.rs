@@ -8,6 +8,7 @@ mod backend;
 mod config;
 mod controller;
 mod discovery;
+mod guardian;
 mod log;
 mod net;
 mod protocol;
@@ -59,12 +60,22 @@ fn print_qr(url: &str) {
     }
 }
 
-fn main() -> Result<()> {
+fn main() {
+    if let Err(e) = real_main() {
+        log::log(&format!("fatal: {e:#}"));
+        say(&format!("error: {e:#}"));
+        std::process::exit(1);
+    }
+}
+
+fn real_main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(String::as_str).unwrap_or("serve");
     let flag = |f: &str| args.iter().any(|a| a == f);
+    let worker = flag("--worker");
+    let cli = !matches!(cmd, "serve") && !cmd.starts_with("--");
     #[cfg(windows)]
-    if flag("--console") || !matches!(cmd, "serve") && !cmd.starts_with("--") {
+    if flag("--console") || cli {
         attach_console();
     }
     let mut cfg = config::load_or_create()?;
@@ -74,9 +85,33 @@ fn main() -> Result<()> {
             config::save(&cfg)?;
         }
     }
+
+    // A normal launch on Windows is the guardian, which keeps the real agent ("worker") alive.
+    // `--guardian` forces this on other systems (used to test it).
+    let console = flag("--console") || cfg!(not(windows));
+    if !worker && !cli && !flag("--console") && (cfg!(windows) || flag("--guardian")) {
+        let port = cfg.port;
+        if !guardian::acquire_single_instance() {
+            // Already running: just bring the dashboard forward.
+            #[cfg(windows)]
+            if !flag("--background") {
+                tray::open_dashboard(&format!("http://127.0.0.1:{port}/dashboard"));
+            }
+            return Ok(());
+        }
+        let forward: Vec<String> = args
+            .iter()
+            .enumerate()
+            .filter(|(i, a)| {
+                matches!(a.as_str(), "--mock" | "--no-mdns" | "--port" | "--simulate-crash" | "--background" | "--console")
+                    || (*i > 0 && matches!(args[i - 1].as_str(), "--port" | "--simulate-crash"))
+            })
+            .map(|(_, a)| a.clone())
+            .collect();
+        std::process::exit(guardian::run(port, forward));
+    }
+
     let ips = net::lan_addrs();
-
-
     match cmd {
         "-h" | "--help" | "help" => say(usage()),
         "rotate" => {
@@ -90,22 +125,46 @@ fn main() -> Result<()> {
         "pair" => say(&format!("Open http://127.0.0.1:{}/pair on this PC (the agent must be running) and scan the code.", cfg.port)),
         "install" => install(&cfg)?,
         "setup-players" => backend::setup::apply(&backend::vlc_password(&cfg.local_secret)).iter().for_each(|l| say(l)),
-        _ => run(cfg, ips, flag("--mock"), flag("--no-mdns"), flag("--background"), flag("--console") || cfg!(not(windows)))?,
+        _ => {
+            log::install_hooks();
+            log::mark_running();
+            let simulate = args.iter().position(|a| a == "--simulate-crash").and_then(|i| args.get(i + 1)).cloned();
+            run(cfg, ips, flag("--mock"), flag("--no-mdns"), flag("--background"), console, simulate)?
+        }
     }
     Ok(())
 }
 
-fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: bool, background: bool, console: bool) -> Result<()> {
+/// Test hook: make the worker die (or hang) on purpose so the guardian can be verified.
+/// `exit:CODE`, `abort` or `hang`, optionally followed by `@SECONDS` (default 2).
+fn simulate_crash(spec: String) {
+    let (kind, secs) = spec.split_once('@').map(|(k, s)| (k.to_string(), s.parse().unwrap_or(2))).unwrap_or((spec, 2));
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(secs));
+        log::log(&format!("simulating: {kind}"));
+        match kind.as_str() {
+            k if k.starts_with("exit:") => std::process::exit(k[5..].parse().unwrap_or(1)),
+            "hang" => server::HANG.store(true, std::sync::atomic::Ordering::SeqCst),
+            _ => std::process::abort(),
+        }
+    });
+}
+
+fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: bool, background: bool, console: bool, simulate: Option<String>) -> Result<()> {
+    if let Some(spec) = simulate {
+        simulate_crash(spec);
+    }
     let pair_page = format!("http://127.0.0.1:{}/dashboard", cfg.port);
     // Bind here so a second launch can detect the running agent and just show the pairing page.
     let listener = match std::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], cfg.port))) {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            say(&format!("Already running. Dashboard: {pair_page}"));
-            if !background {
-                open_url(&pair_page);
-            }
-            return Ok(());
+            // Another program owns our port (the guardian already made sure we are not a second copy).
+            log::log(&format!("port {} is already in use by another program", cfg.port));
+            say(&format!("Port {} is already in use. Start with --port N to use another.", cfg.port));
+            #[cfg(windows)]
+            tray::info("Phone Remote", &format!("Port {} is used by another program, so Phone Remote cannot start.\n\nRun it once from a terminal with: phone-remote --port 8766", cfg.port));
+            std::process::exit(guardian::EXIT_PORT_BUSY);
         }
         Err(e) => return Err(e.into()),
     };
@@ -115,7 +174,6 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
 
     #[cfg(windows)]
     if !console {
-        log::install_panic_hook();
         server::set_pending_hook(Arc::new(|app, p| {
             // Ask on a separate thread so the tray keeps running while the dialog is open.
             std::thread::spawn(move || {
@@ -124,13 +182,16 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
                 app.poke();
             });
         }));
-        log::log(&format!("agent {} starting (tray mode{})", env!("CARGO_PKG_VERSION"), if background { ", at login" } else { "" }));
+        log::log(&format!("agent {} starting (pid {}{})", env!("CARGO_PKG_VERSION"), std::process::id(), if background { ", background" } else { "" }));
         // The server thread never ends on its own: only the tray's Quit stops the process.
         std::thread::spawn(move || supervise(server_cfg, server_ips, listener, mock, no_mdns));
         if !background {
             tray::open_dashboard(&format!("{pair_page}#add"));
         }
-        return tray::run(cfg, pair_page);
+        // The tray loop only returns if something went wrong: exit non-zero so the guardian restarts us.
+        let res = tray::run(cfg, pair_page);
+        log::log(&format!("tray loop ended unexpectedly: {res:?}"));
+        std::process::exit(guardian::EXIT_TRAY_LOST);
     }
     let _ = (background, &pair_page);
     tokio::runtime::Builder::new_multi_thread()
@@ -206,7 +267,15 @@ async fn serve(
     }
 
     let listener = tokio::net::TcpListener::from_std(listener)?;
-    tokio::spawn(server::poll_state(app.clone()));
+    // The state poller feeds every phone; if it ever panics, start it again.
+    let poller_app = app.clone();
+    tokio::spawn(async move {
+        loop {
+            let r = tokio::spawn(server::poll_state(poller_app.clone())).await;
+            log::log(&format!("state poller stopped ({r:?}); restarting"));
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
     let svc = server::router(app).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, svc)
         .with_graceful_shutdown(async move {

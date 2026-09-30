@@ -4,6 +4,7 @@
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -75,9 +76,17 @@ fn with_timeout<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Op
     rx.recv_timeout(Duration::from_millis(700)).ok()
 }
 
+/// A probe that never got an answer keeps this set, so a wedged mpv costs one parked thread,
+/// not one per second.
+static PROBE_BUSY: AtomicBool = AtomicBool::new(false);
+
 pub fn status() -> Option<Status> {
-    with_timeout(|| {
-        let mut io = open().ok()?;
+    // Opening a named pipe never blocks: if mpv is not listening this fails instantly and no thread is used.
+    let mut io = open().ok()?;
+    if PROBE_BUSY.swap(true, Ordering::SeqCst) {
+        return None;
+    }
+    with_timeout(move || {
         let r = exchange(
             &mut io,
             &[
@@ -86,16 +95,16 @@ pub fn status() -> Option<Status> {
                 json!(["get_property", "pause"]),
                 json!(["get_property", "media-title"]),
             ],
-        )
-        .ok()?;
-        parse_status(&r)
+        );
+        PROBE_BUSY.store(false, Ordering::SeqCst);
+        parse_status(&r.ok()?)
     })
     .flatten()
 }
 
 pub fn run(cmd: Value) -> Result<()> {
+    let mut io = open()?;
     with_timeout(move || -> Result<()> {
-        let mut io = open()?;
         let r = exchange(&mut io, &[cmd])?;
         if r[0]["error"] != "success" {
             return Err(anyhow!("mpv: {}", r[0]["error"]));

@@ -3,6 +3,7 @@
 
 use crate::backend::{Backend, Key, Transport};
 use crate::protocol::{Command, PlayerInfo, State};
+const STATE_TTL: Duration = Duration::from_millis(750);
 use anyhow::{bail, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -18,6 +19,9 @@ pub struct Controller {
     /// BROKEN_TTL so one transient miss (track change, buffering) is not permanent.
     seek_broken: Mutex<HashMap<String, Instant>>,
     verify_delay: Duration,
+    /// Short-lived copy of the last `state()`, so the dashboard poll, phone poll and debug views
+    /// share one expensive OS query instead of each making their own.
+    cached: Mutex<Option<(Instant, State)>>,
 }
 
 impl Controller {
@@ -28,6 +32,7 @@ impl Controller {
             selected: Mutex::new(None),
             seek_broken: Mutex::new(HashMap::new()),
             verify_delay: Duration::from_millis(350),
+            cached: Mutex::new(None),
         }
     }
 
@@ -50,6 +55,17 @@ impl Controller {
     }
 
     pub fn state(&self) -> Result<State> {
+        if let Some((at, st)) = self.cached.lock().unwrap().as_ref() {
+            if at.elapsed() < STATE_TTL {
+                return Ok(st.clone());
+            }
+        }
+        let st = self.fresh_state()?;
+        *self.cached.lock().unwrap() = Some((Instant::now(), st.clone()));
+        Ok(st)
+    }
+
+    fn fresh_state(&self) -> Result<State> {
         let players = self.backend.snapshot()?;
         let current = self.pick(&players).map(|p| p.id.clone());
         Ok(State {
@@ -63,6 +79,8 @@ impl Controller {
     }
 
     pub fn execute(&self, cmd: Command) -> Result<()> {
+        // Whatever this command does, the next state must be read fresh.
+        *self.cached.lock().unwrap() = None;
         match cmd {
             Command::Select { id } => {
                 *self.selected.lock().unwrap() = Some(id);
