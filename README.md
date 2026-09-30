@@ -8,6 +8,9 @@ shared/    Design system (base.css, font) and the in-app Guide page, used by bot
 android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
 ```
 
+## Settings and themes
+The remote's **⋮ menu → Settings** (and the same page from the Bluetooth tab): theme (System / Dark / Light), skip step, volume step, touchpad speed, scroll direction, tap-to-click, vibration and keep-screen-on. In the Android app the values live in the app and are shared by every page; in a plain browser they live in `localStorage`. Colours are defined once in `shared/base.css` (and mirrored in `Theme.kt`) and checked for 4.5:1 text contrast in both themes.
+
 ## Guide pages
 `shared/guide.html` holds two pages, *Get connected in 60 seconds* and *What happens when you tap play*. The PC serves it at `/guide` (tray menu → Guide) and the Android app bundles it (top bar → Guide).
 
