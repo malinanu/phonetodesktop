@@ -105,16 +105,16 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Theme first, so every native view, dialog and popup agrees with the pages.
-        val settings = store.settingsJson()
+        val savedSettings = store.settingsJson()
         val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        dark = Theme.isDark(Theme.themeOf(settings), night)
+        dark = Theme.isDark(Theme.themeOf(savedSettings), night)
         C.apply(Theme.palette(dark))
         setTheme(if (dark) android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar)
         super.onCreate(savedInstanceState)
         window.statusBarColor = C.BG
         window.navigationBarColor = C.BG
         styleSystemBars()
-        applyKeepAwake(Theme.keepAwakeOf(settings))
+        applyKeepAwake(Theme.keepAwakeOf(savedSettings))
         // Edge-to-edge is enforced on targetSdk 35; fitsSystemWindows keeps content below the status bar.
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
