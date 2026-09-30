@@ -10,8 +10,27 @@ android {
         applicationId = "app.phoneremote"
         minSdk = 28 // BluetoothHidDevice needs API 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=10203
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "0.1.0"
+    }
+    signingConfigs {
+        // Release keystore comes from the environment (CI secrets); never commit it.
+        val path = System.getenv("ANDROID_KEYSTORE_PATH")
+        if (path != null) {
+            create("release") {
+                storeFile = file(path)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // Without a keystore the APK is debug-signed so it still installs for testing.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

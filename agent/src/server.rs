@@ -17,18 +17,18 @@ const INDEX: &str = include_str!("../web/index.html");
 pub struct App {
     pub controller: Arc<Controller>,
     pub token: String,
-    pub pair_url: Mutex<String>,
+    pub pair_urls: Vec<String>,
     tx: watch::Sender<String>,
     notify: Notify,
     fails: Mutex<(u32, Instant)>,
 }
 
 impl App {
-    pub fn new(controller: Arc<Controller>, token: String, pair_url: String) -> Arc<Self> {
+    pub fn new(controller: Arc<Controller>, token: String, pair_urls: Vec<String>) -> Arc<Self> {
         Arc::new(App {
             controller,
             token,
-            pair_url: Mutex::new(pair_url),
+            pair_urls,
             tx: watch::channel(String::new()).0,
             notify: Notify::new(),
             fails: Mutex::new((0, Instant::now())),
@@ -77,18 +77,31 @@ async fn pair_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, State(app): State
     if !peer.ip().is_loopback() {
         return StatusCode::FORBIDDEN.into_response();
     }
-    let url = app.pair_url.lock().unwrap().clone();
-    let svg = qrcode::QrCode::new(url.as_bytes())
-        .map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(320, 320).build())
-        .unwrap_or_default();
-    let body = format!(
-        "<!doctype html><meta charset=utf-8><title>Pair phone</title>\
-         <body style='font-family:system-ui;text-align:center;padding:2rem;background:#111;color:#eee'>\
-         <h2>Scan with your phone (same Wi-Fi)</h2><div style='background:#fff;display:inline-block;padding:12px'>{svg}</div>\
-         <p style='opacity:.7'>{url}</p>"
-    );
+    let qr = |url: &str| {
+        qrcode::QrCode::new(url.as_bytes())
+            .map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(300, 300).quiet_zone(true).build())
+            .unwrap_or_default()
+    };
+    let main = app.pair_urls.first().cloned().unwrap_or_default();
+    let others: String = app
+        .pair_urls
+        .iter()
+        .skip(1)
+        .map(|u| format!("<div class=qr>{}</div><code>{u}</code>", qr(u)))
+        .collect();
+    let more = if others.is_empty() {
+        String::new()
+    } else {
+        format!("<details><summary>Phone can't connect? Try another network address</summary>{others}</details>")
+    };
+    let body = PAIR_PAGE
+        .replace("{{QR}}", &qr(&main))
+        .replace("{{URL}}", &main)
+        .replace("{{MORE}}", &more);
     ([(header::CACHE_CONTROL, "no-store")], Html(body)).into_response()
 }
+
+const PAIR_PAGE: &str = include_str!("../web/pair.html");
 
 async fn ws_upgrade(ws: WebSocketUpgrade, headers: HeaderMap, State(app): State<Arc<App>>) -> Response {
     // Block cross-site WebSocket hijacking: a browser Origin must match our own Host.

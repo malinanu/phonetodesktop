@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pair your phone · Phone Remote</title>
+<style>
+  :root{--bg:#0e0f13;--card:#181a21;--fg:#eef0f6;--dim:#8b90a0;--acc:#5b8cff;--line:#262a35}
+  @media (prefers-color-scheme:light){:root{--bg:#f3f4f8;--card:#fff;--fg:#14161c;--dim:#666b7a;--line:#e3e5ec}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,"Segoe UI",sans-serif;display:grid;place-items:center;min-height:100vh;padding:24px}
+  main{width:min(880px,100%);background:var(--card);border-radius:24px;padding:36px;display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:center}
+  @media (max-width:720px){main{grid-template-columns:1fr;padding:24px}}
+  .qr{background:#fff;border-radius:16px;padding:12px;width:300px;max-width:100%}
+  .qr svg{width:100%;height:auto;display:block}
+  h1{margin:0 0 4px;font-size:26px} .sub{color:var(--dim);margin:0 0 20px}
+  ol{margin:0 0 20px;padding:0;list-style:none;counter-reset:s}
+  li{counter-increment:s;display:flex;gap:14px;align-items:flex-start;margin:12px 0}
+  li::before{content:counter(s);flex:none;width:28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;font-weight:700;display:grid;place-items:center;font-size:14px}
+  .ok{display:inline-flex;gap:8px;align-items:center;color:var(--dim);font-size:14px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#3ecf8e}
+  code{display:block;margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:10px;font-size:12px;word-break:break-all;color:var(--dim)}
+  details{grid-column:1/-1;border-top:1px solid var(--line);padding-top:16px;color:var(--dim)}
+  details .qr{margin:14px 0 0;width:220px}
+  button{font:inherit;background:var(--acc);color:#fff;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;margin-top:10px}
+</style></head><body>
+<main>
+  <div><div class="qr">{{QR}}</div></div>
+  <div>
+    <h1>Pair your phone</h1>
+    <p class="sub">The agent is running in the background. You only need to do this once per phone.</p>
+    <ol>
+      <li><span>Connect your phone to the <b>same Wi-Fi</b> as this PC.</span></li>
+      <li><span>Open the camera (or the <b>Phone Remote</b> app → Scan QR) and point it at the code.</span></li>
+      <li><span>Play something on the PC and use the buttons on your phone.</span></li>
+    </ol>
+    <span class="ok"><span class="dot"></span>Running · closes to the system tray</span>
+    <code id="u">{{URL}}</code>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('u').textContent);this.textContent='Copied'">Copy link</button>
+  </div>
+  {{MORE}}
+</main></body></html>

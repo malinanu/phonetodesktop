@@ -11,6 +11,9 @@ pub struct Config {
     /// Pairing secret (256 bit, base64url). Rotating it revokes every paired phone.
     pub token: String,
     pub port: u16,
+    /// Windows: start-at-login was switched on once by default; afterwards the tray checkbox rules.
+    #[serde(default)]
+    pub autostart_initialized: bool,
 }
 
 fn path() -> Result<PathBuf> {
@@ -32,7 +35,7 @@ pub fn load_or_create() -> Result<Config> {
             return Ok(c);
         }
     }
-    let c = Config { token: new_token(), port: DEFAULT_PORT };
+    let c = Config { token: new_token(), port: DEFAULT_PORT, autostart_initialized: false };
     save(&c)?;
     Ok(c)
 }
