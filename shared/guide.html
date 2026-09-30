@@ -99,7 +99,7 @@
   <details><summary>The phone says it can't reach the PC</summary><p>Check that both are on the same Wi-Fi, not a guest network or a VPN. On the PC, make sure Windows calls the network <em>Private</em> (Settings → Network → your Wi-Fi → Private). Then tap the message on the phone to retry.</p></details>
   <details><summary>Windows asked about the firewall</summary><p>Allow access on <em>Private networks</em>. If you clicked Cancel, run the installer again or allow "Phone Remote" under Windows Security → Firewall → Allow an app.</p></details>
   <details><summary>Nothing shows as playing</summary><p>Phone Remote sees anything that reports to Windows' media panel: browsers (YouTube, Netflix), Spotify, Media Player and most music apps. Start playback on the PC once, and check the player picker in the top corner if several apps are open.</p></details>
-  <details><summary>My video player (MPC-HC, VLC) shows no progress bar</summary><p>These players do not tell Windows what they are playing, so Phone Remote can only see that they make sound. For <b>MPC-HC / MPC-BE</b>, turn on their built-in web interface: <em>View → Options → Player → Web Interface</em>, tick <em>Listen on port</em> (13579) and press OK. The title, progress bar and exact seek then work, even while paused. Bluetooth and the arrow-key fallback still work without it.</p></details>
+  <details><summary>My video player (VLC, mpv, MPC-HC) shows no progress bar</summary><p>These players do not tell Windows what they are playing, so by default Phone Remote only sees that they make sound. Fix it once: right-click the tray icon and choose <em>Set up video players</em>. That switches on each player's own remote-control interface (VLC's web interface, mpv's IPC, MPC-HC's web interface). Close the player completely, open it again, and play a video. The title, progress bar and exact seek then work, even while paused.</p><p>If the tray item reports a problem for MPC-HC, enable it by hand: <em>View → Options → Player → Web Interface → Listen on port</em>. Players not listed there still get play state, pause, skip and the arrow-key seek fallback.</p></details>
   <details><summary>Skip 10 seconds does nothing in one app</summary><p>A few apps accept the command and ignore it. Phone Remote notices, and next time it sends arrow keys to that player instead, as long as it is the window in front. See <a href="#how">How it works</a>.</p></details>
   <details><summary>Remove a phone I no longer use</summary><p>On the phone, open the menu and choose <em>Forget this PC</em>. To lock out every phone at once, run <code>phone-remote rotate</code> on the PC; all phones must pair again.</p></details>
   <details><summary>The PC's address changed</summary><p>The Android app finds the PC by name on the network, so this fixes itself. In a browser, scan the pairing QR again.</p></details>
@@ -141,8 +141,8 @@
     <tr><td>Browsers: YouTube, Netflix…</td><td class="yes">Yes</td><td class="yes">Yes, when the site supports it</td></tr>
     <tr><td>Media Player, Movies &amp; TV</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
     <tr><td>Spotify</td><td class="yes">Yes</td><td class="maybe">May need the window in front</td></tr>
-    <tr><td>MPC-HC / MPC-BE</td><td class="yes">Yes</td><td class="yes">Exact, with its web interface on</td></tr>
-    <tr><td>VLC, mpv, others</td><td class="yes">Shown as playing when they make sound</td><td class="maybe">Arrow keys, window in front</td></tr>
+    <tr><td>VLC, mpv, MPC-HC</td><td class="yes">Yes</td><td class="yes">Exact, after <em>Set up video players</em></td></tr>
+    <tr><td>PotPlayer and other players</td><td class="yes">Shown as playing when they make sound</td><td class="maybe">Arrow keys, window in front</td></tr>
   </table>
   <p class="dim" style="font-size:14px">This table reflects how each player is documented to behave. Results vary by version.</p>
 

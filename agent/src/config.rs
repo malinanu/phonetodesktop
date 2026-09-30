@@ -11,6 +11,9 @@ pub struct Config {
     /// Pairing secret (256 bit, base64url). Rotating it revokes every paired phone.
     pub token: String,
     pub port: u16,
+    /// Per-install secret for local player interfaces (VLC HTTP password). Not shown to phones.
+    #[serde(default)]
+    pub local_secret: String,
     /// Windows: start-at-login was switched on once by default; afterwards the tray checkbox rules.
     #[serde(default)]
     pub autostart_initialized: bool,
@@ -31,11 +34,15 @@ pub fn new_token() -> String {
 pub fn load_or_create() -> Result<Config> {
     let p = path()?;
     if let Ok(s) = std::fs::read_to_string(&p) {
-        if let Ok(c) = serde_json::from_str::<Config>(&s) {
+        if let Ok(mut c) = serde_json::from_str::<Config>(&s) {
+            if c.local_secret.is_empty() {
+                c.local_secret = new_token();
+                save(&c)?;
+            }
             return Ok(c);
         }
     }
-    let c = Config { token: new_token(), port: DEFAULT_PORT, autostart_initialized: false };
+    let c = Config { token: new_token(), port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
     save(&c)?;
     Ok(c)
 }

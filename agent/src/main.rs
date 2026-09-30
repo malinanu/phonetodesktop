@@ -19,6 +19,7 @@ fn usage() -> &'static str {
     "phone-remote [serve] [--console] [--background] [--port N] [--mock] [--no-mdns]\n\
      phone-remote pair      print the pairing QR\n\
      phone-remote rotate    new secret; unpairs every phone\n\
+     phone-remote setup-players   switch on VLC / mpv / MPC-HC remote interfaces (progress + seek)
      phone-remote install   (Windows) allow private-network firewall access (run as Administrator)\n\
      \n\
      Windows: without --console the agent runs in the system tray."
@@ -90,6 +91,7 @@ fn main() -> Result<()> {
             say(&url);
         }
         "install" => install(&cfg)?,
+        "setup-players" => backend::setup::apply(&backend::vlc_password(&cfg.local_secret)).iter().for_each(|l| say(l)),
         _ => run(cfg, ips, flag("--mock"), flag("--no-mdns"), flag("--background"), flag("--console") || cfg!(not(windows)))?,
     }
     Ok(())
@@ -146,7 +148,7 @@ async fn serve(
     console: bool,
 ) -> Result<()> {
     let host = net::hostname();
-    let backend: Arc<dyn backend::Backend> = Arc::from(backend::default_backend(mock));
+    let backend: Arc<dyn backend::Backend> = Arc::from(backend::default_backend(mock, &cfg.local_secret));
     let controller = Arc::new(controller::Controller::new(backend.clone(), host.clone()));
     let urls: Vec<String> = if ips.is_empty() {
         vec![pair_url(std::net::Ipv4Addr::LOCALHOST, cfg.port, &cfg.token)]

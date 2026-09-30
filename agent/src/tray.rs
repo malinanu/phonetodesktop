@@ -51,6 +51,12 @@ fn icon() -> Icon {
     Icon::from_rgba(px, N as u32, N as u32).expect("valid icon")
 }
 
+pub fn info(title: &str, msg: &str) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+    unsafe { MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from(title), MB_OK | MB_ICONINFORMATION) };
+}
+
 pub fn fatal(msg: &str) {
     // No console in the GUI build; make the failure visible instead of vanishing.
     use windows::core::HSTRING;
@@ -70,17 +76,25 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
     let menu = Menu::new();
     let pair = MenuItem::new("Pair a phone (show QR code)", true, None);
     let guide = MenuItem::new("Guide: how it works and connecting", true, None);
+    let setup = MenuItem::new("Set up video players (VLC, mpv, MPC-HC)", true, None);
     let diag = MenuItem::new("Diagnostics (what is detected)", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&pair, &guide, &diag, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
-    let (pair_id, guide_id, diag_id, auto_id, quit_id) = (pair.id().clone(), guide.id().clone(), diag.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&pair, &guide, &diag, &auto, &quit); // menu items must outlive the tray on this thread
+    menu.append_items(&[&pair, &setup, &guide, &diag, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    let (pair_id, setup_id, guide_id, diag_id, auto_id, quit_id) = (pair.id().clone(), setup.id().clone(), guide.id().clone(), diag.id().clone(), auto.id().clone(), quit.id().clone());
+    let _keep = (&pair, &setup, &guide, &diag, &auto, &quit); // menu items must outlive the tray on this thread
+    let vlc_pw = crate::backend::vlc_password(&cfg.local_secret);
 
     let page = pair_page.clone();
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
         if e.id == pair_id {
             crate::open_url(&page);
+        } else if e.id == setup_id {
+            let pw = vlc_pw.clone();
+            std::thread::spawn(move || {
+                let report = crate::backend::setup::apply(&pw).join("\n\n");
+                info("Set up video players", &format!("{report}\n\nRestart each player once, then play something."));
+            });
         } else if e.id == guide_id {
             crate::open_url(&page.replace("/pair", "/guide"));
         } else if e.id == diag_id {

@@ -2,10 +2,7 @@
 //! (Options > Player > Web Interface > "Listen on port", default 13579) reports the exact
 //! position and accepts seek/play commands. Plain HTTP/1.0 over a std socket; no extra crates.
 
-use anyhow::{anyhow, Result};
-use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, TcpStream};
-use std::time::Duration;
+use anyhow::Result;
 
 pub const DEFAULT_PORT: u16 = 13579;
 
@@ -19,20 +16,7 @@ pub struct Status {
 }
 
 fn get(port: u16, path: &str) -> Result<String> {
-    let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-    let mut s = TcpStream::connect_timeout(&addr, Duration::from_millis(200))?;
-    s.set_read_timeout(Some(Duration::from_millis(500)))?;
-    s.set_write_timeout(Some(Duration::from_millis(500)))?;
-    write!(s, "GET {path} HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")?;
-    let mut body = String::new();
-    // Read errors after some data (timeout on a lingering socket) still leave usable text.
-    let mut buf = Vec::new();
-    let _ = s.read_to_end(&mut buf);
-    body.push_str(&String::from_utf8_lossy(&buf));
-    if body.is_empty() {
-        return Err(anyhow!("empty response"));
-    }
-    Ok(body)
+    super::http::get(port, path, None)
 }
 
 fn field(html: &str, id: &str) -> Option<String> {
@@ -67,6 +51,7 @@ pub fn seek(port: u16, pos_ms: i64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
     use std::net::TcpListener;
 
     const SAMPLE: &str = "<html><body><p id=\"file\">Movie.mkv</p><p id=\"state\">2</p>\

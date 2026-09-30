@@ -1,7 +1,7 @@
 //! Windows backend: GSMTC (Windows.Media.Control) for sessions, SendInput for media keys,
 //! and arrow-key injection into the foreground window as the last-resort seek.
 
-use super::{mpc, Backend, Key, Transport};
+use super::{mpc, mpv, vlc, Backend, Key, Transport};
 use crate::protocol::PlayerInfo;
 use anyhow::{anyhow, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -43,7 +43,9 @@ const KEY_SEEK_TABLE: &[(&str, i64)] = &[
     ("vivaldi.exe", 5),
 ];
 
-pub struct WindowsBackend;
+pub struct WindowsBackend {
+    pub vlc_password: String,
+}
 
 fn init_winrt() {
     // Idempotent; S_FALSE / RPC_E_CHANGED_MODE just mean the thread is already set up.
@@ -213,10 +215,22 @@ fn clean_title(t: &str) -> String {
 }
 
 const MPC_ID: &str = "mpc:webif";
+const VLC_ID: &str = "vlc:http";
+const MPV_ID: &str = "mpv:ipc";
+
+fn state_label(playing: bool, stopped: bool) -> &'static str {
+    if playing {
+        "Playing"
+    } else if stopped {
+        "Stopped"
+    } else {
+        "Paused"
+    }
+}
 
 const IGNORED_AUDIO: &[&str] = &["phone-remote", "audiodg", "system", "svchost", "explorer", "applicationframehost"];
 
-fn collect(errs: &mut Vec<String>) -> Result<Vec<PlayerInfo>> {
+fn collect(errs: &mut Vec<String>, vlc_pw: &str) -> Result<Vec<PlayerInfo>> {
     let mgr = manager()?;
     let current = mgr
         .GetCurrentSession()
@@ -237,8 +251,8 @@ fn collect(errs: &mut Vec<String>) -> Result<Vec<PlayerInfo>> {
                 continue;
             }
             let title = window_title(pid).map(|t| clean_title(&t)).unwrap_or_else(|| "Audio is playing".into());
-            let hint = if app.starts_with("mpc-") {
-                "Turn on the Web Interface in MPC options for progress and seek (see Guide)"
+            let hint = if app.starts_with("mpc-") || app == "vlc" || app == "mpv" {
+                "Tray icon > Set up video players to get progress and seek"
             } else {
                 "This app shares no progress information"
             };
@@ -254,27 +268,51 @@ fn collect(errs: &mut Vec<String>) -> Result<Vec<PlayerInfo>> {
             });
         }
     }
-    // MPC-HC/BE with its Web Interface enabled: exact timeline, and visible even while paused.
+    // Players with a remote-control interface switched on: exact timeline, visible even while paused.
+    let mut enhanced: Vec<PlayerInfo> = Vec::new();
     if let Some(st) = mpc::status(mpc::DEFAULT_PORT) {
         out.retain(|p| !p.id.starts_with("audio:mpc-"));
-        let entry = PlayerInfo {
+        enhanced.push(PlayerInfo {
             id: MPC_ID.into(),
             app: "MPC-HC".into(),
             title: if st.file.is_empty() { "MPC-HC".into() } else { st.file },
-            artist: match st.state {
-                2 => "Playing",
-                1 => "Paused",
-                _ => "Stopped",
-            }
-            .into(),
+            artist: state_label(st.state == 2, st.state == 0).into(),
             playing: st.state == 2,
             pos_ms: st.pos_ms,
             dur_ms: st.dur_ms,
             can_seek: st.dur_ms > 0,
-        };
-        let at = if entry.playing { 0 } else { out.len() };
-        out.insert(at, entry);
+        });
     }
+    if let Some(st) = vlc::status(vlc_pw) {
+        out.retain(|p| p.id != "audio:vlc");
+        enhanced.push(PlayerInfo {
+            id: VLC_ID.into(),
+            app: "VLC".into(),
+            title: st.title,
+            artist: state_label(st.playing, st.stopped).into(),
+            playing: st.playing,
+            pos_ms: st.pos_ms,
+            dur_ms: st.dur_ms,
+            can_seek: st.dur_ms > 0,
+        });
+    }
+    if let Some(st) = mpv::status() {
+        out.retain(|p| p.id != "audio:mpv");
+        enhanced.push(PlayerInfo {
+            id: MPV_ID.into(),
+            app: "mpv".into(),
+            title: st.title,
+            artist: state_label(st.playing, false).into(),
+            playing: st.playing,
+            pos_ms: st.pos_ms,
+            dur_ms: st.dur_ms,
+            can_seek: st.dur_ms > 0,
+        });
+    }
+    // Playing ones lead; paused ones follow the OS sessions.
+    let (playing, paused): (Vec<_>, Vec<_>) = enhanced.into_iter().partition(|p| p.playing);
+    out.splice(0..0, playing);
+    out.extend(paused);
     Ok(out)
 }
 
@@ -284,12 +322,12 @@ impl Backend for WindowsBackend {
     }
 
     fn snapshot(&self) -> Result<Vec<PlayerInfo>> {
-        collect(&mut Vec::new())
+        collect(&mut Vec::new(), &self.vlc_password)
     }
 
     fn debug(&self) -> String {
         let mut errs = Vec::new();
-        let snap = collect(&mut errs);
+        let snap = collect(&mut errs, &self.vlc_password);
         let mut s = String::from("Phone Remote diagnostics (windows-gsmtc)\n\n");
         match snap {
             Ok(p) if p.is_empty() => s.push_str("No sessions found. Windows reports nothing playing and no app is making sound.\n"),
@@ -311,6 +349,23 @@ impl Backend for WindowsBackend {
                 _ => Ok(false), // media key fallback
             };
         }
+        if id == VLC_ID {
+            let pw = &self.vlc_password;
+            return match what {
+                Transport::PlayPause => vlc::play_pause(pw, vlc::status(pw).is_some_and(|s| s.stopped)),
+                Transport::Next => vlc::next(pw),
+                Transport::Prev => vlc::prev(pw),
+            }
+            .map(|_| true);
+        }
+        if id == MPV_ID {
+            return match what {
+                Transport::PlayPause => mpv::play_pause(),
+                Transport::Next => mpv::next(),
+                Transport::Prev => mpv::prev(),
+            }
+            .map(|_| true);
+        }
         if id.starts_with("audio:") {
             return Ok(false); // no session: the controller falls back to the system media key
         }
@@ -325,6 +380,12 @@ impl Backend for WindowsBackend {
     fn seek_abs(&self, id: &str, pos_ms: i64) -> Result<bool> {
         if id == MPC_ID {
             return mpc::seek(mpc::DEFAULT_PORT, pos_ms).map(|_| true);
+        }
+        if id == VLC_ID {
+            return vlc::seek(&self.vlc_password, pos_ms).map(|_| true);
+        }
+        if id == MPV_ID {
+            return mpv::seek(pos_ms).map(|_| true);
         }
         if id.starts_with("audio:") {
             return Ok(false);
