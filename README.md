@@ -35,6 +35,9 @@ The Android app's Bluetooth mode makes the phone a Bluetooth keyboard/media-key 
 Pair it once from Windows (Settings → Bluetooth → Add device), press *Make phone discoverable* in the app first.
 No agent needed, but there is no now-playing display, and seek is arrow keys to the focused window.
 
+## Windows SmartScreen
+Unsigned downloads show "Windows protected your PC / Unknown publisher". Click **More info → Run anyway** (or right-click the file → Properties → Unblock). The release workflow signs the agent exe and the installer automatically when the `WIN_CERT_B64` and `WIN_CERT_PASSWORD` secrets are set; a signed build removes the warning.
+
 ## Security
 The QR carries a 15-minute pairing code that only lets a phone *ask* to join; the PC owner approves it, and the phone then receives its own revocable key. Constant-time compares, 5-failures/min lockout, WebSocket Origin check, LAN-only source addresses. The dashboard and its API are loopback-only with Host-header and custom-header checks (DNS-rebinding/CSRF). Traffic is plain HTTP on the LAN.
 

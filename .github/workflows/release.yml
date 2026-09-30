@@ -31,6 +31,17 @@ jobs:
           & $st sign /f cert.pfx /p $env:WIN_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 agent\target\release\phone-remote.exe
       - run: choco install innosetup -y --no-progress
       - run: iscc /DVersion=$env:VERSION installer\phone-remote.iss
+      - name: Sign installer (optional)
+        if: ${{ env.WIN_CERT_B64 != '' }}
+        shell: pwsh
+        env:
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          $st = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1).FullName
+          Get-ChildItem dist\PhoneRemote-Setup-*.exe | ForEach-Object {
+            & $st sign /f cert.pfx /p $env:WIN_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            & $st verify /pa $_.FullName
+          }
       - uses: actions/upload-artifact@v4
         with: { name: windows-installer, path: dist/PhoneRemote-Setup-*.exe }
   android:
