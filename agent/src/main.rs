@@ -2,6 +2,8 @@
 // CLI subcommands re-attach to the parent terminal so their output still shows.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod api;
+mod auth;
 mod backend;
 mod config;
 mod controller;
@@ -18,8 +20,8 @@ use std::{net::SocketAddr, sync::Arc};
 
 fn usage() -> &'static str {
     "phone-remote [serve] [--console] [--background] [--port N] [--mock] [--no-mdns]\n\
-     phone-remote pair      print the pairing QR\n\
-     phone-remote rotate    new secret; unpairs every phone\n\
+     phone-remote pair      where to find the pairing QR\n\
+     phone-remote rotate    unpair every phone\n\
      phone-remote setup-players   switch on VLC / mpv / MPC-HC remote interfaces (progress + seek)
      phone-remote install   (Windows) allow private-network firewall access (run as Administrator)\n\
      \n\
@@ -43,19 +45,6 @@ pub fn say(s: &str) {
 fn attach_console() {
     use windows::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
     let _ = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
-}
-
-/// Percent-encode everything except unreserved URL characters.
-fn enc(s: &str) -> String {
-    s.bytes()
-        .map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
-        .collect()
-}
-
-/// QR / link contents: where the PC is, the secret, and who it is (so the phone can
-/// recognise this PC again after its IP changes, without scanning again).
-fn pair_url(ip: std::net::Ipv4Addr, cfg: &config::Config) -> String {
-    format!("http://{ip}:{}/#k={}&id={}&n={}", cfg.port, cfg.token, cfg.pc_id, enc(&net::hostname()))
 }
 
 fn print_qr(url: &str) {
@@ -86,20 +75,19 @@ fn main() -> Result<()> {
         }
     }
     let ips = net::lan_addrs();
-    let ip = ips.first().copied().unwrap_or(std::net::Ipv4Addr::LOCALHOST);
+
 
     match cmd {
         "-h" | "--help" | "help" => say(usage()),
         "rotate" => {
+            // Unpair everything: remove all phones and invalidate the legacy shared secret.
+            cfg.devices.clear();
             cfg.token = config::new_token();
+            cfg.legacy_shared_auth = false;
             config::save(&cfg)?;
-            say("New secret generated. All phones must pair again.");
+            say("All phones unpaired. Pair each one again from the dashboard (restart the agent first if it is running).");
         }
-        "pair" => {
-            let url = pair_url(ip, &cfg);
-            print_qr(&url);
-            say(&url);
-        }
+        "pair" => say(&format!("Open http://127.0.0.1:{}/pair on this PC (the agent must be running) and scan the code.", cfg.port)),
         "install" => install(&cfg)?,
         "setup-players" => backend::setup::apply(&backend::vlc_password(&cfg.local_secret)).iter().for_each(|l| say(l)),
         _ => run(cfg, ips, flag("--mock"), flag("--no-mdns"), flag("--background"), flag("--console") || cfg!(not(windows)))?,
@@ -108,12 +96,12 @@ fn main() -> Result<()> {
 }
 
 fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: bool, background: bool, console: bool) -> Result<()> {
-    let pair_page = format!("http://127.0.0.1:{}/pair", cfg.port);
+    let pair_page = format!("http://127.0.0.1:{}/dashboard", cfg.port);
     // Bind here so a second launch can detect the running agent and just show the pairing page.
     let listener = match std::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], cfg.port))) {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            say(&format!("Already running. Pairing page: {pair_page}"));
+            say(&format!("Already running. Dashboard: {pair_page}"));
             if !background {
                 open_url(&pair_page);
             }
@@ -128,11 +116,19 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
     #[cfg(windows)]
     if !console {
         log::install_panic_hook();
+        server::set_pending_hook(Arc::new(|app, p| {
+            // Ask on a separate thread so the tray keeps running while the dialog is open.
+            std::thread::spawn(move || {
+                let allow = tray::ask_allow(&p.name, &p.ip);
+                app.auth.decide(&p.id, allow);
+                app.poke();
+            });
+        }));
         log::log(&format!("agent {} starting (tray mode{})", env!("CARGO_PKG_VERSION"), if background { ", at login" } else { "" }));
         // The server thread never ends on its own: only the tray's Quit stops the process.
         std::thread::spawn(move || supervise(server_cfg, server_ips, listener, mock, no_mdns));
         if !background {
-            open_url(&pair_page);
+            tray::open_dashboard(&format!("{pair_page}#add"));
         }
         return tray::run(cfg, pair_page);
     }
@@ -184,12 +180,8 @@ async fn serve(
     let host = net::hostname();
     let backend: Arc<dyn backend::Backend> = Arc::from(backend::default_backend(mock, &cfg.local_secret));
     let controller = Arc::new(controller::Controller::new(backend.clone(), host.clone()));
-    let urls: Vec<String> = if ips.is_empty() {
-        vec![pair_url(std::net::Ipv4Addr::LOCALHOST, &cfg)]
-    } else {
-        ips.iter().map(|ip| pair_url(*ip, &cfg)).collect()
-    };
-    let app = server::App::new(controller, cfg.token.clone(), urls.clone());
+    let app = server::App::new(controller, &cfg, host.clone(), ips.clone(), server::pending_hook());
+    let urls = app.pair_urls();
 
     let _mdns = if no_mdns {
         None
@@ -210,7 +202,7 @@ async fn serve(
         if urls.len() > 1 {
             say(&format!("(other addresses: {})", ips[1..].iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", ")));
         }
-        say(&format!("Pairing page on this PC: http://127.0.0.1:{}/pair\n", cfg.port));
+        say(&format!("Dashboard (approve phones, settings): http://127.0.0.1:{}/dashboard\n", cfg.port));
     }
 
     let listener = tokio::net::TcpListener::from_std(listener)?;

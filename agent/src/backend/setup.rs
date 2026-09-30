@@ -46,6 +46,38 @@ pub fn ensure_conf_line(text: &str, key: &str, value: &str) -> String {
     lines.join("\n") + "\n"
 }
 
+/// Is each player's remote interface already configured (whether or not the player is running)?
+pub struct Configured {
+    pub vlc: bool,
+    pub mpv: bool,
+    pub mpc: bool,
+}
+
+#[cfg(windows)]
+pub fn configured() -> Configured {
+    use std::os::windows::process::CommandExt;
+    let appdata = std::env::var_os("APPDATA").map(std::path::PathBuf::from);
+    let read = |rel: &str| appdata.as_ref().and_then(|d| std::fs::read_to_string(d.join(rel)).ok()).unwrap_or_default();
+    let web_on = |key: &str| {
+        std::process::Command::new("reg")
+            .args(["query", key, "/v", "EnableWebServer"])
+            .creation_flags(0x0800_0000)
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains("0x1"))
+            .unwrap_or(false)
+    };
+    Configured {
+        vlc: read(r"vlc\vlcrc").lines().any(|l| l.trim() == "extraintf=http"),
+        mpv: read(r"mpv\mpv.conf").lines().any(|l| l.trim_start().starts_with("input-ipc-server=")),
+        mpc: web_on(r"HKCU\Software\MPC-HC\MPC-HC\Settings") || web_on(r"HKCU\Software\MPC-BE\Settings"),
+    }
+}
+
+#[cfg(not(windows))]
+pub fn configured() -> Configured {
+    Configured { vlc: false, mpv: false, mpc: false }
+}
+
 #[cfg(windows)]
 pub fn apply(vlc_password: &str) -> Vec<String> {
     use std::os::windows::process::CommandExt;

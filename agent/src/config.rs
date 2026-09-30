@@ -11,8 +11,15 @@ pub struct Config {
     /// Public, stable identity of this PC (not secret). Phones use it to match mDNS sightings to saved pairings.
     #[serde(default)]
     pub pc_id: String,
-    /// Pairing secret (256 bit, base64url). Rotating it revokes every paired phone.
+    /// Legacy shared secret from before per-phone tokens. Only honoured while `legacy_shared_auth` is on.
     pub token: String,
+    /// Phones approved on this PC, each with its own revocable token.
+    #[serde(default)]
+    pub devices: Vec<Device>,
+    /// Old configs had no devices: phones paired with the shared secret keep working until the
+    /// user switches this off. New installs start with it off.
+    #[serde(default = "yes")]
+    pub legacy_shared_auth: bool,
     pub port: u16,
     /// Per-install secret for local player interfaces (VLC HTTP password). Not shown to phones.
     #[serde(default)]
@@ -20,6 +27,21 @@ pub struct Config {
     /// Windows: start-at-login was switched on once by default; afterwards the tray checkbox rules.
     #[serde(default)]
     pub autostart_initialized: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Device {
+    /// Chosen by the phone (stable across its IP changes).
+    pub id: String,
+    pub name: String,
+    pub token: String,
+    pub created: u64,
+    #[serde(default)]
+    pub last_seen: u64,
 }
 
 fn path() -> Result<PathBuf> {
@@ -66,7 +88,7 @@ pub fn load_or_create() -> Result<Config> {
             }
         }
     }
-    let c = Config { pc_id: new_id(), token: new_token(), port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
+    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
     save(&c)?;
     Ok(c)
 }

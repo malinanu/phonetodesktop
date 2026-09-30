@@ -59,6 +59,7 @@ class MainActivity : Activity() {
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
     private var loadedKey: String? = null
+    private var currentPcId: String? = null
     private lateinit var titleView: TextView
 
     private val bold: Typeface by lazy { resources.getFont(R.font.bricolage_bold) }
@@ -128,6 +129,7 @@ class MainActivity : Activity() {
             overScrollMode = View.OVER_SCROLL_NEVER
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            addJavascriptInterface(Bridge(), "AndroidBridge")
             webViewClient = object : WebViewClient() {
                 override fun onReceivedError(v: WebView, r: WebResourceRequest, e: WebResourceError) {
                     if (r.isForMainFrame) showBanner("Can't reach your PC. Same Wi-Fi? Tap to retry, or use Bluetooth.")
@@ -189,8 +191,8 @@ class MainActivity : Activity() {
         col.addView(label("Pause, skip and seek your PC's media from the couch. Pair once; it reconnects by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
         listOf(
             "Open Phone Remote on your PC",
-            "Right-click its tray icon, then Pair a phone",
-            "Tap the button below and scan the code",
+            "Double-click its tray icon and open Phones",
+            "Scan the code, then tap Allow on the PC",
         ).forEachIndexed { i, t ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
             row.addView(label("${i + 1}", 26f, C.ACC, bold = true), lp(dp(36), WRAP_CONTENT))
@@ -200,6 +202,27 @@ class MainActivity : Activity() {
         col.addView(button("Scan QR code", filled = true) { scanQr() }, lp().apply { topMargin = dp(20) })
         col.addView(button("How it works and troubleshooting") { toggleGuide(true, "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
+    }
+
+    /** Called by the PC's page (see index.html) when the PC owner approves or removes this phone. */
+    inner class Bridge {
+        @android.webkit.JavascriptInterface
+        fun onPaired(token: String, deviceId: String) {
+            val id = currentPcId ?: return
+            runOnUiThread { store.markPaired(id, token, deviceId) }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun onRevoked() {
+            val id = currentPcId ?: return
+            runOnUiThread {
+                store.forget(id)
+                loadedKey = null
+                refreshTitle()
+                showMode(false)
+                openActive()
+            }
+        }
     }
 
     private fun refreshTitle() {
@@ -214,7 +237,9 @@ class MainActivity : Activity() {
         val key = "${pc.id}@${pc.host}:${pc.port}"
         if (loadedKey == key) return
         loadedKey = key
-        web.loadUrl("http://${pc.host}:${pc.port}/#k=${pc.token}")
+        currentPcId = pc.id
+        val auth = if (pc.paired) "mode=auth" else "mode=pair&dn=${java.net.URLEncoder.encode(Build.MODEL, "UTF-8")}"
+        web.loadUrl("http://${pc.host}:${pc.port}/#k=${pc.token}&dev=${pc.deviceId}&$auth")
         updateVisibility(bluetooth = btView.visibility == View.VISIBLE)
     }
 
@@ -264,7 +289,9 @@ class MainActivity : Activity() {
                 val port = m.groupValues[2].toInt()
                 val name = params["n"]?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: host
                 // Scanning the same PC again just refreshes its entry; it never creates a duplicate.
-                store.upsert(Pc(params["id"] ?: "$host:$port", name, token, host, port))
+                val pcId = params["id"] ?: "$host:$port"
+                val deviceId = store.all().firstOrNull { it.id == pcId }?.deviceId ?: newDeviceId()
+                store.upsert(Pc(pcId, name, token, host, port, deviceId, paired = false))
                 loadedKey = null
                 refreshTitle()
                 showMode(false)

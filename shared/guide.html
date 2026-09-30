@@ -77,8 +77,9 @@
     <ol class="steps">
       <li><b>Start Phone Remote on the PC</b><span>Look for the orange play icon near the clock (it may hide under the ^ arrow). No icon? Open Phone Remote from the Start menu.</span></li>
       <li><b>Put both devices on the same Wi-Fi</b><span>The phone and the PC must share one network. A guest network usually will not work.</span></li>
-      <li><b>Show the pairing code</b><span>Right-click the tray icon and choose <em>Pair a phone</em>. A page with a QR code opens.</span></li>
+      <li><b>Show the pairing code</b><span>Double-click the tray icon to open Phone Remote, then go to <em>Phones</em>. The QR code is there.</span></li>
       <li><b>Scan it with your phone</b><span>In the Android app tap <em>Scan QR code</em>. Without the app, point the camera at the code and open the link.</span></li>
+      <li><b>Allow the phone on the PC</b><span>A question appears on the PC: <em>Allow this phone?</em> Choose Allow. You do this once per phone; nobody can join with only the QR code.</span></li>
       <li><b>Play something on the PC</b><span>Start a video or song. The title appears on your phone and the buttons come alive.</span></li>
     </ol>
     <p class="note">Next time there is nothing to do. Open the app and you are connected.</p>
@@ -101,8 +102,8 @@
   <details><summary>Nothing shows as playing</summary><p>Phone Remote sees anything that reports to Windows' media panel: browsers (YouTube, Netflix), Spotify, Media Player and most music apps. Start playback on the PC once, and check the player picker in the top corner if several apps are open.</p></details>
   <details><summary>My video player (VLC, mpv, MPC-HC) shows no progress bar</summary><p>These players do not tell Windows what they are playing, so by default Phone Remote only sees that they make sound. Fix it once: right-click the tray icon and choose <em>Set up video players</em>. That switches on each player's own remote-control interface (VLC's web interface, mpv's IPC, MPC-HC's web interface). Close the player completely, open it again, and play a video. The title, progress bar and exact seek then work, even while paused.</p><p>If the tray item reports a problem for MPC-HC, enable it by hand: <em>View → Options → Player → Web Interface → Listen on port</em>. Players not listed there still get play state, pause, skip and the arrow-key seek fallback.</p></details>
   <details><summary>Skip 10 seconds does nothing in one app</summary><p>A few apps accept the command and ignore it. Phone Remote notices, and next time it sends arrow keys to that player instead, as long as it is the window in front. See <a href="#how">How it works</a>.</p></details>
-  <details><summary>I have more than one PC or laptop</summary><p>Scan each PC's pairing code once. The Android app keeps them all: tap the PC name at the top to switch, add another, or forget one. When a PC's address changes, the app finds it again by its identity, so you never scan it twice. You only need to pair again after you run <code>phone-remote rotate</code> or delete Phone Remote's settings on that PC.</p></details>
-  <details><summary>Remove a phone I no longer use</summary><p>On the phone, open the menu and choose <em>Forget this PC</em>. To lock out every phone at once, run <code>phone-remote rotate</code> on the PC; all phones must pair again.</p></details>
+  <details><summary>I have more than one PC or laptop</summary><p>Scan each PC's pairing code once. The Android app keeps them all: tap the PC name at the top to switch, add another, or forget one. When a PC's address changes, the app finds it again by its identity, so you never scan it twice. You only need to pair again if you remove that phone on the PC, use <em>Unpair all</em>, or delete Phone Remote's settings.</p></details>
+  <details><summary>Remove a phone I no longer use</summary><p>On the PC, open Phone Remote, go to <em>Phones</em> and press <em>Remove</em> next to it; only that phone loses access. To remove every phone at once use <em>Settings → Unpair all</em>. A phone can also just forget the PC from its own menu.</p></details>
   <details><summary>How do I stop Phone Remote?</summary><p>It runs in the background until you quit it: right-click the tray icon (near the clock, maybe under the ^ arrow) and choose <em>Quit Phone Remote</em>. Closing a browser tab or a terminal does not stop it. If it ever misbehaves, <em>Open log folder</em> in the same menu shows what it was doing.</p></details>
   <details><summary>The PC's address changed</summary><p>The Android app finds the PC by name on the network, so this fixes itself. In a browser, scan the pairing QR again.</p></details>
 
@@ -154,7 +155,7 @@
   <h2>Privacy and safety</h2>
   <ol class="layers">
     <li><b>Stays at home</b><span>Commands travel only across your local network. The PC refuses connections from outside your home network.</span></li>
-    <li><b>One secret, in the QR code</b><span>The code holds a long random key. Only a phone that scanned it can send commands, and repeated wrong guesses are locked out.</span></li>
+    <li><b>A key per phone</b><span>Scanning the QR code only lets a phone ask to join, and you must allow it on the PC. Each approved phone then gets its own key, which you can remove at any time. Repeated wrong guesses are locked out.</span></li>
     <li><b>You stay in control</b><span>Quit from the tray icon at any time, or forget a phone from its menu.</span></li>
   </ol>
 

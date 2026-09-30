@@ -33,7 +33,10 @@ pub struct State {
 #[derive(Deserialize, Debug)]
 #[serde(tag = "t", rename_all = "snake_case")]
 pub enum ClientMsg {
-    Auth { token: String },
+    /// Legacy: `device` absent, `token` is the shared secret. Otherwise `device` + its own token.
+    Auth { token: String, #[serde(default)] device: Option<String> },
+    /// First contact with a pairing code from the QR. The PC owner must approve.
+    Pair { code: String, device: String, name: String },
     Cmd(Command),
     Ping,
 }

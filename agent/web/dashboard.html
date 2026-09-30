@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Remote</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  body { min-height:100vh; display:grid; grid-template-columns:232px minmax(0,1fr); }
+  @media (max-width:760px) { body { grid-template-columns:1fr; } }
+
+  /* rail */
+  aside { position:sticky; top:0; height:100vh; padding:26px 16px; display:flex; flex-direction:column; gap:4px; border-right:1px solid var(--line); }
+  @media (max-width:760px) { aside { position:static; height:auto; flex-direction:row; flex-wrap:wrap; padding:14px 12px; border-right:0; border-bottom:1px solid var(--line); } .brand, .rail-foot { display:none; } }
+  .brand { padding:0 12px 22px; } .brand b { display:block; font-size:21px; letter-spacing:-.02em; margin-top:4px; }
+  nav a { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; color:var(--ink-dim); text-decoration:none; font-weight:600; font-size:15px; transition:background .15s var(--ease),color .15s var(--ease); }
+  nav a:hover { background:var(--surface); color:var(--ink); }
+  nav a[aria-current=page] { background:var(--surface-2); color:var(--ink); }
+  nav a .n { margin-left:auto; background:var(--accent); color:var(--on-accent); border-radius:99px; font-size:12px; padding:1px 8px; }
+  nav { display:contents; }
+  @media (max-width:760px) { nav { display:flex; flex-wrap:wrap; gap:4px; } }
+  .rail-foot { margin-top:auto; padding:12px; font-size:13px; color:var(--ink-dim); }
+
+  main { padding:34px clamp(20px,5vw,56px) 60px; max-width:860px; width:100%; }
+  section { display:none; } section.on { display:block; animation:in .3s var(--ease); }
+  @keyframes in { from { opacity:0; transform:translateY(6px); } }
+  h1 { font-size:clamp(30px,5vw,42px); margin:8px 0 6px; }
+  h2 { font-size:18px; margin:34px 0 10px; }
+  .lead { color:var(--ink-dim); font-size:17px; margin:0 0 6px; max-width:36em; }
+
+  .approval { display:none; align-items:center; gap:14px; flex-wrap:wrap; background:var(--accent); color:var(--on-accent); border-radius:16px; padding:14px 18px; margin-bottom:22px; }
+  .approval.on { display:flex; } .approval b { font-size:16px; } .approval span { flex:1; min-width:180px; }
+  .approval .btn { background:var(--on-accent); color:var(--ink); padding:9px 16px; } .approval .btn.ghost { background:transparent; color:var(--on-accent); box-shadow:inset 0 0 0 2px var(--on-accent); }
+
+  .stat { display:flex; gap:40px; flex-wrap:wrap; margin:22px 0 4px; }
+  .stat div b { display:block; font-size:34px; letter-spacing:-.03em; line-height:1.1; } .stat div span { color:var(--ink-dim); font-size:14px; }
+  .now { margin:26px 0 0; padding:20px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .now .t { font-size:24px; font-weight:700; letter-spacing:-.02em; margin:8px 0 2px; } .now .bar { height:4px; background:var(--surface-2); border-radius:4px; margin-top:14px; overflow:hidden; } .now .bar i { display:block; height:100%; background:var(--accent); }
+  .row { display:flex; align-items:center; gap:14px; padding:15px 0; border-top:1px solid var(--line); }
+  .row:last-child { border-bottom:1px solid var(--line); }
+  .row .grow { flex:1; min-width:0; } .row .grow b { font-size:16px; font-weight:650; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .row .grow span { color:var(--ink-dim); font-size:14px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; } .dot.on { background:var(--good); }
+  .chip { font-size:13px; font-weight:650; padding:5px 11px; border-radius:99px; background:var(--surface-2); color:var(--ink-dim); }
+  .chip.ready { background:color-mix(in oklab,var(--good) 18%,transparent); color:var(--good); } .chip.restart { background:color-mix(in oklab,var(--accent) 20%,transparent); color:var(--accent); }
+  .btn.small { padding:8px 14px; font-size:14px; } .btn.danger { color:var(--bad); } .btn.primary:active { filter:brightness(.92); }
+  .empty { color:var(--ink-dim); padding:22px 0; }
+  .qrbox { display:grid; grid-template-columns:minmax(0,260px) 1fr; gap:28px; align-items:center; margin-top:10px; }
+  @media (max-width:640px) { .qrbox { grid-template-columns:1fr; } }
+  .qrbox .qr { background:#fff; border-radius:18px; padding:12px; } .qrbox .qr svg { width:100%; height:auto; display:block; }
+  .qrbox p { color:var(--ink-dim); margin:0 0 10px; }
+  .note { border-left:3px solid var(--accent); padding:4px 0 4px 14px; margin:18px 0; color:var(--ink-dim); }
+  .switch { position:relative; width:46px; height:28px; flex:none; } .switch input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; z-index:1; }
+  .switch i { position:absolute; inset:0; border-radius:99px; background:var(--surface-2); transition:background .2s var(--ease); } .switch i::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:var(--ink-dim); transition:transform .2s var(--ease),background .2s; }
+  .switch input:checked + i { background:var(--accent); } .switch input:checked + i::after { transform:translateX(18px); background:var(--on-accent); }
+  pre { font:12.5px/1.6 ui-monospace,Consolas,monospace; color:var(--ink-dim); white-space:pre-wrap; word-break:break-word; margin:0; }
+  .out { margin-top:14px; } .links { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><span class="kicker">PC agent</span><b>Phone Remote</b></div>
+  <nav>
+    <a href="#home" data-v="home">Home</a>
+    <a href="#phones" data-v="phones">Phones <span class="n" id="pcount" hidden></span></a>
+    <a href="#players" data-v="players">Video players</a>
+    <a href="#settings" data-v="settings">Settings</a>
+    <a href="#activity" data-v="activity">Activity</a>
+    <a href="#help" data-v="help">Help</a>
+  </nav>
+  <div class="rail-foot" id="ver"></div>
+</aside>
+
+<main>
+  <div class="approval" id="approval">
+    <span><b id="apName"></b><br>wants to control this PC's media.</span>
+    <button class="btn" id="apAllow">Allow</button><button class="btn ghost" id="apDeny">Deny</button>
+  </div>
+
+  <section id="home">
+    <span class="kicker">Overview</span>
+    <h1 id="hState">Running</h1>
+    <p class="lead" id="hSub"></p>
+    <div class="stat"><div><b id="hPhones">0</b><span>phones connected</span></div><div><b id="hTotal">0</b><span>phones paired</span></div></div>
+    <div class="now" id="hNow"></div>
+    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a></div>
+  </section>
+
+  <section id="phones">
+    <span class="kicker">Devices</span>
+    <h1>Your phones</h1>
+    <p class="lead">Each phone has its own key. Remove one and only that phone loses access.</p>
+    <div id="devList"></div>
+    <div id="legacyBox"></div>
+    <h2>Add a phone</h2>
+    <div class="qrbox"><div class="qr" id="qr"></div>
+      <div><p>On the same Wi-Fi, open the <b>Phone Remote</b> app and tap <b>Scan QR code</b>, or point the phone camera at this code.</p>
+      <p>You will be asked here to <b>allow</b> the new phone. The code works for 15 minutes.</p>
+      <button class="btn small" id="newCode">New code</button></div></div>
+    <details style="margin-top:18px;color:var(--ink-dim)" id="otherAddrs"><summary>Phone can't connect? Other network addresses</summary><div id="others"></div></details>
+  </section>
+
+  <section id="players">
+    <span class="kicker">Progress and seek</span>
+    <h1>Video players</h1>
+    <p class="lead">Some players don't tell Windows what they play. Switching on their own remote interface gives them a progress bar and exact seek.</p>
+    <div id="plList"></div>
+    <p style="margin-top:18px"><button class="btn primary" id="plSetup">Set up video players</button></p>
+    <pre class="out" id="plOut"></pre>
+    <div class="note">After setup, close each player completely and open it again.</div>
+  </section>
+
+  <section id="settings">
+    <span class="kicker">Preferences</span>
+    <h1>Settings</h1>
+    <div class="row"><div class="grow"><b>Start with Windows</b><span>Run quietly in the tray when you sign in.</span></div><label class="switch"><input type="checkbox" id="autostart"><i></i></label></div>
+    <div class="row"><div class="grow"><b id="setName">This PC</b><span id="setAddr"></span></div></div>
+    <h2>Danger zone</h2>
+    <div class="row"><div class="grow"><b>Unpair all phones</b><span>Every phone has to be approved again.</span></div><button class="btn small danger" id="unpair">Unpair all</button></div>
+  </section>
+
+  <section id="activity">
+    <span class="kicker">Log</span>
+    <h1>Activity</h1>
+    <p class="lead">What the agent has been doing. Useful if something stops working.</p>
+    <p><button class="btn small" id="logRefresh">Refresh</button></p>
+    <pre id="logBox"></pre>
+  </section>
+
+  <section id="help">
+    <span class="kicker">Support</span>
+    <h1>Help</h1>
+    <p class="lead">Setup steps, how it works and fixes for common problems.</p>
+    <div class="links"><a class="btn primary" href="/guide" target="_blank">Open the guide</a><a class="btn" href="/debug" target="_blank">What the agent detects</a></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const api = async (path, method = 'GET', body) => {
+    const r = await fetch(path, { method, headers: { 'X-Requested-With': 'phone-remote', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw new Error(path + ' ' + r.status);
+    return r.json();
+  };
+  const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+  const ago = t => { if (!t) return 'never'; const s = Math.floor(Date.now() / 1000) - t; return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  let view = 'home', data = null, removing = null;
+  const views = ['home', 'phones', 'players', 'settings', 'activity', 'help'];
+  function route() {
+    const h = location.hash.slice(1);
+    view = h === 'add' ? 'phones' : views.includes(h) ? h : 'home';
+    document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === view));
+    document.querySelectorAll('nav a').forEach(a => a.toggleAttribute('aria-current', a.dataset.v === view) || a.removeAttribute('aria-current'));
+    document.querySelectorAll('nav a').forEach(a => { if (a.dataset.v === view) a.setAttribute('aria-current', 'page'); });
+    if (view === 'phones') loadQr();
+    if (view === 'players') loadPlayers();
+    if (view === 'activity') loadLog();
+  }
+  addEventListener('hashchange', route);
+
+  function renderHome() {
+    const now = data.now, p = now && now.players.find(x => x.id === now.current);
+    $('hSub').textContent = `Listening on ${data.ips[0] || '127.0.0.1'}:${data.port}.`;
+    $('hPhones').textContent = data.phones_online;
+    $('hTotal').textContent = data.devices.length + (data.legacy ? '+' : '');
+    const box = $('hNow'); box.textContent = '';
+    box.append(el('span', 'kicker', 'Now playing on this PC'));
+    if (p) {
+      box.append(el('div', 't', p.title || p.app), el('span', 'dim', `${p.app} · ${p.playing ? 'playing' : 'paused'}${p.dur_ms ? ' · ' + fmt(p.pos_ms) + ' / ' + fmt(p.dur_ms) : ''}`));
+      if (p.dur_ms) { const b = el('div', 'bar'), i = el('i'); i.style.width = (100 * p.pos_ms / p.dur_ms) + '%'; b.append(i); box.append(b); }
+    } else box.append(el('div', 'empty', 'Nothing is playing.'));
+  }
+
+  function renderPhones() {
+    const list = $('devList'); list.textContent = '';
+    if (!data.devices.length) list.append(el('div', 'empty', 'No phones paired yet. Add one below.'));
+    data.devices.forEach(d => {
+      const r = el('div', 'row'), dot = el('span', 'dot' + (d.online ? ' on' : ''));
+      const g = el('div', 'grow'); g.append(el('b', null, d.name), el('span', null, d.online ? 'Connected now' : 'Last seen ' + ago(d.last_seen)));
+      const b = el('button', 'btn small danger', removing === d.id ? 'Click again to remove' : 'Remove');
+      b.onclick = async () => { if (removing !== d.id) { removing = d.id; renderPhones(); setTimeout(() => { if (removing === d.id) { removing = null; renderPhones(); } }, 4000); return; } removing = null; await api('/api/devices/' + encodeURIComponent(d.id), 'DELETE'); refresh(); };
+      r.append(dot, g, b); list.append(r);
+    });
+    const lb = $('legacyBox'); lb.textContent = '';
+    if (data.legacy) {
+      const n = el('div', 'note'); n.append(el('div', null, 'Phones paired before this update still connect with the old shared key. Once you have added your phones again, turn this off.'));
+      const b = el('button', 'btn small', 'Turn off old shared key'); b.style.marginTop = '10px';
+      b.onclick = async () => { await api('/api/legacy', 'POST', { enabled: false }); refresh(); }; n.append(b); lb.append(n);
+    }
+  }
+
+  function renderApproval() {
+    const p = data.pending[0];
+    $('approval').classList.toggle('on', !!p);
+    if (!p) return;
+    $('apName').textContent = `“${p.name}” (${p.ip})`;
+    $('apAllow').onclick = async () => { await api(`/api/pending/${encodeURIComponent(p.id)}/approve`, 'POST'); refresh(); };
+    $('apDeny').onclick = async () => { await api(`/api/pending/${encodeURIComponent(p.id)}/deny`, 'POST'); refresh(); };
+  }
+
+  function render() {
+    const c = data.pending.length; const pc = $('pcount'); pc.hidden = !c; pc.textContent = c;
+    $('ver').textContent = `Agent v${data.version} · ${data.host}`;
+    $('setName').textContent = data.host; $('setAddr').textContent = `${data.ips.join(', ') || '127.0.0.1'} · port ${data.port}`;
+    $('autostart').checked = data.autostart;
+    renderApproval(); renderHome(); renderPhones();
+  }
+
+  async function refresh() { try { data = await api('/api/overview'); render(); } catch (e) { $('hState').textContent = 'Not running'; } }
+
+  async function loadQr() {
+    try {
+      const q = await api('/api/qr');
+      $('qr').innerHTML = q.codes[0].svg;
+      const o = $('others'); o.textContent = '';
+      q.codes.slice(1).forEach(c => { const d = el('div'); d.style.cssText = 'background:#fff;border-radius:14px;padding:10px;width:200px;margin:12px 0 4px'; d.innerHTML = c.svg; o.append(d, el('pre', null, c.url)); });
+      $('otherAddrs').hidden = q.codes.length < 2;
+    } catch (e) {}
+  }
+  $('newCode').onclick = async () => { await api('/api/qr/refresh', 'POST'); loadQr(); };
+
+  async function loadPlayers() {
+    const rows = await api('/api/players'); const box = $('plList'); box.textContent = '';
+    const label = { ready: 'Ready', restart: 'Restart the player', off: 'Not set up' };
+    rows.forEach(p => { const r = el('div', 'row'), g = el('div', 'grow'); g.append(el('b', null, p.name), el('span', null, p.note)); r.append(g, el('span', 'chip ' + p.status, label[p.status])); box.append(r); });
+  }
+  $('plSetup').onclick = async () => { $('plOut').textContent = 'Working…'; const r = await api('/api/players/setup', 'POST'); $('plOut').textContent = r.lines.join('\n\n'); loadPlayers(); };
+
+  async function loadLog() { const r = await api('/api/log'); $('logBox').textContent = r.lines.join('\n') || 'Nothing logged yet.'; }
+  $('logRefresh').onclick = loadLog;
+  $('autostart').onchange = async e => { await api('/api/autostart', 'POST', { enabled: e.target.checked }); };
+  $('unpair').onclick = async e => { if (e.target.dataset.sure) { await api('/api/unpair-all', 'POST'); e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; refresh(); } else { e.target.dataset.sure = 1; e.target.textContent = 'Click again to confirm'; setTimeout(() => { e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; }, 4000); } };
+
+  route(); refresh();
+  setInterval(() => { if (!document.hidden) refresh(); }, 2000);
+  setInterval(() => { if (!document.hidden && view === 'phones') loadQr(); }, 30000);
+})();
+</script>
+</body>
+</html>

@@ -1,13 +1,25 @@
-//! System tray icon: keeps the agent alive after the terminal is closed.
+//! System tray icon and the few native dialogs. Everything else lives in the dashboard window.
 
 use crate::config::{self, Config};
 use anyhow::Result;
+use std::sync::Mutex;
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, MouseButton, TrayIconBuilder, TrayIconEvent};
-use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG};
+use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE, WM_QUIT};
 
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_NAME: &str = "PhoneRemote";
+
+static TOOLTIP: Mutex<String> = Mutex::new(String::new());
+
+/// Latest tooltip text; the tray thread applies it on its next tick.
+pub fn set_tooltip(text: &str) {
+    if let Ok(mut t) = TOOLTIP.lock() {
+        if *t != text {
+            *t = text.to_string();
+        }
+    }
+}
 
 fn reg(args: &[&str]) -> bool {
     use std::os::windows::process::CommandExt;
@@ -19,11 +31,11 @@ fn reg(args: &[&str]) -> bool {
         .unwrap_or(false)
 }
 
-fn autostart_enabled() -> bool {
+pub fn autostart_enabled() -> bool {
     reg(&["query", RUN_KEY, "/v", RUN_NAME])
 }
 
-fn set_autostart(on: bool) {
+pub fn set_autostart(on: bool) {
     if on {
         if let Ok(exe) = std::env::current_exe() {
             let value = format!("\"{}\" --background", exe.display());
@@ -51,13 +63,44 @@ fn icon() -> Icon {
     Icon::from_rgba(px, N as u32, N as u32).expect("valid icon")
 }
 
-pub fn info(title: &str, msg: &str) {
+/// Modal Allow/Deny question for a phone that scanned the QR. Call from a worker thread.
+pub fn ask_allow(name: &str, ip: &str) -> bool {
     use windows::core::HSTRING;
-    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
-    unsafe { MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from(title), MB_OK | MB_ICONINFORMATION) };
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, IDYES, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO};
+    let msg = format!("\"{name}\" ({ip}) wants to control this PC's media.\n\nAllow it?");
+    unsafe {
+        MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from("Phone Remote: new phone"), MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND) == IDYES
+    }
 }
 
-pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
+/// Open the dashboard as a frameless app window (Edge, then Chrome), else the default browser.
+pub fn open_dashboard(url: &str) {
+    use std::os::windows::process::CommandExt;
+    let pf = std::env::var("ProgramFiles").unwrap_or_default();
+    let pf86 = std::env::var("ProgramFiles(x86)").unwrap_or_default();
+    let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let candidates = [
+        format!(r"{pf86}\Microsoft\Edge\Application\msedge.exe"),
+        format!(r"{pf}\Microsoft\Edge\Application\msedge.exe"),
+        format!(r"{pf}\Google\Chrome\Application\chrome.exe"),
+        format!(r"{pf86}\Google\Chrome\Application\chrome.exe"),
+        format!(r"{local}\Google\Chrome\Application\chrome.exe"),
+    ];
+    for exe in candidates.iter().filter(|p| std::path::Path::new(p).exists()) {
+        if std::process::Command::new(exe)
+            .arg(format!("--app={url}"))
+            .arg("--window-size=1040,760")
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .is_ok()
+        {
+            return;
+        }
+    }
+    crate::open_url(url);
+}
+
+pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {
     // First run: start with Windows by default; the tray checkbox decides from then on.
     if !cfg.autostart_initialized {
         set_autostart(true);
@@ -66,34 +109,20 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
     }
 
     let menu = Menu::new();
-    let pair = MenuItem::new("Pair a phone (show QR code)", true, None);
-    let guide = MenuItem::new("Guide: how it works and connecting", true, None);
-    let setup = MenuItem::new("Set up video players (VLC, mpv, MPC-HC)", true, None);
-    let logm = MenuItem::new("Open log folder", true, None);
-    let diag = MenuItem::new("Diagnostics (what is detected)", true, None);
+    let open = MenuItem::new("Open Phone Remote", true, None);
+    let add = MenuItem::new("Add a phone", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&pair, &setup, &guide, &diag, &logm, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
-    let (pair_id, setup_id, guide_id, diag_id, log_id, auto_id, quit_id) = (pair.id().clone(), setup.id().clone(), guide.id().clone(), diag.id().clone(), logm.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&pair, &setup, &guide, &diag, &logm, &auto, &quit); // menu items must outlive the tray on this thread
-    let vlc_pw = crate::backend::vlc_password(&cfg.local_secret);
+    menu.append_items(&[&open, &add, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    let (open_id, add_id, auto_id, quit_id) = (open.id().clone(), add.id().clone(), auto.id().clone(), quit.id().clone());
+    let _keep = (&open, &add, &auto, &quit); // menu items must outlive the tray on this thread
 
-    let page = pair_page.clone();
+    let (d1, d2, d3) = (dashboard.clone(), dashboard.clone(), dashboard.clone());
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
-        if e.id == pair_id {
-            crate::open_url(&page);
-        } else if e.id == setup_id {
-            let pw = vlc_pw.clone();
-            std::thread::spawn(move || {
-                let report = crate::backend::setup::apply(&pw).join("\n\n");
-                info("Set up video players", &format!("{report}\n\nRestart each player once, then play something."));
-            });
-        } else if e.id == guide_id {
-            crate::open_url(&page.replace("/pair", "/guide"));
-        } else if e.id == diag_id {
-            crate::open_url(&page.replace("/pair", "/debug"));
-        } else if e.id == log_id {
-            crate::open_url(&crate::log::dir().display().to_string());
+        if e.id == open_id {
+            open_dashboard(&d1);
+        } else if e.id == add_id {
+            open_dashboard(&format!("{d2}#add"));
         } else if e.id == auto_id {
             // The checkbox flips itself natively; make the registry match the new state.
             set_autostart(!autostart_enabled());
@@ -104,23 +133,36 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
     }));
     TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
         if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = e {
-            crate::open_url(&pair_page);
+            open_dashboard(&d3);
         }
     }));
 
-    let _tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
-        .with_tooltip("Phone Remote — running")
+        .with_tooltip("Phone Remote")
         .with_icon(icon())
         .build()?;
 
     // The tray's hidden window needs this thread's message loop; menu callbacks fire from it.
-    unsafe {
-        let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            let _ = TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+    // Poll (rather than block) so the tooltip can follow the server's state.
+    let mut shown = String::new();
+    'pump: loop {
+        unsafe {
+            let mut msg = MSG::default();
+            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                if msg.message == WM_QUIT {
+                    break 'pump;
+                }
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
         }
+        let want = TOOLTIP.lock().map(|t| t.clone()).unwrap_or_default();
+        if !want.is_empty() && want != shown {
+            let _ = tray.set_tooltip(Some(want.clone()));
+            shown = want;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(40));
     }
     Ok(())
 }

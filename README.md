@@ -33,8 +33,10 @@ Pair it once from Windows (Settings → Bluetooth → Add device), press *Make p
 No agent needed, but there is no now-playing display, and seek is arrow keys to the focused window.
 
 ## Security
-256-bit secret from the QR, constant-time compare, 5-failures/min lockout, WebSocket Origin check,
-private/LAN source addresses only, `/pair` only from localhost. Traffic is plain HTTP on the LAN.
+The QR carries a 15-minute pairing code that only lets a phone *ask* to join; the PC owner approves it, and the phone then receives its own revocable key. Constant-time compares, 5-failures/min lockout, WebSocket Origin check, LAN-only source addresses. The dashboard and its API are loopback-only with Host-header and custom-header checks (DNS-rebinding/CSRF). Traffic is plain HTTP on the LAN.
+
+## Dashboard
+Double-click the tray icon: Home, Phones (approve/remove, QR), Video players (one-click setup), Settings, Activity, Help. It opens as an app-style Edge window.
 
 ## Status
 Tested: controller logic (unit tests), WebSocket auth/commands/Origin check against the mock backend on Linux.

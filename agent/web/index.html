@@ -127,23 +127,39 @@
   <button class="btn" id="close">Close</button>
 </div></div>
 <div id="gate">
-  <span class="kicker">Not paired</span>
-  <h2>Pair with your PC</h2>
-  <p>On the PC, right-click the Phone Remote tray icon, choose <b>Pair a phone</b>, then scan the QR code with this phone's camera.</p>
+  <span class="kicker" id="gk">Not paired</span>
+  <h2 id="gh">Pair with your PC</h2>
+  <p id="gp">On the PC, open Phone Remote from the tray icon, choose <b>Add a phone</b>, then scan the QR code with this phone's camera.</p>
   <a class="btn primary" href="/guide">Show me how</a>
 </div>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const KEY = 'pr.token';
-  let token = null;
+  // ---- identity: this phone's id + its own key (once the PC owner has approved it) ----
+  const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('');
+  const q = {};
+  (location.hash.slice(1).split('&')).forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+  const bridge = window.AndroidBridge;
+  let retryNow = false, legacy = null, deviceId = null, token = null, pairCode = null, triedLegacy = false;
+  const ua = navigator.userAgent, model = (/Android [\d.]+; ([^)]+)\)/.exec(ua) || [])[1];
+  const deviceName = q.dn || (model && model.replace(/ Build.*/, '')) || (/iPhone|iPad/.test(ua) ? 'iPhone' : 'Browser');
   try {
-    const m = /[#&]k=([^&]+)/.exec(location.hash);
-    if (m) { localStorage.setItem(KEY, m[1]); history.replaceState(null, '', location.pathname); }
-    token = localStorage.getItem(KEY);
+    deviceId = q.dev || localStorage.getItem('pr.dev');
+    if (!deviceId) { deviceId = rnd(); }
+    localStorage.setItem('pr.dev', deviceId);
+    if (q.k && q.mode === 'auth') token = q.k;
+    else if (q.k) pairCode = q.k;
+    else token = localStorage.getItem('pr.tok');
+    if (!token && !pairCode) token = localStorage.getItem('pr.tok');
+    if (q.k) history.replaceState(null, '', location.pathname);
   } catch (e) {}
-  if (!token) { $('gate').classList.add('show'); return; }
+  const showGate = (k, h, p) => { $('gk').textContent = k; $('gh').textContent = h; $('gp').textContent = p; $('gate').classList.add('show'); };
+  if (!token && !pairCode) {
+    // Browsers paired before per-phone keys stored the shared key under these names.
+    try { legacy = localStorage.getItem('pr.legacy') || localStorage.getItem('pr.token'); } catch (e) {}
+  }
+  if (!token && !pairCode && !legacy) { $('gate').classList.add('show'); return; }
 
   let lastMsg = 0, rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb, toastT;
   const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600);
@@ -158,17 +174,34 @@
   function connect() {
     setStatus(false, 'Connecting…');
     ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token }));
+    ws.onopen = () => ws.send(JSON.stringify(legacy ? { t: 'auth', token: legacy } : token ? { t: 'auth', token, device: deviceId } : { t: 'pair', code: pairCode, device: deviceId, name: deviceName }));
     ws.onmessage = e => {
       lastMsg = performance.now();
       const m = JSON.parse(e.data);
-      if (m.t === 'auth') {
-        if (m.ok) { retry = 500; clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); }
+      if (m.t === 'pair') {
+        if (m.status === 'pending') showGate('Waiting for approval', 'Check your PC', `Allow “${deviceName}” in the Phone Remote window on your PC.`);
+        else if (m.status === 'approved') {
+          token = m.device_token; pairCode = null;
+          try { localStorage.setItem('pr.tok', token); } catch (e) {}
+          if (bridge && bridge.onPaired) bridge.onPaired(token, deviceId);
+          $('gate').classList.remove('show');
+        } else if (m.status === 'denied') { rejected = true; showGate('Declined', 'Not allowed', 'The PC owner declined this phone. Scan the QR code again to retry.'); }
+        else if (m.status === 'expired') { rejected = true; showGate('Code expired', 'Get a fresh code', 'Open Add a phone on the PC for a new QR code, then scan it.'); }
+        else if (m.status === 'bad_code') {
+          // Phones paired before per-phone keys hold the old shared key; try it once.
+          if (!triedLegacy && pairCode) { triedLegacy = true; legacy = pairCode; pairCode = null; retryNow = true; }
+          else { rejected = true; showGate('Not valid', 'That code did not work', 'Scan the QR code shown on the PC again.'); }
+        }
+      } else if (m.t === 'auth') {
+        if (m.ok) { retry = 500; if (legacy) { try { localStorage.setItem('pr.legacy', legacy); } catch (e) {} } clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); $('gate').classList.remove('show'); }
         else {
-          // Only a wrong secret unpairs; a lockout is temporary and must not wipe a valid pairing.
+          // Only a wrong or removed key unpairs; a lockout is temporary and must not wipe a valid pairing.
           rejected = true;
-          if (m.err === 'bad token') { $('gate').classList.add('show'); localStorage.removeItem(KEY); }
-          else setStatus(false, 'Locked out, retry in a minute');
+          if (m.err === 'bad token' || m.err === 'revoked') {
+            try { localStorage.removeItem('pr.tok'); } catch (e) {}
+            if (bridge && bridge.onRevoked) bridge.onRevoked();
+            showGate('Not paired', 'This phone was removed', 'Scan the QR code on the PC again to reconnect.');
+          } else setStatus(false, 'Locked out, retry in a minute');
           ws.close();
         }
       } else if (m.t === 'state') { state = m; recvAt = performance.now(); setStatus(true, m.host); render(true); }
@@ -176,6 +209,7 @@
     };
     ws.onclose = () => {
       clearInterval(hb);
+      if (retryNow) { retryNow = false; setTimeout(connect, 0); return; }
       if (rejected) { rejected = false; if ($('gate').classList.contains('show')) return; retry = 60000; }
       else setStatus(false, 'Reconnecting…');
       setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000);
@@ -247,7 +281,7 @@
   $('close').onclick = () => $('menu').classList.remove('show');
   $('menu').onclick = e => { if (e.target.id === 'menu') $('menu').classList.remove('show'); };
   $('reconnect').onclick = () => { $('menu').classList.remove('show'); if (ws) ws.close(); };
-  $('forget').onclick = () => { localStorage.removeItem(KEY); location.reload(); };
+  $('forget').onclick = () => { ['pr.tok', 'pr.legacy', 'pr.token'].forEach(k => localStorage.removeItem(k)); location.reload(); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) revive(); });
   connect();
 })();

@@ -5,7 +5,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** One paired PC. `id` is the PC's stable public identity; the token is the pairing secret. */
-data class Pc(val id: String, val name: String, val token: String, val host: String, val port: Int)
+data class Pc(
+    val id: String,
+    val name: String,
+    /** The QR pairing code until this phone is approved, then this phone's own key. */
+    val token: String,
+    val host: String,
+    val port: Int,
+    /** This phone's identity on that PC; stable across IP changes. */
+    val deviceId: String = newDeviceId(),
+    val paired: Boolean = false,
+)
+
+fun newDeviceId(): String = java.util.UUID.randomUUID().toString().replace("-", "").take(18)
 
 /**
  * Every PC this phone has been paired with, kept until the user forgets it. Pairing is by QR once;
@@ -20,13 +32,16 @@ class Store(ctx: Context) {
         val a = JSONArray(prefs.getString("pcs", "[]"))
         return (0 until a.length()).map {
             val o = a.getJSONObject(it)
-            Pc(o.getString("id"), o.getString("name"), o.getString("token"), o.getString("host"), o.getInt("port"))
+            Pc(
+                o.getString("id"), o.getString("name"), o.getString("token"), o.getString("host"), o.getInt("port"),
+                o.optString("deviceId").ifEmpty { newDeviceId() }, o.optBoolean("paired", false),
+            )
         }
     }
 
     private fun save(list: List<Pc>) {
         val a = JSONArray()
-        list.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name).put("token", it.token).put("host", it.host).put("port", it.port)) }
+        list.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name).put("token", it.token).put("host", it.host).put("port", it.port).put("deviceId", it.deviceId).put("paired", it.paired)) }
         prefs.edit().putString("pcs", a.toString()).apply()
     }
 
@@ -34,6 +49,11 @@ class Store(ctx: Context) {
         val id = prefs.getString("active", null)
         val l = all()
         return l.firstOrNull { it.id == id } ?: l.firstOrNull()
+    }
+
+    /** The PC owner approved this phone: keep the key it issued instead of the QR code. */
+    fun markPaired(id: String, token: String, deviceId: String) {
+        save(all().map { if (it.id == id) it.copy(token = token, deviceId = deviceId, paired = true) else it })
     }
 
     fun setActive(id: String) { prefs.edit().putString("active", id).apply() }
