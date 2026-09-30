@@ -30,6 +30,9 @@
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; margin-top:-6px; border-radius:50%; background:var(--accent); border:0; transition:transform .15s var(--ease); }
   input[type=range]:active::-webkit-slider-thumb { transform:scale(1.35); }
   input[type=range]:disabled { opacity:.3; }
+  .seek.none input, .seek.none .times { display:none; }
+  #notl { display:none; color:var(--ink-dim); font-size:14px; padding:10px 0 14px; }
+  .seek.none #notl { display:block; }
   .times { display:flex; justify-content:space-between; font-size:13px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
 
   .transport { display:grid; grid-template-columns:1fr 1fr 1.7fr 1fr 1fr; gap:10px; align-items:center; }
@@ -89,7 +92,8 @@
   <div class="app"><span class="eq" id="eq"><i></i><i></i><i></i><i></i></span><span class="kicker" id="app">Idle</span></div>
   <div id="title">Nothing playing</div>
   <div id="artist">Start a video or a song on your PC.</div>
-  <div class="seek">
+  <div class="seek" id="seek">
+    <div id="notl">This app does not share progress.</div>
     <input id="bar" type="range" min="0" max="1" value="0" step="1" disabled aria-label="Seek">
     <div class="times"><span id="cur">0:00</span><span id="dur"></span></div>
   </div>
@@ -116,7 +120,7 @@
 
 <div id="toast" role="status"></div>
 <div id="menu"><div class="sheet">
-  <h3 id="mhost">This PC</h3><p>Connected over your local network.</p>
+  <h3 id="mhost">This PC</h3><p>Connected over your local network. <span id="mver"></span></p>
   <a class="btn" href="/guide" style="width:100%;justify-content:center">Guide: how it works</a>
   <button class="btn" id="reconnect">Reconnect</button>
   <button class="btn danger" id="forget">Forget this PC</button>
@@ -199,7 +203,9 @@
       $('bar').disabled = !p || !p.can_seek;
       $('bar').max = p ? Math.max(1, p.dur_ms) : 1;
       $('dur').textContent = p && p.dur_ms > 0 ? fmt(p.dur_ms) : '';
+      $('seek').classList.toggle('none', !!p && !p.can_seek && p.dur_ms === 0);
       $('mhost').textContent = state.host;
+      $('mver').textContent = 'Agent v' + (state.version || '?');
     }
     if (p && !seeking) {
       const pos = Math.min(p.dur_ms, p.pos_ms + (p.playing ? performance.now() - recvAt : 0));

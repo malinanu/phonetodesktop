@@ -56,6 +56,7 @@ impl Controller {
             t: "state",
             host: self.host.clone(),
             backend: self.backend.name(),
+            version: env!("CARGO_PKG_VERSION"),
             current,
             players,
         })

@@ -92,6 +92,9 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Status and navigation bars take the app background so nothing clashes with the page below.
+        window.statusBarColor = C.BG
+        window.navigationBarColor = C.BG
         // Edge-to-edge is enforced on targetSdk 35; fitsSystemWindows keeps content below the status bar.
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

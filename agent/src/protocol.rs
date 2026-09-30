@@ -24,6 +24,7 @@ pub struct State {
     pub t: &'static str,
     pub host: String,
     pub backend: &'static str,
+    pub version: &'static str,
     /// Id of the player the commands go to.
     pub current: Option<String>,
     pub players: Vec<PlayerInfo>,

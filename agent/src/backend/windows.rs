@@ -1,7 +1,7 @@
 //! Windows backend: GSMTC (Windows.Media.Control) for sessions, SendInput for media keys,
 //! and arrow-key injection into the foreground window as the last-resort seek.
 
-use super::{Backend, Key, Transport};
+use super::{mpc, Backend, Key, Transport};
 use crate::protocol::PlayerInfo;
 use anyhow::{anyhow, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -133,7 +133,7 @@ fn describe(s: &Session, errs: &mut Vec<String>) -> Option<PlayerInfo> {
 
 /// Apps currently producing audio on the default output, by executable stem (lowercase).
 /// Catches players that register no media session (VLC 3, mpv, many games).
-fn active_audio_apps(errs: &mut Vec<String>) -> Vec<String> {
+fn active_audio_apps(errs: &mut Vec<String>) -> Vec<(String, u32)> {
     match audio_apps() {
         Ok(v) => v,
         Err(e) => {
@@ -143,7 +143,7 @@ fn active_audio_apps(errs: &mut Vec<String>) -> Vec<String> {
     }
 }
 
-fn audio_apps() -> Result<Vec<String>> {
+fn audio_apps() -> Result<Vec<(String, u32)>> {
     use windows::core::Interface;
     use windows::Win32::Media::Audio::{
         eMultimedia, eRender, AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
@@ -168,14 +168,51 @@ fn audio_apps() -> Result<Vec<String>> {
             }
             if let Some(exe) = exe_of_pid(pid) {
                 let stem = exe.trim_end_matches(".exe").to_lowercase();
-                if !out.contains(&stem) {
-                    out.push(stem);
+                if !out.iter().any(|(s, _)| *s == stem) {
+                    out.push((stem, pid));
                 }
             }
         }
     }
     Ok(out)
 }
+
+/// Longest visible top-level window title of a process (players put the file name there).
+fn window_title(pid: u32) -> Option<String> {
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::LPARAM;
+    use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible};
+    unsafe extern "system" fn cb(hwnd: HWND, lp: LPARAM) -> BOOL {
+        let data = unsafe { &mut *(lp.0 as *mut (u32, String)) };
+        let mut wpid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut wpid)) };
+        if wpid == data.0 && unsafe { IsWindowVisible(hwnd) }.as_bool() {
+            let mut buf = [0u16; 512];
+            let n = unsafe { GetWindowTextW(hwnd, &mut buf) };
+            if n > 0 {
+                let t = String::from_utf16_lossy(&buf[..n as usize]);
+                if t.len() > data.1.len() {
+                    data.1 = t;
+                }
+            }
+        }
+        BOOL(1)
+    }
+    let mut data = (pid, String::new());
+    let _ = unsafe { EnumWindows(Some(cb), LPARAM(&mut data as *mut _ as isize)) };
+    (!data.1.is_empty()).then_some(data.1)
+}
+
+/// "Movie.mkv - VLC media player" -> "Movie.mkv"
+fn clean_title(t: &str) -> String {
+    const PLAYERS: &[&str] = &["vlc", "mpc", "mpv", "potplayer", "media player", "kmplayer", "winamp", "foobar"];
+    match t.rsplit_once(" - ") {
+        Some((head, tail)) if PLAYERS.iter().any(|p| tail.to_lowercase().contains(p)) => head.to_string(),
+        _ => t.to_string(),
+    }
+}
+
+const MPC_ID: &str = "mpc:webif";
 
 const IGNORED_AUDIO: &[&str] = &["phone-remote", "audiodg", "system", "svchost", "explorer", "applicationframehost"];
 
@@ -195,21 +232,48 @@ fn collect(errs: &mut Vec<String>) -> Result<Vec<PlayerInfo>> {
     }
     // Nothing with a media session is playing: surface apps that are making sound anyway.
     if !out.iter().any(|p| p.playing) {
-        for app in active_audio_apps(errs) {
+        for (app, pid) in active_audio_apps(errs) {
             if IGNORED_AUDIO.contains(&app.as_str()) {
                 continue;
             }
+            let title = window_title(pid).map(|t| clean_title(&t)).unwrap_or_else(|| "Audio is playing".into());
+            let hint = if app.starts_with("mpc-") {
+                "Turn on the Web Interface in MPC options for progress and seek (see Guide)"
+            } else {
+                "This app shares no progress information"
+            };
             out.push(PlayerInfo {
                 id: format!("audio:{app}"),
                 app: app.clone(),
-                title: "Audio is playing".into(),
-                artist: "This app shares no track details".into(),
+                title,
+                artist: hint.into(),
                 playing: true,
                 pos_ms: 0,
                 dur_ms: 0,
                 can_seek: false,
             });
         }
+    }
+    // MPC-HC/BE with its Web Interface enabled: exact timeline, and visible even while paused.
+    if let Some(st) = mpc::status(mpc::DEFAULT_PORT) {
+        out.retain(|p| !p.id.starts_with("audio:mpc-"));
+        let entry = PlayerInfo {
+            id: MPC_ID.into(),
+            app: "MPC-HC".into(),
+            title: if st.file.is_empty() { "MPC-HC".into() } else { st.file },
+            artist: match st.state {
+                2 => "Playing",
+                1 => "Paused",
+                _ => "Stopped",
+            }
+            .into(),
+            playing: st.state == 2,
+            pos_ms: st.pos_ms,
+            dur_ms: st.dur_ms,
+            can_seek: st.dur_ms > 0,
+        };
+        let at = if entry.playing { 0 } else { out.len() };
+        out.insert(at, entry);
     }
     Ok(out)
 }
@@ -241,6 +305,12 @@ impl Backend for WindowsBackend {
     }
 
     fn transport(&self, id: &str, what: Transport) -> Result<bool> {
+        if id == MPC_ID {
+            return match what {
+                Transport::PlayPause => mpc::play_pause(mpc::DEFAULT_PORT).map(|_| true),
+                _ => Ok(false), // media key fallback
+            };
+        }
         if id.starts_with("audio:") {
             return Ok(false); // no session: the controller falls back to the system media key
         }
@@ -253,6 +323,9 @@ impl Backend for WindowsBackend {
     }
 
     fn seek_abs(&self, id: &str, pos_ms: i64) -> Result<bool> {
+        if id == MPC_ID {
+            return mpc::seek(mpc::DEFAULT_PORT, pos_ms).map(|_| true);
+        }
         if id.starts_with("audio:") {
             return Ok(false);
         }

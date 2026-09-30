@@ -4,6 +4,8 @@ use crate::protocol::PlayerInfo;
 use anyhow::Result;
 
 pub mod mock;
+#[cfg_attr(not(windows), allow(dead_code))]
+pub mod mpc;
 #[cfg(windows)]
 pub mod windows;
 
