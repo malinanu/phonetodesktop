@@ -46,7 +46,7 @@ class MainActivity : Activity() {
         val BAD = Color.parseColor("#FF8A7A")
     }
 
-    private val prefs by lazy { getSharedPreferences("pr", Context.MODE_PRIVATE) }
+    private val store by lazy { Store(this) }
     private lateinit var web: WebView
     private lateinit var welcome: View
     private lateinit var banner: TextView
@@ -58,7 +58,8 @@ class MainActivity : Activity() {
     private lateinit var tabBt: Button
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
-    private var loadedHost: String? = null
+    private var loadedKey: String? = null
+    private lateinit var titleView: TextView
 
     private val bold: Typeface by lazy { resources.getFont(R.font.bricolage_bold) }
     private val medium: Typeface by lazy { resources.getFont(R.font.bricolage_medium) }
@@ -106,7 +107,8 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(20), dp(8), dp(12), dp(8))
         }
-        top.addView(label("Phone Remote", 20f, bold = true), lp(0, WRAP_CONTENT, 1f))
+        titleView = label("Phone Remote", 20f, bold = true).apply { setOnClickListener { if (store.all().isNotEmpty()) showPcs() } }
+        top.addView(titleView, lp(0, WRAP_CONTENT, 1f))
         guideBtn = button("Guide") { toggleGuide() }.apply { minHeight = dp(40); textSize = 13f; background = null; setTextColor(C.DIM) }
         top.addView(guideBtn, lp(WRAP_CONTENT, dp(40)))
         top.addView(button("Scan QR") { scanQr() }.apply { minHeight = dp(40); textSize = 13f }, lp(WRAP_CONTENT, dp(40)))
@@ -116,7 +118,7 @@ class MainActivity : Activity() {
             background = bg(C.BAD, 12)
             setPadding(dp(16), dp(12), dp(16), dp(12))
             visibility = View.GONE
-            setOnClickListener { visibility = View.GONE; loadedHost = null; reconnect() }
+            setOnClickListener { visibility = View.GONE; loadedKey = null; reconnect() }
         }
         root.addView(banner, lp(m = 12))
 
@@ -156,22 +158,23 @@ class MainActivity : Activity() {
         root.addView(nav)
         setContentView(root)
 
-        discovery = Discovery(this) { host, port -> runOnUiThread { openPc(host, port) } }
+        discovery = Discovery(this) { id, host, port -> runOnUiThread { onSighting(id, host, port) } }
         showMode(false)
         // Load the last known address right away, then let mDNS correct it if the IP changed.
-        prefs.getString("host", null)?.let { openPc(it, prefs.getInt("port", 8765)) }
+        refreshTitle()
+        openActive()
     }
 
     override fun onStart() { super.onStart(); if (paired()) discovery.start() }
     override fun onStop() { super.onStop(); discovery.stop() }
     override fun onDestroy() { hid?.stop(); super.onDestroy() }
 
-    private fun paired() = prefs.getString("token", null) != null
+    private fun paired() = store.active() != null
 
     private fun showBanner(msg: String) { banner.text = msg; banner.visibility = View.VISIBLE }
 
     private fun reconnect() {
-        prefs.getString("host", null)?.let { openPc(it, prefs.getInt("port", 8765)) }
+        openActive()
         discovery.start()
     }
 
@@ -199,26 +202,73 @@ class MainActivity : Activity() {
         return col
     }
 
-    private fun openPc(host: String, port: Int) {
-        val token = prefs.getString("token", null) ?: return
-        if (loadedHost == "$host:$port") return
-        loadedHost = "$host:$port"
-        prefs.edit().putString("host", host).putInt("port", port).apply()
-        web.loadUrl("http://$host:$port/#k=$token")
+    private fun refreshTitle() {
+        val pcs = store.all()
+        titleView.text = store.active()?.let { if (pcs.size > 1) "${it.name} ▾" else it.name } ?: "Phone Remote"
+    }
+
+    /** Load the active PC's controller. The pairing never changes here, only where we look for the PC. */
+    private fun openActive() {
+        val pc = store.active() ?: return
+        if (pc.host.isEmpty()) return
+        val key = "${pc.id}@${pc.host}:${pc.port}"
+        if (loadedKey == key) return
+        loadedKey = key
+        web.loadUrl("http://${pc.host}:${pc.port}/#k=${pc.token}")
         updateVisibility(bluetooth = btView.visibility == View.VISIBLE)
+    }
+
+    /** mDNS saw a PC. Match it to a saved pairing by identity; a stranger's PC is ignored. */
+    private fun onSighting(id: String?, host: String, port: Int) {
+        val known = when {
+            id != null -> store.updateAddress(id, host, port) ?: store.adoptLegacy(id, host, port)
+            // Agents older than this version advertise no id: only trust it if we know exactly one PC.
+            store.all().size == 1 -> store.active()?.let { store.updateAddress(it.id, host, port) }
+            else -> null
+        } ?: return
+        if (known.id == store.active()?.id) openActive()
+    }
+
+    private fun showPcs() {
+        val pcs = store.all()
+        val names = pcs.map { it.name }.toTypedArray()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Your PCs")
+            .setItems(names) { _, i ->
+                store.setActive(pcs[i].id)
+                loadedKey = null
+                refreshTitle()
+                showMode(false)
+                openActive()
+            }
+            .setPositiveButton("Add a PC") { _, _ -> scanQr() }
+            .setNegativeButton("Forget ${store.active()?.name ?: ""}") { _, _ ->
+                store.active()?.let { store.forget(it.id) }
+                loadedKey = null
+                refreshTitle()
+                showMode(false)
+                openActive()
+            }
+            .show()
     }
 
     private fun scanQr() {
         val opts = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
         GmsBarcodeScanning.getClient(this, opts).startScan()
             .addOnSuccessListener { code ->
-                val m = Regex("^http://([^:/]+):(\\d+)/#k=([\\w-]+)$").find(code.rawValue ?: "")
-                if (m == null) { Toast.makeText(this, "That is not a Phone Remote code", Toast.LENGTH_SHORT).show(); return@addOnSuccessListener }
-                val (host, port, token) = m.destructured
-                prefs.edit().putString("token", token).apply()
-                loadedHost = null
+                val m = Regex("^http://([^:/]+):(\\d+)/#(.+)$").find(code.rawValue ?: "")
+                val params = m?.groupValues?.get(3)?.split("&")?.mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 } }?.associate { it[0] to it[1] }
+                val token = params?.get("k")
+                if (m == null || token == null) { Toast.makeText(this, "That is not a Phone Remote code", Toast.LENGTH_SHORT).show(); return@addOnSuccessListener }
+                val host = m.groupValues[1]
+                val port = m.groupValues[2].toInt()
+                val name = params["n"]?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: host
+                // Scanning the same PC again just refreshes its entry; it never creates a duplicate.
+                store.upsert(Pc(params["id"] ?: "$host:$port", name, token, host, port))
+                loadedKey = null
+                refreshTitle()
                 showMode(false)
-                openPc(host, port.toInt())
+                openActive()
                 discovery.start()
             }
             .addOnFailureListener { Toast.makeText(this, "Scan failed: ${it.message}", Toast.LENGTH_SHORT).show() }

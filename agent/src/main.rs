@@ -45,8 +45,17 @@ fn attach_console() {
     let _ = unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
 }
 
-fn pair_url(ip: std::net::Ipv4Addr, port: u16, token: &str) -> String {
-    format!("http://{ip}:{port}/#k={token}")
+/// Percent-encode everything except unreserved URL characters.
+fn enc(s: &str) -> String {
+    s.bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
+}
+
+/// QR / link contents: where the PC is, the secret, and who it is (so the phone can
+/// recognise this PC again after its IP changes, without scanning again).
+fn pair_url(ip: std::net::Ipv4Addr, cfg: &config::Config) -> String {
+    format!("http://{ip}:{}/#k={}&id={}&n={}", cfg.port, cfg.token, cfg.pc_id, enc(&net::hostname()))
 }
 
 fn print_qr(url: &str) {
@@ -87,7 +96,7 @@ fn main() -> Result<()> {
             say("New secret generated. All phones must pair again.");
         }
         "pair" => {
-            let url = pair_url(ip, cfg.port, &cfg.token);
+            let url = pair_url(ip, &cfg);
             print_qr(&url);
             say(&url);
         }
@@ -176,16 +185,16 @@ async fn serve(
     let backend: Arc<dyn backend::Backend> = Arc::from(backend::default_backend(mock, &cfg.local_secret));
     let controller = Arc::new(controller::Controller::new(backend.clone(), host.clone()));
     let urls: Vec<String> = if ips.is_empty() {
-        vec![pair_url(std::net::Ipv4Addr::LOCALHOST, cfg.port, &cfg.token)]
+        vec![pair_url(std::net::Ipv4Addr::LOCALHOST, &cfg)]
     } else {
-        ips.iter().map(|ip| pair_url(*ip, cfg.port, &cfg.token)).collect()
+        ips.iter().map(|ip| pair_url(*ip, &cfg)).collect()
     };
     let app = server::App::new(controller, cfg.token.clone(), urls.clone());
 
     let _mdns = if no_mdns {
         None
     } else {
-        match discovery::advertise(&host, cfg.port) {
+        match discovery::advertise(&host, cfg.port, &cfg.pc_id) {
             Ok(d) => Some(d),
             Err(e) => {
                 eprintln!("mDNS advertising failed (QR pairing still works): {e}");

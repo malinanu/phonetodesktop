@@ -5,14 +5,14 @@ use mdns_sd::{IfKind, ServiceDaemon, ServiceInfo};
 
 pub const SERVICE: &str = "_phoneremote._tcp.local.";
 
-pub fn advertise(host: &str, port: u16) -> Result<ServiceDaemon> {
+pub fn advertise(host: &str, port: u16, pc_id: &str) -> Result<ServiceDaemon> {
     let daemon = ServiceDaemon::new()?;
     // NSD on Android resolves to a single address; an IPv6 link-local one would break the URL.
     let _ = daemon.disable_interface(IfKind::IPv6);
     let safe: String = host.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
     let hostname = format!("{safe}.local.");
     // `enable_addr_auto` publishes every interface address and tracks changes.
-    let info = ServiceInfo::new(SERVICE, host, &hostname, "", port, &[("v", "1")][..])?.enable_addr_auto();
+    let info = ServiceInfo::new(SERVICE, host, &hostname, "", port, &[("v", "1"), ("id", pc_id)][..])?.enable_addr_auto();
     daemon.register(info)?;
     Ok(daemon)
 }

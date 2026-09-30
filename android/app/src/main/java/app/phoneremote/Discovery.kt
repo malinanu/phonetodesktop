@@ -5,7 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 
 /** Finds the desktop agent via mDNS (`_phoneremote._tcp`) so an IP change never needs re-pairing. */
-class Discovery(ctx: Context, private val onFound: (host: String, port: Int) -> Unit) {
+class Discovery(ctx: Context, private val onFound: (id: String?, host: String, port: Int) -> Unit) {
     private val nsd = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var listener: NsdManager.DiscoveryListener? = null
 
@@ -19,7 +19,8 @@ class Discovery(ctx: Context, private val onFound: (host: String, port: Int) -> 
                     override fun onServiceResolved(s: NsdServiceInfo) {
                         val addr = s.host as? java.net.Inet4Address ?: return // IPv6 link-local breaks the URL
                         val host = addr.hostAddress ?: return
-                        onFound(host, s.port)
+                        val id = s.attributes?.get("id")?.let { String(it) }
+                        onFound(id, host, s.port)
                     }
                 })
             }
