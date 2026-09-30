@@ -8,6 +8,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      WIN_CERT_B64: ${{ secrets.WIN_CERT_B64 }}
     steps:
       - uses: actions/checkout@v4
       - name: Version from tag
@@ -22,7 +24,6 @@ jobs:
         if: ${{ env.WIN_CERT_B64 != '' }}
         shell: pwsh
         env:
-          WIN_CERT_B64: ${{ secrets.WIN_CERT_B64 }}
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
         run: |
           [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:WIN_CERT_B64))
