@@ -151,6 +151,7 @@ async fn session(mut sock: WebSocket, app: Arc<App>) {
         return;
     }
     let mut rx = app.tx.subscribe();
+    crate::log::log("phone connected");
     let _ = sock.send(text(r#"{"t":"auth","ok":true}"#)).await;
     app.notify.notify_one();
     let initial = rx.borrow().clone();
@@ -179,6 +180,7 @@ async fn session(mut sock: WebSocket, app: Arc<App>) {
             }
         }
     }
+    crate::log::log("phone disconnected");
 }
 
 async fn authenticate(sock: &mut WebSocket, app: &App) -> bool {

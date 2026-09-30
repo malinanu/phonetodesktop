@@ -6,6 +6,7 @@ mod backend;
 mod config;
 mod controller;
 mod discovery;
+mod log;
 mod net;
 mod protocol;
 mod server;
@@ -113,30 +114,54 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
     };
     listener.set_nonblocking(true)?;
 
-    let server_cfg = cfg.clone();
-    let server_ips = ips.clone();
-    let server = move || {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .map_err(anyhow::Error::from)
-            .and_then(|rt| rt.block_on(serve(server_cfg, server_ips, listener, mock, no_mdns, console)))
-    };
+    let (server_cfg, server_ips) = (cfg.clone(), ips.clone());
 
     #[cfg(windows)]
     if !console {
-        std::thread::spawn(move || {
-            if let Err(e) = server() {
-                tray::fatal(&format!("Phone Remote stopped: {e}"));
-            }
-        });
+        log::install_panic_hook();
+        log::log(&format!("agent {} starting (tray mode{})", env!("CARGO_PKG_VERSION"), if background { ", at login" } else { "" }));
+        // The server thread never ends on its own: only the tray's Quit stops the process.
+        std::thread::spawn(move || supervise(server_cfg, server_ips, listener, mock, no_mdns));
         if !background {
             open_url(&pair_page);
         }
         return tray::run(cfg, pair_page);
     }
     let _ = (background, &pair_page);
-    server()
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(serve(server_cfg, server_ips, listener, mock, no_mdns, console))
+}
+
+/// Run the server forever, restarting it (and logging why) if it ever stops or panics.
+#[cfg(windows)]
+fn supervise(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, first: std::net::TcpListener, mock: bool, no_mdns: bool) {
+    let mut listener = Some(first);
+    loop {
+        let l = match listener.take() {
+            Some(l) => l,
+            None => match std::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], cfg.port))).and_then(|l| l.set_nonblocking(true).map(|_| l)) {
+                Ok(l) => l,
+                Err(e) => {
+                    log::log(&format!("cannot bind port {}: {e}; retrying", cfg.port));
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    continue;
+                }
+            },
+        };
+        log::log(&format!("server listening on port {}", cfg.port));
+        let (c, i) = (cfg.clone(), ips.clone());
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .map_err(anyhow::Error::from)
+                .and_then(|rt| rt.block_on(serve(c, i, l, mock, no_mdns, false)))
+        }));
+        log::log(&format!("server stopped unexpectedly: {res:?}; restarting in 2s"));
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
 }
 
 async fn serve(
@@ -183,8 +208,13 @@ async fn serve(
     tokio::spawn(server::poll_state(app.clone()));
     let svc = server::router(app).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, svc)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
+        .with_graceful_shutdown(async move {
+            if console {
+                let _ = tokio::signal::ctrl_c().await;
+            } else {
+                // Background mode: no signal, no window, no browser can stop the server.
+                std::future::pending::<()>().await;
+            }
         })
         .await?;
     Ok(())

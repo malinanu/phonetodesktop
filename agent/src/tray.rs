@@ -34,7 +34,7 @@ fn set_autostart(on: bool) {
     }
 }
 
-/// 32x32 blue disc with a white play triangle.
+/// 32x32 amber disc with a dark play triangle (matches the app's accent).
 fn icon() -> Icon {
     const N: i32 = 32;
     let mut px = Vec::with_capacity((N * N * 4) as usize);
@@ -44,7 +44,7 @@ fn icon() -> Icon {
             let inside_disc = dx * dx + dy * dy <= 15.0 * 15.0;
             // Triangle with vertices (11,8) (11,24) (24,16).
             let t = x >= 11 && (y as f32 - 16.0).abs() <= (24.0 - x as f32) * (8.0 / 13.0);
-            let c = if !inside_disc { [0, 0, 0, 0] } else if t { [255, 255, 255, 255] } else { [91, 140, 255, 255] };
+            let c = if !inside_disc { [0, 0, 0, 0] } else if t { [27, 16, 6, 255] } else { [255, 154, 60, 255] };
             px.extend_from_slice(&c);
         }
     }
@@ -55,14 +55,6 @@ pub fn info(title: &str, msg: &str) {
     use windows::core::HSTRING;
     use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
     unsafe { MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from(title), MB_OK | MB_ICONINFORMATION) };
-}
-
-pub fn fatal(msg: &str) {
-    // No console in the GUI build; make the failure visible instead of vanishing.
-    use windows::core::HSTRING;
-    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
-    unsafe { MessageBoxW(None, &HSTRING::from(msg), &HSTRING::from("Phone Remote"), MB_OK | MB_ICONERROR) };
-    std::process::exit(1);
 }
 
 pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
@@ -77,12 +69,13 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
     let pair = MenuItem::new("Pair a phone (show QR code)", true, None);
     let guide = MenuItem::new("Guide: how it works and connecting", true, None);
     let setup = MenuItem::new("Set up video players (VLC, mpv, MPC-HC)", true, None);
+    let logm = MenuItem::new("Open log folder", true, None);
     let diag = MenuItem::new("Diagnostics (what is detected)", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&pair, &setup, &guide, &diag, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
-    let (pair_id, setup_id, guide_id, diag_id, auto_id, quit_id) = (pair.id().clone(), setup.id().clone(), guide.id().clone(), diag.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&pair, &setup, &guide, &diag, &auto, &quit); // menu items must outlive the tray on this thread
+    menu.append_items(&[&pair, &setup, &guide, &diag, &logm, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    let (pair_id, setup_id, guide_id, diag_id, log_id, auto_id, quit_id) = (pair.id().clone(), setup.id().clone(), guide.id().clone(), diag.id().clone(), logm.id().clone(), auto.id().clone(), quit.id().clone());
+    let _keep = (&pair, &setup, &guide, &diag, &logm, &auto, &quit); // menu items must outlive the tray on this thread
     let vlc_pw = crate::backend::vlc_password(&cfg.local_secret);
 
     let page = pair_page.clone();
@@ -99,10 +92,13 @@ pub fn run(mut cfg: Config, pair_page: String) -> Result<()> {
             crate::open_url(&page.replace("/pair", "/guide"));
         } else if e.id == diag_id {
             crate::open_url(&page.replace("/pair", "/debug"));
+        } else if e.id == log_id {
+            crate::open_url(&crate::log::dir().display().to_string());
         } else if e.id == auto_id {
             // The checkbox flips itself natively; make the registry match the new state.
             set_autostart(!autostart_enabled());
         } else if e.id == quit_id {
+            crate::log::log("quit requested from tray");
             std::process::exit(0);
         }
     }));

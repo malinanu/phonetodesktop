@@ -145,7 +145,7 @@
   } catch (e) {}
   if (!token) { $('gate').classList.add('show'); return; }
 
-  let rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb, toastT;
+  let lastMsg = 0, rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb, toastT;
   const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600);
     const m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
@@ -160,6 +160,7 @@
     ws = new WebSocket(`ws://${location.host}/ws`);
     ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token }));
     ws.onmessage = e => {
+      lastMsg = performance.now();
       const m = JSON.parse(e.data);
       if (m.t === 'auth') {
         if (m.ok) { retry = 500; clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); }
@@ -181,6 +182,12 @@
     };
     ws.onerror = () => ws.close();
   }
+  // The agent pushes state every second. Silence means the socket died without telling us
+  // (phone asleep, Wi-Fi roam, tab frozen), so drop it and reconnect.
+  const revive = () => { if (!ws || ws.readyState > 1) connect(); else if (performance.now() - lastMsg > 5000) ws.close(); };
+  setInterval(() => { if (!document.hidden) revive(); }, 2000);
+  addEventListener('online', revive);
+  addEventListener('pageshow', revive);
   const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 
   function render(full) {
@@ -241,7 +248,7 @@
   $('menu').onclick = e => { if (e.target.id === 'menu') $('menu').classList.remove('show'); };
   $('reconnect').onclick = () => { $('menu').classList.remove('show'); if (ws) ws.close(); };
   $('forget').onclick = () => { localStorage.removeItem(KEY); location.reload(); };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && ws && ws.readyState > 1) connect(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) revive(); });
   connect();
 })();
 </script>
