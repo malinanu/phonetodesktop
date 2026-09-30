@@ -336,38 +336,205 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Bluetooth HID mode -------------------------------------------------------------
+    // ---- Bluetooth: remote, touchpad and keyboard -----------------------------------------
 
-    private lateinit var btStatus: TextView
-    private lateinit var deviceList: LinearLayout
+    private val btPrefs by lazy { getSharedPreferences("bt", Context.MODE_PRIVATE) }
+    private lateinit var btDot: View
+    private lateinit var btTitle: TextView
+    private lateinit var btSub: TextView
+    private lateinit var btAction: Button
+    private lateinit var btHelp: View
+    private lateinit var btMigrate: View
+    private lateinit var btRemote: View
+    private lateinit var btPadWeb: WebView
+    private lateinit var btTabRemote: Button
+    private lateinit var btTabPad: Button
+    private var btDevice: android.bluetooth.BluetoothDevice? = null
+    private var btShowAll = false
+    private var btStarted = false
+
+    private fun card(title: String, body: String, action: String?, onAction: () -> Unit): LinearLayout {
+        val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = bg(C.CARD, 18); setPadding(dp(16), dp(14), dp(16), dp(14)) }
+        c.addView(label(title, 13f, C.ACC, bold = true))
+        c.addView(label(body, 14f).apply { setPadding(0, dp(4), 0, if (action != null) dp(10) else 0) })
+        if (action != null) c.addView(button(action) { onAction() }.apply { background = bg(C.CARD2); minHeight = dp(44) })
+        return c
+    }
+
+    private fun iconButton(icon: Int, caption: String? = null, filled: Boolean = false, click: () -> Unit): View {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = bg(if (filled) C.ACC else C.CARD, 22)
+            isClickable = true
+            setOnClickListener { needConnection { click() } }
+        }
+        val tint = if (filled) C.ON_ACC else C.FG
+        box.addView(android.widget.ImageView(this).apply { setImageResource(icon); setColorFilter(tint) }, LinearLayout.LayoutParams(dp(if (filled) 40 else 30), dp(if (filled) 40 else 30)))
+        if (caption != null) box.addView(label(caption, 12f, if (filled) C.ON_ACC else C.DIM).apply { setPadding(0, dp(4), 0, 0) })
+        return box
+    }
+
+    private fun needConnection(run: () -> Unit) {
+        if (hid?.connected == true) run() else {
+            Toast.makeText(this, "Not connected to a PC yet", Toast.LENGTH_SHORT).show()
+            autoConnect()
+        }
+    }
 
     private fun buildBluetoothView(): View {
-        val v = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(4), dp(16), dp(16)) }
-        btStatus = label("Bluetooth remote. No PC software needed.", 14f, C.DIM).apply { setPadding(dp(4), dp(4), dp(4), dp(12)) }
-        v.addView(btStatus)
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(4), dp(16), dp(8)) }
 
-        val setup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = bg(C.CARD, 20); setPadding(dp(16), dp(16), dp(16), dp(16)) }
-        setup.addView(label("First time only", 13f, C.DIM))
-        setup.addView(label("On the PC: Settings → Bluetooth & devices → Add device → Bluetooth. Then make this phone visible:", 14f).apply { setPadding(0, dp(6), 0, dp(10)) })
-        setup.addView(button("Make phone visible") {
+        // Status: who we are connected to, and the one button to change it.
+        val status = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; background = bg(C.CARD, 18); setPadding(dp(16), dp(10), dp(10), dp(10)) }
+        btDot = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(C.DIM) } }
+        status.addView(btDot, LinearLayout.LayoutParams(dp(10), dp(10)).apply { rightMargin = dp(12) })
+        val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        btTitle = label("Not connected", 16f, bold = true)
+        btSub = label("Bluetooth, no PC software needed", 13f, C.DIM)
+        texts.addView(btTitle); texts.addView(btSub)
+        status.addView(texts, lp(0, WRAP_CONTENT, 1f))
+        btAction = button("Connect") { onBtAction() }.apply { minHeight = dp(40); textSize = 13f }
+        status.addView(btAction, lp(WRAP_CONTENT, dp(40)))
+        col.addView(status, lp())
+
+        btMigrate = card(
+            "Update needed, once",
+            "To use the mouse and keyboard, remove this phone in Windows (Settings, Bluetooth & devices, select the phone, Remove device) and pair it again.",
+            "Done, I paired it again",
+        ) { btPrefs.edit().putInt("hid_v", HidRemote.DESCRIPTOR_VERSION).apply(); refreshBtUi() }
+        col.addView(btMigrate, lp().apply { topMargin = dp(10) })
+
+        btHelp = card(
+            "First time",
+            "On the PC: Settings, Bluetooth & devices, Add device, Bluetooth. Make this phone visible, then pick it on the PC.",
+            "Make phone visible",
+        ) {
             startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120))
-        }.apply { background = bg(C.CARD2) })
-        v.addView(setup, lp())
+        }
+        col.addView(btHelp, lp().apply { topMargin = dp(10) })
 
-        deviceList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        v.addView(deviceList, lp().apply { topMargin = dp(12) })
+        // Remote | Touchpad
+        val seg = LinearLayout(this).apply { background = bg(C.CARD, 99); setPadding(dp(4), dp(4), dp(4), dp(4)) }
+        btTabRemote = button("Remote") { showBtTab(false) }.apply { minHeight = dp(40) }
+        btTabPad = button("Touchpad") { showBtTab(true) }.apply { minHeight = dp(40) }
+        seg.addView(btTabRemote, lp(0, WRAP_CONTENT, 1f)); seg.addView(btTabPad, lp(0, WRAP_CONTENT, 1f))
+        col.addView(seg, lp().apply { topMargin = dp(12) })
 
-        fun row(vararg b: Button) = LinearLayout(this).apply { b.forEach { addView(it, lp(0, dp(72), 1f, 4)) } }
-        fun key(t: String, filled: Boolean = false, f: () -> Unit) = button(t, filled, f).apply { textSize = 18f }
-        val padView = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        padView.addView(row(key("⏮") { hid?.media(HidRemote.PREV) }, key("▶ / ⏸", true) { hid?.media(HidRemote.PLAY_PAUSE) }, key("⏭") { hid?.media(HidRemote.NEXT) }))
+        val frame = FrameLayout(this)
+        btRemote = buildRemotePad()
+        btPadWeb = WebView(this).apply {
+            setBackgroundColor(C.BG)
+            overScrollMode = View.OVER_SCROLL_NEVER
+            settings.javaScriptEnabled = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            addJavascriptInterface(HidBridge(), "AndroidHid")
+            loadUrl("file:///android_asset/pad.html")
+            visibility = View.GONE
+        }
+        frame.addView(btRemote, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        frame.addView(btPadWeb, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        col.addView(frame, lp(h = 0, weight = 1f).apply { topMargin = dp(10) })
+        showBtTab(false)
+        return col
+    }
+
+    private fun buildRemotePad(): View {
+        val pad = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun row(weight: Float, vararg v: Pair<View, Float>) = LinearLayout(this).apply {
+            v.forEach { (view, w) -> addView(view, lp(0, MATCH_PARENT, w, 4)) }
+        }.also { pad.addView(it, lp(h = 0, weight = weight)) }
+        row(2f, iconButton(R.drawable.ic_prev) { hid?.media(HidRemote.PREV) } to 1f,
+            iconButton(R.drawable.ic_play_pause, filled = true) { hid?.media(HidRemote.PLAY_PAUSE) } to 2f,
+            iconButton(R.drawable.ic_next) { hid?.media(HidRemote.NEXT) } to 1f)
         // Arrow keys reach whichever window has focus; players skip 5–10 s per press.
-        padView.addView(row(key("« Back") { hid?.key(HidRemote.KEY_LEFT, 2) }, key("Space") { hid?.key(HidRemote.KEY_SPACE) }, key("Fwd »") { hid?.key(HidRemote.KEY_RIGHT, 2) }))
-        padView.addView(row(key("Vol −") { hid?.media(HidRemote.VOL_DOWN) }, key("Mute") { hid?.media(HidRemote.MUTE) }, key("Vol +") { hid?.media(HidRemote.VOL_UP) }))
-        padView.addView(label("Back/Fwd send arrow keys to the window that has focus on the PC.", 12f, C.DIM).apply { setPadding(dp(4), dp(8), 0, 0) })
-        v.addView(padView, lp().apply { topMargin = dp(12) })
+        row(1.4f, iconButton(R.drawable.ic_back10, "Back") { hid?.key(0x50, 2) } to 1f,
+            iconButton(R.drawable.ic_play, "Space") { hid?.key(0x2C) } to 1f,
+            iconButton(R.drawable.ic_fwd10, "Forward") { hid?.key(0x4F, 2) } to 1f)
+        row(1.4f, iconButton(R.drawable.ic_vol_down) { hid?.media(HidRemote.VOL_DOWN) } to 1f,
+            iconButton(R.drawable.ic_mute) { hid?.media(HidRemote.MUTE) } to 1f,
+            iconButton(R.drawable.ic_vol_up) { hid?.media(HidRemote.VOL_UP) } to 1f)
+        pad.addView(label("Back and Forward press the arrow keys in the window in front on the PC.", 12f, C.DIM).apply { setPadding(dp(4), dp(6), 0, 0) })
+        return pad
+    }
 
-        return ScrollView(this).apply { addView(v); isFillViewport = true }
+    private fun showBtTab(touchpad: Boolean) {
+        btRemote.visibility = if (touchpad) View.GONE else View.VISIBLE
+        btPadWeb.visibility = if (touchpad) View.VISIBLE else View.GONE
+        btTabRemote.background = bg(if (!touchpad) C.ACC else C.CARD, 99)
+        btTabPad.background = bg(if (touchpad) C.ACC else C.CARD, 99)
+        btTabRemote.setTextColor(if (!touchpad) C.ON_ACC else C.DIM)
+        btTabPad.setTextColor(if (touchpad) C.ON_ACC else C.DIM)
+        if (touchpad) btPadWeb.requestFocus()
+    }
+
+    /** Called from the touchpad page; every call becomes a real Bluetooth HID report. */
+    inner class HidBridge {
+        @android.webkit.JavascriptInterface fun move(dx: Int, dy: Int) { hid?.move(dx, dy) }
+        @android.webkit.JavascriptInterface fun button(b: String, action: String) { hid?.button(b, action) }
+        @android.webkit.JavascriptInterface fun scroll(dx: Int, dy: Int) { hid?.scroll(dx, dy) }
+        @android.webkit.JavascriptInterface fun key(name: String, mods: String) { hid?.namedKey(name, mods.split(",").filter { it.isNotEmpty() }) }
+        @android.webkit.JavascriptInterface fun text(s: String) {
+            val skipped = hid?.typeText(s) ?: 0
+            if (skipped > 0) runOnUiThread { Toast.makeText(this@MainActivity, "That character needs Wi-Fi mode (Bluetooth types US-layout keys)", Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    @Suppress("MissingPermission")
+    private fun computers(): List<android.bluetooth.BluetoothDevice> {
+        val all = hid?.bondedDevices().orEmpty()
+        return if (btShowAll) all else all.filter { HidRemote.isComputer(it) }
+    }
+
+    @Suppress("MissingPermission")
+    private fun autoConnect() {
+        val h = hid ?: return
+        if (h.connected) return
+        val bonded = h.bondedDevices()
+        val last = btPrefs.getString("last", null)
+        val target = bonded.firstOrNull { it.address == last } ?: bonded.filter { HidRemote.isComputer(it) }.singleOrNull()
+        if (target != null) h.connect(target)
+    }
+
+    @Suppress("MissingPermission")
+    private fun onBtAction() {
+        val list = computers()
+        when {
+            list.isEmpty() && !btShowAll -> {
+                btShowAll = true
+                if (computers().isEmpty()) { Toast.makeText(this, "No paired devices yet. Pair this phone from the PC first.", Toast.LENGTH_LONG).show(); btShowAll = false; btHelp.visibility = View.VISIBLE }
+                else showChooser()
+            }
+            list.size == 1 && hid?.connected != true -> hid?.connect(list[0])
+            else -> showChooser()
+        }
+    }
+
+    @Suppress("MissingPermission")
+    private fun showChooser() {
+        val list = computers()
+        val names = list.map { it.name ?: it.address }.toTypedArray()
+        android.app.AlertDialog.Builder(this)
+            .setTitle(if (btShowAll) "All paired devices" else "Choose your PC")
+            .setItems(names) { _, i -> hid?.connect(list[i]) }
+            .setNeutralButton(if (btShowAll) "Computers only" else "Show all devices") { _, _ -> btShowAll = !btShowAll; showChooser() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    @Suppress("MissingPermission")
+    private fun refreshBtUi() {
+        val d = btDevice
+        (btDot.background as GradientDrawable).setColor(if (d != null) Color.parseColor("#86D9A6") else C.DIM)
+        btTitle.text = if (d != null) "Connected to ${d.name ?: d.address}" else "Not connected"
+        btSub.text = if (d != null) "Remote, mouse and keyboard are ready" else "Pick your PC to start"
+        btAction.text = if (d != null) "Change" else if (computers().size == 1) "Connect" else "Choose PC"
+        val seen = btPrefs.getBoolean("seen", false)
+        btHelp.visibility = if (!seen && d == null) View.VISIBLE else View.GONE
+        btMigrate.visibility = if (seen && btPrefs.getInt("hid_v", 0) != HidRemote.DESCRIPTOR_VERSION) View.VISIBLE else View.GONE
+        btRemote.alpha = if (d != null) 1f else 0.45f
+        btPadWeb.alpha = if (d != null) 1f else 0.45f
     }
 
     private fun startBluetooth() {
@@ -375,23 +542,30 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE), 1)
             return
         }
-        if (hid == null) hid = HidRemote(this) { s -> runOnUiThread { btStatus.text = s; refreshDevices() } }
-        hid?.start()
-        refreshDevices()
+        if (hid == null) {
+            hid = HidRemote(
+                this,
+                onChange = { device, message ->
+                    runOnUiThread {
+                        btDevice = device
+                        if (device != null) {
+                            // First success: no need to show the setup help again; the descriptor is already current.
+                            if (!btPrefs.getBoolean("seen", false)) btPrefs.edit().putBoolean("seen", true).putInt("hid_v", HidRemote.DESCRIPTOR_VERSION).apply()
+                            btPrefs.edit().putString("last", device.address).apply()
+                        }
+                        refreshBtUi()
+                        if (device == null) btSub.text = message
+                    }
+                },
+                onReady = { runOnUiThread { refreshBtUi(); autoConnect() } },
+            )
+        }
+        if (!btStarted) { btStarted = true; hid?.start() } else autoConnect()
+        refreshBtUi()
     }
 
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
         if (results.isNotEmpty() && results.all { it == PackageManager.PERMISSION_GRANTED }) startBluetooth()
-        else btStatus.text = "Bluetooth permission is required"
-    }
-
-    private fun refreshDevices() {
-        deviceList.removeAllViews()
-        val devices = hid?.bondedDevices().orEmpty()
-        if (devices.isNotEmpty()) deviceList.addView(label("Paired computers — tap to connect", 13f, C.DIM).apply { setPadding(dp(4), 0, 0, dp(6)) })
-        devices.forEach { d ->
-            @Suppress("MissingPermission")
-            deviceList.addView(button(d.name ?: d.address) { hid?.connect(d) }, lp().apply { bottomMargin = dp(8) })
-        }
+        else btSub.text = "Allow Bluetooth permission to use this tab"
     }
 }
