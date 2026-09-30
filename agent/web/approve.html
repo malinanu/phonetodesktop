@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New phone · Phone Remote</title>
+<link rel="stylesheet" href="/base.css">
+<script src="/settings.js"></script>
+<style>
+  body { min-height:100vh; display:grid; place-items:center; padding:24px; }
+  main { width:min(420px,100%); }
+  h1 { font-size:clamp(28px,7vw,36px); margin:8px 0 10px; }
+  .who { font-weight:700; color:var(--accent); }
+  .lead { color:var(--ink-dim); font-size:16px; margin:0 0 6px; }
+  ul { list-style:none; padding:0; margin:18px 0 22px; }
+  li { display:flex; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); font-size:15px; }
+  li svg { width:20px; height:20px; fill:var(--ink-dim); flex:none; }
+  .acts { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .btn { justify-content:center; min-height:56px; font-size:17px; }
+  .timer { margin-top:14px; font-size:13px; color:var(--ink-dim); text-align:center; font-variant-numeric:tabular-nums; }
+  .done { text-align:center; } .done .tick { font-size:54px; line-height:1; color:var(--accent); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main id="ask" hidden>
+  <span class="kicker">New phone</span>
+  <h1><span class="who" id="who">A phone</span> wants to connect</h1>
+  <p class="lead" id="ip"></p>
+  <ul>
+    <li><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Play, pause, skip and change the volume</li>
+    <li><svg viewBox="0 0 24 24"><path d="M3 3l7 18 2.5-7.5L20 11z"/></svg>Move the mouse and type on this PC</li>
+  </ul>
+  <div class="acts"><button class="btn" id="deny">Deny</button><button class="btn primary" id="allow">Allow</button></div>
+  <div class="timer" id="timer"></div>
+</main>
+<main id="result" class="done" hidden>
+  <div class="tick" id="tick">✓</div>
+  <h1 id="rTitle">Allowed</h1>
+  <p class="lead" id="rText"></p>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const id = new URLSearchParams(location.search).get('id');
+  const api = async (path, method = 'GET') => {
+    const r = await fetch(path, { method, headers: { 'X-Requested-With': 'phone-remote' } });
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  };
+  let deadline = 0, finished = false;
+  const finish = (title, text, tick) => {
+    finished = true;
+    $('ask').hidden = true; $('result').hidden = false;
+    $('rTitle').textContent = title; $('rText').textContent = text; $('tick').textContent = tick;
+    setTimeout(() => window.close(), 1400);
+  };
+  const decide = async verb => {
+    try { await api(`/api/pending/${encodeURIComponent(id)}/${verb}`, 'POST'); }
+    catch (e) { return finish('Already handled', 'This request was answered somewhere else.', '•'); }
+    if (verb === 'approve') finish('Allowed', 'The phone can connect now.', '✓'); else finish('Denied', 'The phone was turned away.', '✕');
+  };
+  $('allow').onclick = () => decide('approve');
+  $('deny').onclick = () => decide('deny');
+  addEventListener('keydown', e => { if (e.key === 'Escape') decide('deny'); });
+
+  async function poll() {
+    if (finished) return;
+    try {
+      const ov = await api('/api/overview');
+      const p = ov.pending.find(x => x.id === id);
+      if (!p) {
+        if (!$('ask').hidden || !finished) finish('Done', 'This request is no longer waiting.', '•');
+        return;
+      }
+      $('who').textContent = p.name || 'A phone';
+      $('ip').textContent = `From ${p.ip} on your network. Only allow phones you recognise.`;
+      $('ask').hidden = false;
+      if (!deadline) deadline = Date.now() + Math.max(0, 120 - p.age_s) * 1000;
+    } catch (e) {}
+    setTimeout(poll, 1500);
+  }
+  setInterval(() => {
+    if (finished || !deadline) return;
+    const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+    $('timer').textContent = left > 0 ? `This request expires in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'This request has expired';
+  }, 500);
+  poll();
+})();
+</script>
+</body>
+</html>

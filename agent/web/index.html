@@ -7,6 +7,7 @@
 <title>Phone Remote</title>
 <link rel="stylesheet" href="/base.css">
 <link rel="stylesheet" href="/pad.css">
+<script src="/settings.js"></script>
 <style>
   html,body { height:100%; }
   body { display:flex; flex-direction:column; max-width:520px; margin:0 auto; user-select:none; touch-action:manipulation;
@@ -18,7 +19,7 @@
   #dot.on { background:var(--good); }
   .hdr-r { display:flex; gap:4px; align-items:center; }
   .seg { display:inline-flex; background:var(--surface); border-radius:99px; padding:3px; }
-  .seg button { font:600 13px var(--font); border:0; background:transparent; color:var(--ink-dim); padding:7px 12px; border-radius:99px; cursor:pointer; }
+  .seg button { font:600 13px var(--font); border:0; background:transparent; color:var(--ink-dim); padding:7px 14px; min-height:40px; border-radius:99px; cursor:pointer; }
   .seg button.on { background:var(--surface-2); color:var(--ink); }
   #media { display:flex; flex-direction:column; flex:1; min-height:0; }
   #touch { display:none; flex:1; min-height:0; flex-direction:column; padding-bottom:4px; }
@@ -73,6 +74,27 @@
   #gate { position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; justify-content:center; padding:32px 28px; gap:14px; max-width:520px; margin:0 auto; }
   #gate.show { display:flex; } #gate h2 { font-size:34px; } #gate p { color:var(--ink-dim); margin:0; font-size:17px; }
   #gate .btn { align-self:flex-start; margin-top:10px; }
+
+  .appOnly { display:none; } body.inapp .appOnly { display:inline-flex; }
+  .banner { display:none; background:var(--surface); border-radius:16px; padding:12px 14px; margin:4px 0 6px; gap:10px; flex-direction:column; font-size:14px; }
+  .banner.show { display:flex; animation:in .25s var(--ease); } @keyframes in { from { opacity:0; transform:translateY(-6px); } }
+  .banner .acts { display:flex; gap:8px; flex-wrap:wrap; } .btn.small { padding:9px 14px; font-size:14px; min-height:44px; }
+  .now { position:relative; }
+  .badge { position:absolute; right:0; top:30%; font-size:34px; font-weight:800; letter-spacing:-.03em; color:var(--accent); opacity:0; transform:translateY(8px); pointer-events:none; font-variant-numeric:tabular-nums; }
+  .badge.show { animation:pop .9s var(--ease) forwards; }
+  @keyframes pop { 0% { opacity:0; transform:translateY(10px); } 15% { opacity:1; transform:translateY(0); } 70% { opacity:1; } 100% { opacity:0; transform:translateY(-6px); } }
+  .volrow { display:flex; align-items:center; gap:12px; margin-top:12px; }
+  .vb { width:52px; height:52px; border:0; border-radius:16px; background:var(--surface); color:var(--ink); display:grid; place-items:center; font-size:22px; flex:none; cursor:pointer; transition:background .15s var(--ease),transform .12s var(--ease); }
+  .vb:active { transform:scale(.94); background:var(--surface-2); } .vb[aria-pressed=true] { background:var(--accent); color:var(--on-accent); }
+  .volrow input[type=range] { -webkit-appearance:none; appearance:none; flex:1; height:32px; background:transparent; margin:0; }
+  .volrow input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:4px; background:linear-gradient(to right,var(--accent) var(--p,0%),var(--surface-2) var(--p,0%)); }
+  .volrow input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; margin-top:-8px; border-radius:50%; background:var(--accent); border:0; }
+  .volval { width:3em; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-dim); font-size:14px; }
+  #gate .spin { display:none; width:28px; height:28px; border-radius:50%; border:3px solid var(--surface-2); border-top-color:var(--accent); animation:spin .9s linear infinite; }
+  #gate.busy .spin { display:block; } @keyframes spin { to { transform:rotate(360deg); } }
+  #gate .btn { align-self:flex-start; min-height:48px; }
+  #gate .btn[hidden] { display:none; }
+  @media (prefers-reduced-motion:reduce) { .badge.show, .banner.show, #gate .spin { animation:none; } .badge.show { opacity:1; } }
 </style>
 </head>
 <body class="off">
@@ -95,13 +117,14 @@
   <div class="seg" id="tabs"><button data-v="media" class="on">Media</button><button data-v="touch">Touchpad</button></div>
   <div class="hdr-r">
     <select id="players" aria-label="Player" style="display:none"></select>
-    <a class="ib" href="/guide" aria-label="Guide"><svg class="i"><use href="#i-help"/></svg></a>
     <button class="ib" id="more" aria-label="Menu"><svg class="i"><use href="#i-more"/></svg></button>
   </div>
 </header>
+<div class="banner" id="banner" role="alert"><span id="bText"></span><div class="acts"><button class="btn small" id="bTry">Try again</button><button class="btn small" id="bBt" hidden>Use Bluetooth</button><button class="btn small" id="bSw" hidden>Switch PC</button></div></div>
 
 <div id="media">
 <section class="now">
+  <div class="badge" id="badge" aria-live="polite"></div>
   <div class="app"><span class="eq" id="eq"><i></i><i></i><i></i><i></i></span><span class="kicker" id="app">Idle</span></div>
   <div id="title">Nothing playing</div>
   <div id="artist">Start a video or a song on your PC.</div>
@@ -113,24 +136,27 @@
 </section>
 
 <div class="transport">
-  <button class="t" data-c="seek" data-d="-10" aria-label="Back 10 seconds"><svg class="i"><use href="#i-back"/></svg><span class="n">10</span></button>
+  <button class="t" data-c="seek" data-sign="-1" data-d="-10" data-repeat aria-label="Back 10 seconds"><svg class="i"><use href="#i-back"/></svg><span class="n">10</span></button>
   <button class="t" data-c="prev" aria-label="Previous"><svg class="i"><use href="#i-prev"/></svg></button>
   <button class="t main" id="pp" data-c="play_pause" aria-label="Play or pause"><svg class="i"><use href="#i-play"/></svg></button>
   <button class="t" data-c="next" aria-label="Next"><svg class="i"><use href="#i-next"/></svg></button>
-  <button class="t" data-c="seek" data-d="10" aria-label="Forward 10 seconds"><svg class="i"><use href="#i-fwd"/></svg><span class="n">10</span></button>
+  <button class="t" data-c="seek" data-sign="1" data-d="10" data-repeat aria-label="Forward 10 seconds"><svg class="i"><use href="#i-fwd"/></svg><span class="n">10</span></button>
+</div>
+<div class="volrow" id="volRow" hidden>
+  <button class="vb" id="muteBtn" data-c="mute" aria-pressed="false" aria-label="Mute"><svg class="i"><use href="#i-volup"/></svg></button>
+  <input id="vol" type="range" min="0" max="100" step="1" value="50" aria-label="Volume">
+  <span class="volval" id="volVal">50%</span>
 </div>
 <div class="tools">
   <div class="grp">
-    <button data-c="volume" data-d="-2" data-repeat aria-label="Volume down"><svg class="i"><use href="#i-voldn"/></svg></button>
-    <button data-c="mute" aria-label="Mute"><svg class="i"><use href="#i-mute"/></svg></button>
-    <button data-c="volume" data-d="2" data-repeat aria-label="Volume up"><svg class="i"><use href="#i-volup"/></svg></button>
+    <button data-c="volume" data-sign="-1" data-d="-2" data-repeat aria-label="Volume down"><svg class="i"><use href="#i-voldn"/></svg></button>
+    <button data-c="volume" data-sign="1" data-d="2" data-repeat aria-label="Volume up"><svg class="i"><use href="#i-volup"/></svg></button>
   </div>
   <div class="grp">
-    <button class="txt" data-c="seek" data-d="-30" aria-label="Back 30 seconds">−30s</button>
-    <button class="txt" data-c="seek" data-d="30" aria-label="Forward 30 seconds">+30s</button>
+    <button class="txt" data-c="seek" data-sign="-1" data-d="-30" aria-label="Back 30 seconds">−30s</button>
+    <button class="txt" data-c="seek" data-sign="1" data-d="30" aria-label="Forward 30 seconds">+30s</button>
   </div>
 </div>
-
 </div>
 
 <div id="touch">
@@ -139,29 +165,40 @@
 </div>
 
 <div id="toast" role="status"></div>
-<div id="menu"><div class="sheet">
+<div id="menu" role="dialog" aria-label="Menu"><div class="sheet">
   <h3 id="mhost">This PC</h3><p>Connected over your local network. <span id="mver"></span></p>
-  <a class="btn" href="/guide" style="width:100%;justify-content:center">Guide: how it works</a>
+  <button class="btn" id="mSwitch" hidden>Switch PC</button>
+  <button class="btn appOnly" id="mAdd">Add another PC</button>
+  <button class="btn" id="mSettings">Settings</button>
+  <button class="btn" id="mGuide">Guide: how it works</button>
   <button class="btn" id="reconnect">Reconnect</button>
   <button class="btn danger" id="forget">Forget this PC</button>
   <button class="btn" id="close">Close</button>
 </div></div>
-<div id="gate">
+<div id="gate" role="dialog" aria-live="polite">
   <span class="kicker" id="gk">Not paired</span>
   <h2 id="gh">Pair with your PC</h2>
-  <p id="gp">On the PC, open Phone Remote from the tray icon, choose <b>Add a phone</b>, then scan the QR code with this phone's camera.</p>
-  <a class="btn primary" href="/guide">Show me how</a>
+  <div class="spin" aria-hidden="true"></div>
+  <p id="gp"></p>
+  <button class="btn primary" id="gAct" hidden></button>
+  <button class="btn" id="gCancel" hidden>Cancel</button>
 </div>
 
 <script src="/pad.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  const PRS = window.PRSettings;
+  const bridge = window.AndroidBridge;
+  const inApp = !!(bridge && bridge.openSettings);
+  if (inApp) document.body.classList.add('inapp');
+  const buzz = n => PRS.haptic(n);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
   // ---- identity: this phone's id + its own key (once the PC owner has approved it) ----
   const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('');
   const q = {};
   (location.hash.slice(1).split('&')).forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
-  const bridge = window.AndroidBridge;
   let inputOk = false, padMounted = false, retryNow = false, legacy = null, deviceId = null, token = null, pairCode = null, triedLegacy = false;
   const ua = navigator.userAgent, model = (/Android [\d.]+; ([^)]+)\)/.exec(ua) || [])[1];
   const deviceName = q.dn || (model && model.replace(/ Build.*/, '')) || (/iPhone|iPad/.test(ua) ? 'iPhone' : 'Browser');
@@ -175,65 +212,118 @@
     if (!token && !pairCode) token = localStorage.getItem('pr.tok');
     if (q.k) history.replaceState(null, '', location.pathname);
   } catch (e) {}
-  const showGate = (k, h, p) => { $('gk').textContent = k; $('gh').textContent = h; $('gp').textContent = p; $('gate').classList.add('show'); };
+
+  const openGuide = (anchor) => { if (inApp) bridge.openGuide(anchor || 'connect'); else location.href = '/guide' + (anchor ? '#' + anchor : ''); };
+
+  // ---- full-screen messages (pairing, removed phone) ----
+  function showGate(kicker, title, text, opts = {}) {
+    $('gk').textContent = kicker; $('gh').textContent = title; $('gp').textContent = text;
+    $('gate').classList.toggle('busy', !!opts.busy);
+    const a = $('gAct'); a.hidden = !opts.action; a.textContent = opts.action || ''; a.onclick = opts.onAction || null;
+    const c = $('gCancel'); c.hidden = !opts.cancel; c.onclick = opts.onCancel || null;
+    $('gate').classList.add('show');
+  }
+  const hideGate = () => $('gate').classList.remove('show');
+  const scanAgain = inApp ? { action: 'Scan the code again', onAction: () => bridge.addPc() } : {};
+
   if (!token && !pairCode) {
     // Browsers paired before per-phone keys stored the shared key under these names.
     try { legacy = localStorage.getItem('pr.legacy') || localStorage.getItem('pr.token'); } catch (e) {}
   }
-  if (!token && !pairCode && !legacy) { $('gate').classList.add('show'); return; }
+  if (!token && !pairCode && !legacy) {
+    showGate('Not paired', 'Pair with your PC', 'On the PC, open Phone Remote from the tray icon, choose Add a phone, then scan the QR code with this phone.',
+      { action: 'Show me how', onAction: () => openGuide('connect') });
+    return;
+  }
 
-  let lastMsg = 0, rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb, toastT;
+  let lastMsg = 0, rejected = false, ws, state = null, recvAt = 0, retry = 500, seeking = false, hb, toastT, reconnectT;
+  let connFails = 0, wasConnected = false, volDrag = false, volT = 0;
   const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600);
     const m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
   const cur = () => state && state.players.find(p => p.id === state.current);
-  const buzz = n => navigator.vibrate && navigator.vibrate(n);
   const toast = t => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600); };
-  const setStatus = (on, t) => { $('dot').classList.toggle('on', on); $('stxt').textContent = t; document.body.classList.toggle('off', !on); };
   const setIcon = (btn, id) => btn.querySelector('use').setAttribute('href', '#' + id);
 
+  // ---- connection status + the banner that explains what to do ----
+  function setStatus(on, text) {
+    $('dot').classList.toggle('on', on);
+    $('stxt').textContent = text;
+    document.body.classList.toggle('off', !on);
+  }
+  function showBanner(on) {
+    $('banner').classList.toggle('show', on);
+    if (!on) return;
+    $('bText').textContent = `Can't reach ${(state && state.host) || 'your PC'}. Is it awake and on this Wi-Fi?`;
+    $('bBt').hidden = !inApp;
+    $('bSw').hidden = !(inApp && bridge.pcCount && bridge.pcCount() > 1);
+  }
+  function forceReconnect() {
+    clearTimeout(reconnectT);
+    retry = 500;
+    if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch (e) {} }
+    connect();
+  }
+  $('bTry').onclick = () => { buzz(10); forceReconnect(); };
+  $('bBt').onclick = () => bridge.showBluetooth();
+  $('bSw').onclick = () => bridge.switchPc();
+
+  // ---- pairing flow ----
+  function cancelPair() { rejected = true; pairCode = null; if (ws) ws.close(); showGate('Cancelled', 'Pairing cancelled', 'Scan the QR code on the PC whenever you want to try again.', scanAgain); }
+  function retryPair() { hideGate(); rejected = false; connFails = 0; forceReconnect(); }
+
   function connect() {
-    setStatus(false, 'Connecting…');
+    if (ws && ws.readyState <= 1) return;
+    setStatus(false, wasConnected ? 'Reconnecting…' : 'Connecting…');
     ws = new WebSocket(`ws://${location.host}/ws`);
     ws.onopen = () => ws.send(JSON.stringify(legacy ? { t: 'auth', token: legacy } : token ? { t: 'auth', token, device: deviceId } : { t: 'pair', code: pairCode, device: deviceId, name: deviceName }));
     ws.onmessage = e => {
       lastMsg = performance.now();
       const m = JSON.parse(e.data);
       if (m.t === 'pair') {
-        if (m.status === 'pending') showGate('Waiting for approval', 'Check your PC', `Allow “${deviceName}” in the Phone Remote window on your PC.`);
+        if (m.status === 'pending') showGate('Waiting for approval', 'Check your PC', `Allow “${deviceName}” in the Phone Remote window on your PC. This page continues by itself.`, { busy: true, cancel: true, onCancel: cancelPair });
         else if (m.status === 'approved') {
           token = m.device_token; pairCode = null;
           try { localStorage.setItem('pr.tok', token); } catch (e) {}
           if (bridge && bridge.onPaired) bridge.onPaired(token, deviceId);
-          $('gate').classList.remove('show');
-        } else if (m.status === 'denied') { rejected = true; showGate('Declined', 'Not allowed', 'The PC owner declined this phone. Scan the QR code again to retry.'); }
-        else if (m.status === 'expired') { rejected = true; showGate('Code expired', 'Get a fresh code', 'Open Add a phone on the PC for a new QR code, then scan it.'); }
+          buzz([30, 40, 30]);
+          showGate('Paired', 'You’re in', 'This phone can now control the PC.');
+          setTimeout(hideGate, 1100);
+        } else if (m.status === 'denied') { rejected = true; showGate('Declined', 'Not allowed', 'The PC owner declined this phone.', { action: 'Try again', onAction: retryPair }); }
+        else if (m.status === 'expired') { rejected = true; showGate('Code expired', 'Get a fresh code', 'Open Phone Remote on the PC, choose Add a phone, and scan the new QR code.', scanAgain); }
         else if (m.status === 'bad_code') {
           // Phones paired before per-phone keys hold the old shared key; try it once.
           if (!triedLegacy && pairCode) { triedLegacy = true; legacy = pairCode; pairCode = null; retryNow = true; }
-          else { rejected = true; showGate('Not valid', 'That code did not work', 'Scan the QR code shown on the PC again.'); }
+          else { rejected = true; showGate('Not valid', 'That code did not work', 'Scan the QR code shown on the PC again.', scanAgain); }
         }
       } else if (m.t === 'auth') {
-        if (m.ok) { inputOk = !!m.input; document.body.classList.toggle('noinput', !inputOk); retry = 500; if (legacy) { try { localStorage.setItem('pr.legacy', legacy); } catch (e) {} } clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000); $('gate').classList.remove('show'); }
-        else {
+        if (m.ok) {
+          inputOk = !!m.input; document.body.classList.toggle('noinput', !inputOk);
+          retry = 500; connFails = 0; wasConnected = true; showBanner(false);
+          if (legacy) { try { localStorage.setItem('pr.legacy', legacy); } catch (e) {} }
+          clearInterval(hb); hb = setInterval(() => send({ t: 'ping' }), 15000);
+          if (!$('gate').classList.contains('busy') && $('gh').textContent !== 'You’re in') hideGate();
+        } else {
           // Only a wrong or removed key unpairs; a lockout is temporary and must not wipe a valid pairing.
           rejected = true;
           if (m.err === 'bad token' || m.err === 'revoked') {
             try { localStorage.removeItem('pr.tok'); } catch (e) {}
             if (bridge && bridge.onRevoked) bridge.onRevoked();
-            showGate('Not paired', 'This phone was removed', 'Scan the QR code on the PC again to reconnect.');
+            showGate('Not paired', 'This phone was removed', 'Scan the QR code on the PC again to reconnect.', scanAgain);
           } else setStatus(false, 'Locked out, retry in a minute');
           ws.close();
         }
-      } else if (m.t === 'state') { state = m; recvAt = performance.now(); setStatus(true, m.host); render(true); }
-      else if (m.t === 'ack' && !m.ok) { buzz(80); toast(m.err || 'That did not work'); }
+      } else if (m.t === 'state') {
+        state = m; recvAt = performance.now(); setStatus(true, m.host); showBanner(false); reconcile(); render(true);
+      } else if (m.t === 'ack' && !m.ok) { buzz([60, 40, 60]); toast(m.err || 'That did not work'); }
     };
     ws.onclose = () => {
       clearInterval(hb);
       if (retryNow) { retryNow = false; setTimeout(connect, 0); return; }
       if (rejected) { rejected = false; if ($('gate').classList.contains('show')) return; retry = 60000; }
-      else setStatus(false, 'Reconnecting…');
-      setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000);
+      else { connFails++; setStatus(false, 'Offline'); if (connFails >= 2 || wasConnected) showBanner(true); }
+      clearTimeout(reconnectT);
+      reconnectT = setTimeout(connect, retry); retry = Math.min(retry * 1.6, 5000);
     };
     ws.onerror = () => ws.close();
   }
@@ -245,8 +335,38 @@
   addEventListener('pageshow', revive);
   const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 
+  // ---- instant feedback: show the result of a tap now, let the PC's answer confirm it ----
+  let opt = null;       // {playing, until}: play/pause pressed, waiting for the PC
+  let seekOpt = null;   // {pos, at, until}: seek pressed, waiting for the PC
+  let badgeSum = 0, badgeT;
+  function view(p) {
+    const now = performance.now();
+    let playing = p.playing;
+    if (opt && now < opt.until) playing = opt.playing; else opt = null;
+    let pos = p.pos_ms + (p.playing ? now - recvAt : 0);
+    if (seekOpt && now < seekOpt.until) pos = seekOpt.pos + (playing ? now - seekOpt.at : 0); else seekOpt = null;
+    return { playing, pos: clamp(pos, 0, Math.max(0, p.dur_ms)) };
+  }
+  // A fresh state that agrees with what we showed makes the guess unnecessary.
+  function reconcile() {
+    const p = cur(); if (!p) return;
+    if (opt && p.playing === opt.playing) opt = null;
+    if (seekOpt) {
+      const expected = seekOpt.pos + (opt ? 0 : (p.playing ? performance.now() - seekOpt.at : 0));
+      if (Math.abs(p.pos_ms - expected) < 2500) seekOpt = null;
+    }
+  }
+  function flashBadge(d) {
+    badgeSum += d;
+    const b = $('badge');
+    b.textContent = (badgeSum > 0 ? '+' : '−') + Math.abs(badgeSum) + 's';
+    b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    clearTimeout(badgeT); badgeT = setTimeout(() => { badgeSum = 0; b.classList.remove('show'); }, 900);
+  }
+
   function render(full) {
     const p = cur();
+    const v = p ? view(p) : null;
     if (full) {
       const sel = $('players');
       const ids = state.players.map(pl => pl.id).join('|');
@@ -259,29 +379,61 @@
       sel.style.display = state.players.length > 1 ? '' : 'none';
       $('title').textContent = p ? (p.title || p.app) : 'Nothing playing';
       $('artist').textContent = p ? p.artist : 'Start a video or a song on your PC.';
-      $('app').textContent = p ? p.app + (p.playing ? ' · playing' : ' · paused') : 'Idle';
-      $('eq').classList.toggle('on', !!(p && p.playing));
-      setIcon($('pp'), p && p.playing ? 'i-pause' : 'i-play');
       $('bar').disabled = !p || !p.can_seek;
       $('bar').max = p ? Math.max(1, p.dur_ms) : 1;
       $('dur').textContent = p && p.dur_ms > 0 ? fmt(p.dur_ms) : '';
       $('seek').classList.toggle('none', !!p && !p.can_seek && p.dur_ms === 0);
       $('mhost').textContent = state.host;
       $('mver').textContent = 'Agent v' + (state.version || '?');
+      // Volume: a real level when the PC reports one.
+      const hasVol = state.volume != null;
+      $('volRow').hidden = !hasVol;
+      if (hasVol) {
+        if (!volDrag) { $('vol').value = state.volume; $('vol').style.setProperty('--p', state.volume + '%'); $('volVal').textContent = state.volume + '%'; }
+        setIcon($('muteBtn'), state.muted ? 'i-mute' : 'i-volup');
+        $('muteBtn').setAttribute('aria-pressed', String(!!state.muted));
+        $('muteBtn').setAttribute('aria-label', state.muted ? 'Unmute' : 'Mute');
+      }
     }
+    // Things that depend on the (possibly guessed) play state.
+    $('app').textContent = p ? p.app + (v.playing ? ' · playing' : ' · paused') : 'Idle';
+    $('eq').classList.toggle('on', !!(v && v.playing));
+    setIcon($('pp'), v && v.playing ? 'i-pause' : 'i-play');
     if (p && !seeking) {
-      const pos = Math.min(p.dur_ms, p.pos_ms + (p.playing ? performance.now() - recvAt : 0));
-      $('bar').value = pos; $('cur').textContent = fmt(pos);
-      $('bar').style.setProperty('--p', p.dur_ms > 0 ? (100 * pos / p.dur_ms) + '%' : '0%');
+      $('bar').value = v.pos; $('cur').textContent = fmt(v.pos);
+      $('bar').style.setProperty('--p', p.dur_ms > 0 ? (100 * v.pos / p.dur_ms) + '%' : '0%');
     } else if (!p) { $('bar').value = 0; $('cur').textContent = '0:00'; $('bar').style.setProperty('--p', '0%'); }
   }
   setInterval(() => state && render(false), 250);
 
-  // Buttons; volume repeats while held.
-  let rep;
+  // ---- settings drive the button values ----
+  function applySettings() {
+    const s = PRS.get();
+    document.querySelectorAll('.t[data-c=seek]').forEach(b => {
+      const sign = Number(b.dataset.sign);
+      b.dataset.d = sign * s.skip;
+      b.setAttribute('aria-label', (sign < 0 ? 'Back ' : 'Forward ') + s.skip + ' seconds');
+      b.querySelector('.n').textContent = s.skip;
+    });
+    document.querySelectorAll('[data-c=volume]').forEach(b => { b.dataset.d = Number(b.dataset.sign) * s.volStep; });
+  }
+  PRS.onChange(applySettings); applySettings();
+
+  // ---- buttons; seek and volume repeat while held ----
+  let rep, repN = 0;
   const fire = b => {
-    buzz(15);
-    const c = b.dataset.c, d = +b.dataset.d;
+    buzz(12);
+    const c = b.dataset.c, d = +b.dataset.d, p = cur();
+    const now = performance.now();
+    if (c === 'play_pause' && p) {
+      const v = view(p);
+      opt = { playing: !v.playing, until: now + 1500 };
+      seekOpt = { pos: v.pos, at: now, until: now + 1500 };   // freeze or resume the clock right away
+      render(false);
+    } else if (c === 'seek') {
+      if (p && p.can_seek) { const v = view(p); seekOpt = { pos: clamp(v.pos + d * 1000, 0, p.dur_ms), at: now, until: now + 1800 }; render(false); }
+      flashBadge(d);
+    }
     if (c === 'seek') send({ t: 'cmd', c: 'seek_rel', d });
     else if (c === 'volume') send({ t: 'cmd', c: 'volume', d });
     else send({ t: 'cmd', c });
@@ -289,14 +441,28 @@
   document.addEventListener('pointerdown', e => {
     const b = e.target.closest('button[data-c]'); if (!b) return;
     fire(b);
-    if (b.hasAttribute('data-repeat')) { clearInterval(rep); rep = setTimeout(() => { rep = setInterval(() => fire(b), 140); }, 350); }
+    if (b.hasAttribute('data-repeat')) {
+      clearTimeout(rep); clearInterval(rep); repN = 0;
+      const slow = b.dataset.c === 'seek';
+      const tick = () => { fire(b); repN++; rep = setTimeout(tick, slow ? (repN > 5 ? 280 : 450) : 140); };
+      rep = setTimeout(tick, 400);
+    }
   });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(rep); clearInterval(rep); }));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(rep); }));
 
   $('players').onchange = e => send({ t: 'cmd', c: 'select', id: e.target.value });
   const bar = $('bar');
   bar.oninput = () => { seeking = true; $('cur').textContent = fmt(+bar.value); bar.style.setProperty('--p', (100 * bar.value / bar.max) + '%'); };
   bar.onchange = () => { send({ t: 'cmd', c: 'seek_abs', pos_ms: +bar.value }); setTimeout(() => seeking = false, 700); };
+
+  // Volume slider: follows the PC, and sets it while dragged.
+  const vol = $('vol');
+  vol.oninput = () => {
+    volDrag = true; $('volVal').textContent = vol.value + '%'; vol.style.setProperty('--p', vol.value + '%');
+    const now = Date.now();
+    if (now - volT > 90) { volT = now; send({ t: 'cmd', c: 'volume_set', level: +vol.value }); }
+  };
+  vol.onchange = () => { send({ t: 'cmd', c: 'volume_set', level: +vol.value }); buzz(8); setTimeout(() => volDrag = false, 600); };
 
   // ---- Media | Touchpad ----
   const padApi = {
@@ -308,17 +474,32 @@
   };
   function showView(v) {
     document.body.classList.toggle('touchmode', v === 'touch');
-    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    document.querySelectorAll('#tabs button').forEach(b => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
     if (v === 'touch' && !padMounted) { padMounted = true; window.mountPad($('touchHost'), padApi, {}); }
-    buzz(10);
+    buzz(8);
   }
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.v));
 
-  $('more').onclick = () => $('menu').classList.add('show');
-  $('close').onclick = () => $('menu').classList.remove('show');
-  $('menu').onclick = e => { if (e.target.id === 'menu') $('menu').classList.remove('show'); };
-  $('reconnect').onclick = () => { $('menu').classList.remove('show'); if (ws) ws.close(); };
-  $('forget').onclick = () => { ['pr.tok', 'pr.legacy', 'pr.token'].forEach(k => localStorage.removeItem(k)); location.reload(); };
+  // ---- menu ----
+  const menu = $('menu');
+  const closeMenu = () => menu.classList.remove('show');
+  const inMenu = (id, fn) => { $(id).onclick = () => { closeMenu(); fn(); }; };
+  $('more').onclick = () => {
+    $('mSwitch').hidden = !(inApp && bridge.pcCount && bridge.pcCount() > 1);
+    menu.classList.add('show');
+  };
+  $('close').onclick = closeMenu;
+  menu.onclick = e => { if (e.target.id === 'menu') closeMenu(); };
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  inMenu('mSettings', () => { if (inApp) bridge.openSettings(); else location.href = '/settings'; });
+  inMenu('mGuide', () => openGuide('connect'));
+  inMenu('mSwitch', () => bridge.switchPc());
+  inMenu('mAdd', () => bridge.addPc());
+  inMenu('reconnect', forceReconnect);
+  inMenu('forget', () => {
+    if (inApp && bridge.forgetCurrentPc) { bridge.forgetCurrentPc(); return; }
+    ['pr.tok', 'pr.legacy', 'pr.token'].forEach(k => localStorage.removeItem(k)); location.reload();
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) revive(); });
   connect();
 })();

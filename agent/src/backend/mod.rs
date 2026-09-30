@@ -72,6 +72,16 @@ pub trait Backend: Send + Sync {
     /// Send Left/Right arrows to the foreground window if it is a known player.
     /// Returns the number of seconds actually skipped (0 = nothing sent).
     fn focused_seek(&self, secs: i64) -> Result<i64>;
+    /// Master volume (0-100) and mute state, if this system can report them.
+    fn volume(&self) -> Option<(u8, bool)> {
+        None
+    }
+    fn set_volume(&self, _level: u8) -> Result<()> {
+        Err(anyhow::anyhow!("volume level is not supported here"))
+    }
+    fn set_mute(&self, _muted: bool) -> Result<()> {
+        Err(anyhow::anyhow!("mute is not supported here"))
+    }
     /// Mouse and keyboard input. Backends without support refuse it.
     fn input(&self, _input: Input) -> Result<()> {
         Err(anyhow::anyhow!("mouse and keyboard control is not supported on this system"))

@@ -17,12 +17,15 @@ use tokio::sync::{watch, Notify};
 const INDEX: &str = include_str!("../web/index.html");
 const DASHBOARD: &str = include_str!("../web/dashboard.html");
 const PAIR_PAGE: &str = include_str!("../web/pair.html");
+const APPROVE: &str = include_str!("../web/approve.html");
 // Shared with the Android app (bundled there as assets).
 const GUIDE: &str = include_str!("../../shared/guide.html");
 const BASE_CSS: &str = include_str!("../../shared/base.css");
 const FONT: &[u8] = include_bytes!("../../shared/font.woff2");
 const PAD_JS: &str = include_str!("../../shared/pad.js");
 const PAD_CSS: &str = include_str!("../../shared/pad.css");
+const SETTINGS_JS: &str = include_str!("../../shared/settings.js");
+const SETTINGS_PAGE: &str = include_str!("../../shared/settings.html");
 
 /// Called when a new phone asks to pair (the tray shows an Allow/Deny prompt).
 pub type PendingHook = Arc<dyn Fn(Arc<App>, Pending) + Send + Sync>;
@@ -127,9 +130,12 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/guide", get(|| async { Html(GUIDE) }))
         .route("/base.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "max-age=3600")], BASE_CSS) }))
         .route("/pad.js", get(|| async { ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], PAD_JS) }))
+        .route("/settings.js", get(|| async { ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], SETTINGS_JS) }))
+        .route("/settings", get(|| async { Html(SETTINGS_PAGE) }))
         .route("/pad.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], PAD_CSS) }))
         .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
         .route("/dashboard", get(dashboard_page))
+        .route("/approve", get(approve_page))
         .route("/health", get(|| async {
             if HANG.load(std::sync::atomic::Ordering::SeqCst) {
                 std::future::pending::<()>().await;
@@ -177,6 +183,13 @@ async fn dashboard_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, headers: Hea
         return StatusCode::FORBIDDEN.into_response();
     }
     ([(header::CACHE_CONTROL, "no-store")], Html(DASHBOARD)).into_response()
+}
+
+async fn approve_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, headers: HeaderMap, State(app): State<Arc<App>>) -> Response {
+    if !is_local(&peer, &headers, app.port) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    ([(header::CACHE_CONTROL, "no-store")], Html(APPROVE)).into_response()
 }
 
 /// Loopback-only diagnostics: what the agent can see right now, and why sessions may be missing.

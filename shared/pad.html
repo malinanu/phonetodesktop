@@ -6,6 +6,7 @@
 <title>Touchpad</title>
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="pad.css">
+<script src="settings.js"></script>
 <style>
   html, body { height:100%; margin:0; }
   body { padding:0 16px 12px; overflow:hidden; }
@@ -17,13 +18,13 @@
 <script src="pad.js"></script>
 <script>
   // Bluetooth transport: every call goes to the Android app, which sends real HID reports.
-  var hid = window.AndroidHid;
+  var hid = window.AndroidBridge;
   mountPad(document.getElementById('host'), {
-    move: function (dx, dy) { hid.move(dx, dy); },
-    button: function (b, a) { hid.button(b, a); },
-    scroll: function (dx, dy) { hid.scroll(dx, dy); },
-    text: function (s) { hid.text(s); },
-    key: function (name, mods) { hid.key(name, (mods || []).join(',')); }
+    move: function (dx, dy) { hid.hidMove(dx, dy); },
+    button: function (b, a) { hid.hidButton(b, a); },
+    scroll: function (dx, dy) { hid.hidScroll(dx, dy); },
+    text: function (s) { hid.hidText(s); },
+    key: function (name, mods) { hid.hidKey(name, (mods || []).join(',')); }
   }, { note: 'Bluetooth keyboard: US-layout keys only. For Sinhala, emoji and other scripts, use Wi-Fi.' });
 </script>
 </body>

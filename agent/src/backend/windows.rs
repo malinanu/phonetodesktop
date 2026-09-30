@@ -241,6 +241,18 @@ fn state_label(playing: bool, stopped: bool) -> &'static str {
     }
 }
 
+/// Master volume of the default output device.
+fn endpoint_volume() -> Result<windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume> {
+    use windows::Win32::Media::Audio::{eMultimedia, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator, MMDeviceEnumerator};
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
+    init_winrt();
+    unsafe {
+        let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let dev = en.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
+        Ok(dev.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)?)
+    }
+}
+
 const IGNORED_AUDIO: &[&str] = &["phone-remote", "audiodg", "system", "svchost", "explorer", "applicationframehost"];
 
 fn collect(errs: &mut Vec<String>, vlc_pw: &str) -> Result<Vec<PlayerInfo>> {
@@ -419,6 +431,32 @@ impl Backend for WindowsBackend {
             Key::Mute => VK_VOLUME_MUTE,
         };
         tap(vk, true)
+    }
+
+    fn volume(&self) -> Option<(u8, bool)> {
+        let ep = endpoint_volume().ok()?;
+        unsafe {
+            let level = ep.GetMasterVolumeLevelScalar().ok()?;
+            let muted = ep.GetMute().ok()?.as_bool();
+            Some(((level * 100.0).round().clamp(0.0, 100.0) as u8, muted))
+        }
+    }
+
+    fn set_volume(&self, level: u8) -> Result<()> {
+        let ep = endpoint_volume()?;
+        unsafe {
+            ep.SetMasterVolumeLevelScalar(level.min(100) as f32 / 100.0, std::ptr::null())?;
+            // Raising the volume while muted should be audible.
+            if level > 0 {
+                ep.SetMute(false, std::ptr::null())?;
+            }
+        }
+        Ok(())
+    }
+
+    fn set_mute(&self, muted: bool) -> Result<()> {
+        unsafe { endpoint_volume()?.SetMute(muted, std::ptr::null())? };
+        Ok(())
     }
 
     fn input(&self, input: Input) -> Result<()> {

@@ -56,6 +56,11 @@ class Store(ctx: Context) {
         save(all().map { if (it.id == id) it.copy(token = token, deviceId = deviceId, paired = true) else it })
     }
 
+    /** Settings chosen on the settings page (one JSON blob shared by every WebView). */
+    fun settingsJson(): String = prefs.getString("settings", "{}") ?: "{}"
+
+    fun saveSettings(json: String) { prefs.edit().putString("settings", json).apply() }
+
     fun setActive(id: String) { prefs.edit().putString("active", id).apply() }
 
     /** Add a PC, or refresh an already-known one (same id), and make it the active one. */

@@ -54,12 +54,26 @@
   .switch input:checked + i { background:var(--accent); } .switch input:checked + i::after { transform:translateX(18px); background:var(--on-accent); }
   pre { font:12.5px/1.6 ui-monospace,Consolas,monospace; color:var(--ink-dim); white-space:pre-wrap; word-break:break-word; margin:0; }
   .out { margin-top:14px; } .links { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+
+  .dots { display:flex; gap:8px; margin:18px 0 22px; } .dots i { width:34px; height:5px; border-radius:5px; background:var(--surface-2); transition:background .25s var(--ease); } .dots i.on { background:var(--accent); }
+  .wiz-actions { display:flex; gap:10px; margin-top:26px; flex-wrap:wrap; }
+  .okline { display:none; align-items:center; gap:10px; margin-top:16px; padding:12px 14px; border-radius:14px; background:color-mix(in oklab,var(--good) 16%,transparent); color:var(--good); font-weight:650; }
+  .okline.on { display:flex; animation:in .3s var(--ease); }
+  .waiting { display:flex; align-items:center; gap:10px; margin-top:16px; color:var(--ink-dim); font-size:15px; }
+  .waiting .sp { width:16px; height:16px; border-radius:50%; border:2.5px solid var(--surface-2); border-top-color:var(--accent); animation:spin .9s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
+  #toast { position:fixed; right:24px; bottom:24px; background:var(--ink); color:var(--bg); padding:12px 18px; border-radius:14px; font-weight:600; font-size:15px; opacity:0; transform:translateY(12px); transition:.25s var(--ease); pointer-events:none; z-index:20; max-width:min(420px,90vw); }
+  #toast.show { opacity:1; transform:none; }
+  .emptybox { padding:26px 0; color:var(--ink-dim); } .emptybox b { display:block; color:var(--ink); font-size:17px; margin-bottom:4px; }
+  .emptybox .btn { margin-top:14px; }
+  [hidden] { display:none !important; }
+  @media (prefers-reduced-motion:reduce) { .waiting .sp { animation:none; } }
 </style>
 </head>
 <body>
 <aside>
   <div class="brand"><span class="kicker">PC agent</span><b>Phone Remote</b></div>
   <nav>
+    <a href="#setup" data-v="setup" id="navSetup" hidden>Finish setup</a>
     <a href="#home" data-v="home">Home</a>
     <a href="#phones" data-v="phones">Phones <span class="n" id="pcount" hidden></span></a>
     <a href="#players" data-v="players">Video players</a>
@@ -77,6 +91,38 @@
   </div>
 
   <div class="note" id="restartNote" hidden></div>
+
+  <section id="setup">
+    <span class="kicker" id="stepNo">Get started · 1 of 3</span>
+    <h1 id="stepTitle">Add your phone</h1>
+    <p class="lead" id="stepLead"></p>
+    <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+
+    <div id="step1">
+      <div class="qrbox"><div class="qr" id="wQr"></div>
+        <div><p>Connect your phone to the <b>same Wi-Fi</b>, open the <b>Phone Remote</b> app and tap <b>Scan QR code</b>. You can also point the camera at this code.</p>
+        <p>A window will ask you to <b>allow</b> the phone.</p></div></div>
+      <div class="waiting" id="wWait"><span class="sp"></span>Waiting for your phone…</div>
+      <div class="okline" id="wOk">✓ <span id="wOkText">Phone connected</span></div>
+    </div>
+
+    <div id="step2" hidden>
+      <div id="wPl"></div>
+      <p style="margin-top:18px"><button class="btn primary" id="wPlSetup">Set up video players</button></p>
+      <pre class="out" id="wPlOut"></pre>
+      <div class="note">Browsers, Spotify and Windows Media Player already work. This step adds progress and seek for VLC, mpv and MPC-HC. You can skip it and do it later.</div>
+    </div>
+
+    <div id="step3" hidden>
+      <div class="now" id="wNow"></div>
+      <div class="note">Play a video or a song on this PC. Its title appears here and on your phone. Try pause, skip and the volume from your phone.</div>
+    </div>
+
+    <div class="wiz-actions">
+      <button class="btn" id="wBack" hidden>Back</button>
+      <button class="btn primary" id="wNext">Skip this step</button>
+    </div>
+  </section>
 
   <section id="home">
     <span class="kicker">Overview</span>
@@ -136,6 +182,7 @@
   </section>
 </main>
 
+<div id="toast" role="status" aria-live="polite"></div>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -149,7 +196,7 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
   let view = 'home', data = null, removing = null;
-  const views = ['home', 'phones', 'players', 'settings', 'activity', 'help'];
+  const views = ['setup', 'home', 'phones', 'players', 'settings', 'activity', 'help'];
   function route() {
     const h = location.hash.slice(1);
     view = h === 'add' ? 'phones' : views.includes(h) ? h : 'home';
@@ -157,6 +204,7 @@
     document.querySelectorAll('nav a').forEach(a => a.toggleAttribute('aria-current', a.dataset.v === view) || a.removeAttribute('aria-current'));
     document.querySelectorAll('nav a').forEach(a => { if (a.dataset.v === view) a.setAttribute('aria-current', 'page'); });
     if (view === 'phones') loadQr();
+    if (view === 'setup') renderWizard();
     if (view === 'players') loadPlayers();
     if (view === 'activity') loadLog();
   }
@@ -172,12 +220,15 @@
     if (p) {
       box.append(el('div', 't', p.title || p.app), el('span', 'dim', `${p.app} · ${p.playing ? 'playing' : 'paused'}${p.dur_ms ? ' · ' + fmt(p.pos_ms) + ' / ' + fmt(p.dur_ms) : ''}`));
       if (p.dur_ms) { const b = el('div', 'bar'), i = el('i'); i.style.width = (100 * p.pos_ms / p.dur_ms) + '%'; b.append(i); box.append(b); }
-    } else box.append(el('div', 'empty', 'Nothing is playing.'));
+    } else { const e = el('div', 'emptybox'); e.append(el('b', null, 'Nothing is playing'), el('span', null, 'Start a video or a song on this PC and it shows up here and on your phone.')); box.append(e); }
   }
 
   function renderPhones() {
     const list = $('devList'); list.textContent = '';
-    if (!data.devices.length) list.append(el('div', 'empty', 'No phones paired yet. Add one below.'));
+    if (!data.devices.length) {
+      const e = el('div', 'emptybox'); e.append(el('b', null, 'No phones yet'), el('span', null, 'Scan the code below with the Phone Remote app to add your first phone.'));
+      const g = el('a', 'btn', 'How it works'); g.href = '/guide#connect'; g.target = '_blank'; e.append(g); list.append(e);
+    }
     data.devices.forEach(d => {
       const r = el('div', 'row'), dot = el('span', 'dot' + (d.online ? ' on' : ''));
       const g = el('div', 'grow'); g.append(el('b', null, d.name), el('span', null, d.online ? 'Connected now' : 'Last seen ' + ago(d.last_seen)));
@@ -217,7 +268,7 @@
     renderApproval(); renderHome(); renderPhones();
   }
 
-  async function refresh() { try { data = await api('/api/overview'); render(); } catch (e) { $('hState').textContent = 'Not running'; } }
+  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); $('navSetup').hidden = data.setup_done; if (first && !data.setup_done && !location.hash) location.hash = '#setup'; } catch (e) { $('hState').textContent = 'Not running'; } }
 
   async function loadQr() {
     try {
@@ -241,6 +292,61 @@
   $('logRefresh').onclick = loadLog;
   $('autostart').onchange = async e => { await api('/api/autostart', 'POST', { enabled: e.target.checked }); };
   $('unpair').onclick = async e => { if (e.target.dataset.sure) { await api('/api/unpair-all', 'POST'); e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; refresh(); } else { e.target.dataset.sure = 1; e.target.textContent = 'Click again to confirm'; setTimeout(() => { e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; }, 4000); } };
+
+  // ---- toasts: tell the user when a phone comes or goes ----
+  let toastT, prevOnline = null;
+  function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('show'), 3200); }
+  function watchPhones() {
+    const now = {}; data.devices.forEach(d => now[d.id] = d.online);
+    if (prevOnline) data.devices.forEach(d => {
+      if (prevOnline[d.id] === undefined && d.online) toast(`${d.name} joined`);
+      else if (prevOnline[d.id] === false && d.online) toast(`${d.name} connected`);
+      else if (prevOnline[d.id] === true && !d.online) toast(`${d.name} disconnected`);
+    });
+    prevOnline = now;
+  }
+
+  // ---- first-run wizard ----
+  let wiz = 1, wizPhone = false;
+  const STEPS = [
+    ['Add your phone', 'It takes about a minute, and you only do it once per phone.'],
+    ['Video players', 'Some players need their remote interface switched on for progress and seek.'],
+    ['Try it out', 'Everything is ready. Play something and control it from your phone.'],
+  ];
+  function renderWizard() {
+    $('stepNo').textContent = `Get started · ${wiz} of 3`;
+    $('stepTitle').textContent = STEPS[wiz - 1][0]; $('stepLead').textContent = STEPS[wiz - 1][1];
+    document.querySelectorAll('.dots i').forEach((d, i) => d.classList.toggle('on', i < wiz));
+    [1, 2, 3].forEach(n => $('step' + n).hidden = n !== wiz);
+    $('wBack').hidden = wiz === 1;
+    $('wNext').textContent = wiz === 3 ? 'Finish' : (wiz === 1 && !wizPhone ? 'Skip this step' : 'Continue');
+    if (wiz === 1) api('/api/qr').then(q => { $('wQr').innerHTML = q.codes[0].svg; }).catch(() => {});
+    if (wiz === 2) api('/api/players').then(rows => {
+      const box = $('wPl'); box.textContent = '';
+      const label = { ready: 'Ready', restart: 'Restart the player', off: 'Not set up' };
+      rows.forEach(p => { const r = el('div', 'row'), g = el('div', 'grow'); g.append(el('b', null, p.name), el('span', null, p.note)); r.append(g, el('span', 'chip ' + p.status, label[p.status])); box.append(r); });
+    }).catch(() => {});
+  }
+  function wizardTick() {
+    if (!data || view !== 'setup') return;
+    const first = data.devices.find(d => d.online) || data.devices[0];
+    if (wiz === 1 && first && !wizPhone) {
+      wizPhone = true; $('wWait').hidden = true; $('wOk').classList.add('on'); $('wOkText').textContent = `${first.name} is connected`;
+      $('wNext').textContent = 'Continue'; toast(`${first.name} is connected`);
+    }
+    if (wiz === 3) {
+      const nn = data.now, p = nn && nn.players.find(x => x.id === nn.current), box = $('wNow'); box.textContent = '';
+      box.append(el('span', 'kicker', 'Now playing on this PC'));
+      if (p) box.append(el('div', 't', p.title || p.app), el('span', 'dim', `${p.app} · ${p.playing ? 'playing' : 'paused'}`));
+      else box.append(el('div', 'emptybox', 'Waiting for something to play…'));
+    }
+  }
+  $('wNext').onclick = async () => {
+    if (wiz < 3) { wiz++; renderWizard(); wizardTick(); return; }
+    await api('/api/setup-done', 'POST'); data.setup_done = true; $('navSetup').hidden = true; location.hash = '#home';
+  };
+  $('wBack').onclick = () => { wiz--; renderWizard(); };
+  $('wPlSetup').onclick = async () => { $('wPlOut').textContent = 'Working…'; const r = await api('/api/players/setup', 'POST'); $('wPlOut').textContent = r.lines.join('\n\n'); renderWizard(); };
 
   route(); refresh();
   setInterval(() => { if (!document.hidden) refresh(); }, 2000);

@@ -6,6 +6,10 @@
   'use strict';
   var KB_SENTINEL = '​​';
 
+  // Settings are optional so the pad still works if settings.js is not loaded.
+  function cfg() { return (window.PRSettings && window.PRSettings.get()) || { padSpeed: 1, scroll: 'natural', tapToClick: true, vibrate: true }; }
+  function buzz(ms) { if (window.PRSettings) window.PRSettings.haptic(ms); else if (navigator.vibrate) navigator.vibrate(ms); }
+
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
   window.mountPad = function (root, api, opts) {
@@ -13,6 +17,11 @@
     root.textContent = '';
     var pad = el('div', 'pad');
     var surface = el('div', 'pad-surface', '<div class="hint">Drag to move the cursor<br>Tap to click · two fingers: tap = right click, drag = scroll</div>');
+    function ripple(x, y) {
+      var r = surface.getBoundingClientRect(), d = el('i', 'ripple');
+      d.style.left = (x - r.left) + 'px'; d.style.top = (y - r.top) + 'px';
+      surface.append(d); setTimeout(function () { d.remove(); }, 450);
+    }
     var mouseRow = el('div', 'pad-row');
     var left = el('button', 'mouse', 'Left click'), right = el('button', 'mouse', 'Right click');
     mouseRow.append(left, right);
@@ -57,7 +66,7 @@
 
     /* ---- mouse buttons: real press / release so dragging works ---- */
     function hold(btn, which) {
-      var down = function (e) { e.preventDefault(); btn.classList.add('on'); api.button(which, 'down'); };
+      var down = function (e) { e.preventDefault(); btn.classList.add('on'); buzz(12); api.button(which, 'down'); };
       var up = function (e) { e.preventDefault(); if (btn.classList.contains('on')) { btn.classList.remove('on'); api.button(which, 'up'); } };
       btn.addEventListener('touchstart', down, { passive: false });
       btn.addEventListener('touchend', up, { passive: false });
@@ -93,7 +102,7 @@
       var c = centroid(e.touches);
       if (st.fingers === 1) {
         st.startT = now; st.startX = st.lastX = c.x; st.startY = st.lastY = c.y; st.lastT = now; st.moved = 0; st.maxFingers = 1;
-        st.dragArmed = now - st.lastTapEnd < 280;   // tap, then touch again and move = drag
+        st.dragArmed = cfg().tapToClick && now - st.lastTapEnd < 280;   // tap, then touch again and move = drag
       } else { st.cx = c.x; st.cy = c.y; surface.classList.add('scrolling'); }
     }, { passive: false });
 
@@ -105,7 +114,7 @@
         st.moved += Math.abs(dx) + Math.abs(dy);
         if (st.dragArmed && !st.dragging && st.moved > 6) { st.dragging = true; api.button('left', 'down'); }
         var speed = Math.sqrt(dx * dx + dy * dy) / dt;           // px per ms
-        var gain = 1.1 + Math.min(1.9, speed * 1.1);             // gentle acceleration
+        var gain = (1.1 + Math.min(1.9, speed * 1.1)) * cfg().padSpeed;   // gentle acceleration, scaled by the speed setting
         pending.dx += dx * gain; pending.dy += dy * gain;
         st.lastX = c.x; st.lastY = c.y; st.lastT = now;
         schedule();
@@ -113,7 +122,8 @@
         var sdx = c.x - st.cx, sdy = c.y - st.cy;
         st.moved += Math.abs(sdx) + Math.abs(sdy);
         // Wheel units: 120 = one notch. Fingers moving down scroll the content down (natural direction).
-        pending.sy += sdy * 4; pending.sx += sdx * 4;
+        var dir = cfg().scroll === 'classic' ? -1 : 1;
+        pending.sy += sdy * 4 * dir; pending.sx += sdx * 4 * dir;
         st.cx = c.x; st.cy = c.y;
         schedule();
       }
@@ -125,9 +135,10 @@
       if (e.touches.length === 0) {
         flush();
         var quick = now - st.startT < 280 && st.moved < 10;
+        var taps = cfg().tapToClick;
         if (st.dragging) { api.button('left', 'up'); st.dragging = false; st.lastTapEnd = 0; }
-        else if (quick && st.maxFingers === 1) { api.button('left', 'click'); st.lastTapEnd = now; }
-        else if (quick && st.maxFingers === 2) { api.button('right', 'click'); st.lastTapEnd = 0; }
+        else if (taps && quick && st.maxFingers === 1) { api.button('left', 'click'); st.lastTapEnd = now; buzz(8); ripple(st.lastX, st.lastY); }
+        else if (taps && quick && st.maxFingers === 2) { api.button('right', 'click'); st.lastTapEnd = 0; buzz(14); ripple(st.cx, st.cy); }
         st.maxFingers = 0; st.fingers = 0; st.dragArmed = false;
         surface.classList.remove('scrolling');
       } else {

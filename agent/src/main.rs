@@ -174,14 +174,7 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
 
     #[cfg(windows)]
     if !console {
-        server::set_pending_hook(Arc::new(|app, p| {
-            // Ask on a separate thread so the tray keeps running while the dialog is open.
-            std::thread::spawn(move || {
-                let allow = tray::ask_allow(&p.name, &p.ip);
-                app.auth.decide(&p.id, allow);
-                app.poke();
-            });
-        }));
+        server::set_pending_hook(Arc::new(|app, p| tray::request_approval(app, p)));
         log::log(&format!("agent {} starting (pid {}{})", env!("CARGO_PKG_VERSION"), std::process::id(), if background { ", background" } else { "" }));
         // The server thread never ends on its own: only the tray's Quit stops the process.
         std::thread::spawn(move || supervise(server_cfg, server_ips, listener, mock, no_mdns));

@@ -35,32 +35,42 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
  * Bluetooth tab: the phone acts as a Bluetooth media-key/arrow-key keyboard (see HidRemote).
  */
 class MainActivity : Activity() {
+    /** Colours of the current theme; filled in by [C.apply] before any view is built. */
     private object C {
-        val BG = Color.parseColor("#15110E")
-        val CARD = Color.parseColor("#1F1A16")
-        val CARD2 = Color.parseColor("#2A231D")
-        val FG = Color.parseColor("#F5EBDD")
-        val DIM = Color.parseColor("#B3A594")
-        val ACC = Color.parseColor("#FF9A3C")
-        val ON_ACC = Color.parseColor("#1B1006")
-        val BAD = Color.parseColor("#FF8A7A")
+        var BG = 0
+        var CARD = 0
+        var CARD2 = 0
+        var FG = 0
+        var DIM = 0
+        var ACC = 0
+        var ON_ACC = 0
+        var BAD = 0
+        var GOOD = 0
+
+        fun apply(p: Palette) {
+            BG = p.bg; CARD = p.card; CARD2 = p.card2; FG = p.fg; DIM = p.dim
+            ACC = p.acc; ON_ACC = p.onAcc; BAD = p.bad; GOOD = p.good
+        }
     }
+
+    private var dark = true
 
     private val store by lazy { Store(this) }
     private lateinit var web: WebView
     private lateinit var welcome: View
     private lateinit var banner: TextView
     private lateinit var guide: WebView
-    private lateinit var guideBtn: Button
-    private var guideOpen = false
+    private lateinit var settingsPage: WebView
+    private lateinit var nav: LinearLayout
+    /** The full-screen page on top of everything: "guide", "settings" or none. */
+    private var overlay: String? = null
     private lateinit var btView: View
-    private lateinit var tabWifi: Button
-    private lateinit var tabBt: Button
+    private lateinit var navWifi: LinearLayout
+    private lateinit var navBt: LinearLayout
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
     private var loadedKey: String? = null
     private var currentPcId: String? = null
-    private lateinit var titleView: TextView
 
     private val bold: Typeface by lazy { resources.getFont(R.font.bricolage_bold) }
     private val medium: Typeface by lazy { resources.getFont(R.font.bricolage_medium) }
@@ -93,27 +103,23 @@ class MainActivity : Activity() {
         LinearLayout.LayoutParams(w, h, weight).apply { setMargins(dp(m), dp(m), dp(m), dp(m)) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Theme first, so every native view, dialog and popup agrees with the pages.
+        val settings = store.settingsJson()
+        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        dark = Theme.isDark(Theme.themeOf(settings), night)
+        C.apply(Theme.palette(dark))
+        setTheme(if (dark) android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar)
         super.onCreate(savedInstanceState)
-        // Status and navigation bars take the app background so nothing clashes with the page below.
         window.statusBarColor = C.BG
         window.navigationBarColor = C.BG
+        styleSystemBars()
+        applyKeepAwake(Theme.keepAwakeOf(settings))
         // Edge-to-edge is enforced on targetSdk 35; fitsSystemWindows keeps content below the status bar.
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(C.BG)
             fitsSystemWindows = true
         }
-
-        val top = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(8), dp(12), dp(8))
-        }
-        titleView = label("Phone Remote", 20f, bold = true).apply { setOnClickListener { if (store.all().isNotEmpty()) showPcs() } }
-        top.addView(titleView, lp(0, WRAP_CONTENT, 1f))
-        guideBtn = button("Guide") { toggleGuide() }.apply { minHeight = dp(40); textSize = 13f; background = null; setTextColor(C.DIM) }
-        top.addView(guideBtn, lp(WRAP_CONTENT, dp(40)))
-        top.addView(button("Scan QR") { scanQr() }.apply { minHeight = dp(40); textSize = 13f }, lp(WRAP_CONTENT, dp(40)))
-        root.addView(top)
 
         banner = label("", 14f, C.ON_ACC, bold = true).apply {
             background = bg(C.BAD, 12)
@@ -137,33 +143,37 @@ class MainActivity : Activity() {
                 override fun onPageFinished(v: WebView, url: String) { banner.visibility = View.GONE }
             }
         }
-        guide = WebView(this).apply {
-            setBackgroundColor(C.BG)
-            overScrollMode = View.OVER_SCROLL_NEVER
-            settings.javaScriptEnabled = true
-            visibility = View.GONE
-            loadUrl("file:///android_asset/guide.html")
-        }
+        guide = overlayPage()
+        settingsPage = overlayPage()
         welcome = buildWelcome()
         btView = buildBluetoothView()
         content.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(welcome, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(guide, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        content.addView(settingsPage, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(btView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content, lp(h = 0, weight = 1f))
 
-        val nav = LinearLayout(this).apply { setPadding(dp(12), dp(8), dp(12), dp(12)) }
-        tabWifi = button("Wi-Fi") { showMode(false) }
-        tabBt = button("Bluetooth") { showMode(true) }
-        nav.addView(tabWifi, lp(0, WRAP_CONTENT, 1f, 4))
-        nav.addView(tabBt, lp(0, WRAP_CONTENT, 1f, 4))
+        nav = LinearLayout(this).apply {
+            setBackgroundColor(C.CARD)
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+        }
+        navWifi = navItem(R.drawable.ic_wifi, "Wi-Fi") { showMode(false) }
+        navBt = navItem(R.drawable.ic_bluetooth, "Bluetooth") { showMode(true) }
+        nav.addView(navWifi, lp(0, WRAP_CONTENT, 1f))
+        nav.addView(navBt, lp(0, WRAP_CONTENT, 1f))
         root.addView(nav)
+        // The bar is only useful when the keyboard is closed.
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val imeUp = if (Build.VERSION.SDK_INT >= 30) insets.isVisible(android.view.WindowInsets.Type.ime()) else false
+            nav.visibility = if (imeUp) View.GONE else View.VISIBLE
+            v.onApplyWindowInsets(insets)
+        }
         setContentView(root)
 
         discovery = Discovery(this) { id, host, port -> runOnUiThread { onSighting(id, host, port) } }
         showMode(false)
         // Load the last known address right away, then let mDNS correct it if the IP changed.
-        refreshTitle()
         openActive()
     }
 
@@ -200,12 +210,17 @@ class MainActivity : Activity() {
             col.addView(row)
         }
         col.addView(button("Scan QR code", filled = true) { scanQr() }, lp().apply { topMargin = dp(20) })
-        col.addView(button("How it works and troubleshooting") { toggleGuide(true, "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("How it works and troubleshooting") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
     }
 
-    /** Called by the PC's page (see index.html) when the PC owner approves or removes this phone. */
+    /**
+     * What the pages loaded in this app can ask of it. Every WebView (remote, guide, settings and
+     * the Bluetooth touchpad) gets the same object as `window.AndroidBridge`; in an ordinary
+     * browser the object does not exist and the pages fall back to their own behaviour.
+     */
     inner class Bridge {
+        // -- pairing (from the PC's remote page) --
         @android.webkit.JavascriptInterface
         fun onPaired(token: String, deviceId: String) {
             val id = currentPcId ?: return
@@ -215,19 +230,48 @@ class MainActivity : Activity() {
         @android.webkit.JavascriptInterface
         fun onRevoked() {
             val id = currentPcId ?: return
+            runOnUiThread { forgetPc(id) }
+        }
+
+        // -- navigation --
+        @android.webkit.JavascriptInterface fun openGuide(anchor: String) { runOnUiThread { openOverlay("guide", anchor) } }
+        @android.webkit.JavascriptInterface fun openSettings() { runOnUiThread { openOverlay("settings") } }
+        @android.webkit.JavascriptInterface fun closeOverlay() { runOnUiThread { this@MainActivity.closeOverlay() } }
+        @android.webkit.JavascriptInterface fun addPc() { runOnUiThread { scanQr() } }
+        @android.webkit.JavascriptInterface fun showBluetooth() { runOnUiThread { showMode(true) } }
+        @android.webkit.JavascriptInterface fun switchPc() { runOnUiThread { showPcs() } }
+        @android.webkit.JavascriptInterface fun pcCount(): Int = store.all().size
+        @android.webkit.JavascriptInterface fun forgetCurrentPc() { runOnUiThread { store.active()?.let { forgetPc(it.id) } } }
+
+        // -- settings (one JSON blob kept in the app, shared by every page) --
+        @android.webkit.JavascriptInterface fun getSettings(): String = store.settingsJson()
+        @android.webkit.JavascriptInterface fun saveSettings(json: String) {
+            val old = Theme.themeOf(store.settingsJson())
+            store.saveSettings(json)
             runOnUiThread {
-                store.forget(id)
-                loadedKey = null
-                refreshTitle()
-                showMode(false)
-                openActive()
+                applyKeepAwake(Theme.keepAwakeOf(json))
+                // A theme change needs the native views rebuilt in the new colours.
+                if (Theme.themeOf(json) != old) recreate()
             }
+        }
+
+        // -- Bluetooth mouse, keyboard (from the touchpad page in Bluetooth mode) --
+        @android.webkit.JavascriptInterface fun hidConnected(): Boolean = hid?.connected == true
+        @android.webkit.JavascriptInterface fun hidMove(dx: Int, dy: Int) { hid?.move(dx, dy) }
+        @android.webkit.JavascriptInterface fun hidButton(b: String, action: String) { hid?.button(b, action) }
+        @android.webkit.JavascriptInterface fun hidScroll(dx: Int, dy: Int) { hid?.scroll(dx, dy) }
+        @android.webkit.JavascriptInterface fun hidKey(name: String, mods: String) { hid?.namedKey(name, mods.split(",").filter { it.isNotEmpty() }) }
+        @android.webkit.JavascriptInterface fun hidText(s: String) {
+            val skipped = hid?.typeText(s) ?: 0
+            if (skipped > 0) runOnUiThread { Toast.makeText(this@MainActivity, "That character needs Wi-Fi mode (Bluetooth types US-layout keys)", Toast.LENGTH_SHORT).show() }
         }
     }
 
-    private fun refreshTitle() {
-        val pcs = store.all()
-        titleView.text = store.active()?.let { if (pcs.size > 1) "${it.name} ▾" else it.name } ?: "Phone Remote"
+    private fun forgetPc(id: String) {
+        store.forget(id)
+        loadedKey = null
+        showMode(false)
+        openActive()
     }
 
     /** Load the active PC's controller. The pairing never changes here, only where we look for the PC. */
@@ -262,18 +306,11 @@ class MainActivity : Activity() {
             .setItems(names) { _, i ->
                 store.setActive(pcs[i].id)
                 loadedKey = null
-                refreshTitle()
                 showMode(false)
                 openActive()
             }
             .setPositiveButton("Add a PC") { _, _ -> scanQr() }
-            .setNegativeButton("Forget ${store.active()?.name ?: ""}") { _, _ ->
-                store.active()?.let { store.forget(it.id) }
-                loadedKey = null
-                refreshTitle()
-                showMode(false)
-                openActive()
-            }
+            .setNegativeButton("Forget ${store.active()?.name ?: ""}") { _, _ -> store.active()?.let { forgetPc(it.id) } }
             .show()
     }
 
@@ -293,7 +330,6 @@ class MainActivity : Activity() {
                 val deviceId = store.all().firstOrNull { it.id == pcId }?.deviceId ?: newDeviceId()
                 store.upsert(Pc(pcId, name, token, host, port, deviceId, paired = false))
                 loadedKey = null
-                refreshTitle()
                 showMode(false)
                 openActive()
                 discovery.start()
@@ -302,38 +338,92 @@ class MainActivity : Activity() {
     }
 
     private fun showMode(bluetooth: Boolean) {
-        guideOpen = false
-        guideBtn.text = "Guide"
+        overlay = null
         updateVisibility(bluetooth)
         if (bluetooth) startBluetooth()
     }
 
-    private fun toggleGuide(open: Boolean = !guideOpen, anchor: String = "connect") {
-        guideOpen = open
-        guideBtn.text = if (open) "Close" else "Guide"
-        if (open) guide.loadUrl("file:///android_asset/guide.html#$anchor")
+    /** Full-screen Guide or Settings on top of the current screen. */
+    private fun openOverlay(name: String, anchor: String = "") {
+        overlay = name
+        val url = if (name == "guide") "file:///android_asset/guide.html#${anchor.ifEmpty { "connect" }}" else "file:///android_asset/settings.html"
+        (if (name == "guide") guide else settingsPage).loadUrl(url)
+        updateVisibility(btView.visibility == View.VISIBLE)
+    }
+
+    private fun closeOverlay() {
+        overlay = null
         updateVisibility(btView.visibility == View.VISIBLE)
     }
 
     private fun updateVisibility(bluetooth: Boolean) {
-        guide.visibility = if (guideOpen) View.VISIBLE else View.GONE
-        btView.visibility = if (bluetooth && !guideOpen) View.VISIBLE else View.GONE
-        web.visibility = if (!bluetooth && !guideOpen && paired()) View.VISIBLE else View.GONE
-        welcome.visibility = if (!bluetooth && !guideOpen && !paired()) View.VISIBLE else View.GONE
-        tabWifi.background = bg(if (!bluetooth) C.ACC else C.CARD)
-        tabBt.background = bg(if (bluetooth) C.ACC else C.CARD)
-        tabWifi.setTextColor(if (!bluetooth) C.ON_ACC else C.DIM)
-        tabBt.setTextColor(if (bluetooth) C.ON_ACC else C.DIM)
+        val base = overlay == null
+        guide.visibility = if (overlay == "guide") View.VISIBLE else View.GONE
+        settingsPage.visibility = if (overlay == "settings") View.VISIBLE else View.GONE
+        btView.visibility = if (bluetooth && base) View.VISIBLE else View.GONE
+        web.visibility = if (!bluetooth && base && paired()) View.VISIBLE else View.GONE
+        welcome.visibility = if (!bluetooth && base && !paired()) View.VISIBLE else View.GONE
+        styleNav(navWifi, !bluetooth)
+        styleNav(navBt, bluetooth)
         if (bluetooth) banner.visibility = View.GONE
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
-            guideOpen -> toggleGuide(false)
+            overlay != null -> closeOverlay()
             web.visibility == View.VISIBLE && web.canGoBack() -> web.goBack()
             else -> super.onBackPressed()
         }
+    }
+
+    // ---- shell building blocks ---------------------------------------------------------------
+
+    /** A full-screen WebView used for the Guide and Settings pages; hidden until opened. */
+    private fun overlayPage() = WebView(this).apply {
+        setBackgroundColor(C.BG)
+        overScrollMode = View.OVER_SCROLL_NEVER
+        settings.javaScriptEnabled = true
+        addJavascriptInterface(Bridge(), "AndroidBridge")
+        visibility = View.GONE
+    }
+
+    /** Bottom navigation entry: icon over label, accent when selected. */
+    private fun navItem(icon: Int, text: String, click: () -> Unit): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        minimumHeight = dp(56)
+        isClickable = true
+        contentDescription = text
+        setOnClickListener { click() }
+        addView(android.widget.ImageView(this@MainActivity).apply { setImageResource(icon) }, LinearLayout.LayoutParams(dp(24), dp(24)))
+        addView(label(text, 12f, bold = true).apply { setPadding(0, dp(2), 0, 0) })
+    }
+
+    private fun styleNav(item: LinearLayout, selected: Boolean) {
+        val color = if (selected) C.ACC else C.DIM
+        (item.getChildAt(0) as android.widget.ImageView).setColorFilter(color)
+        (item.getChildAt(1) as TextView).setTextColor(color)
+    }
+
+    /** Light icons on dark bars and dark icons on light bars. */
+    private fun styleSystemBars() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            val mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            window.insetsController?.setSystemBarsAppearance(if (dark) 0 else mask, mask)
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = if (dark) 0 else {
+                var f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                if (Build.VERSION.SDK_INT >= 26) f = f or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                f
+            }
+        }
+    }
+
+    private fun applyKeepAwake(on: Boolean) {
+        if (on) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     // ---- Bluetooth: remote, touchpad and keyboard -----------------------------------------
@@ -361,12 +451,13 @@ class MainActivity : Activity() {
         return c
     }
 
-    private fun iconButton(icon: Int, caption: String? = null, filled: Boolean = false, click: () -> Unit): View {
+    private fun iconButton(icon: Int, desc: String, caption: String? = null, filled: Boolean = false, click: () -> Unit): View {
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = bg(if (filled) C.ACC else C.CARD, 22)
             isClickable = true
+            contentDescription = desc
             setOnClickListener { needConnection { click() } }
         }
         val tint = if (filled) C.ON_ACC else C.FG
@@ -396,6 +487,25 @@ class MainActivity : Activity() {
         status.addView(texts, lp(0, WRAP_CONTENT, 1f))
         btAction = button("Connect") { onBtAction() }.apply { minHeight = dp(40); textSize = 13f }
         status.addView(btAction, lp(WRAP_CONTENT, dp(40)))
+        val more = android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.ic_more)
+            setColorFilter(C.DIM)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            contentDescription = "More options"
+            isClickable = true
+            setOnClickListener { v ->
+                android.widget.PopupMenu(this@MainActivity, v).apply {
+                    menu.add(0, 1, 0, "Settings")
+                    menu.add(0, 2, 1, "Guide")
+                    menu.add(0, 3, 2, "Add a PC with a QR code")
+                    setOnMenuItemClickListener {
+                        when (it.itemId) { 1 -> openOverlay("settings"); 2 -> openOverlay("guide"); else -> scanQr() }
+                        true
+                    }
+                }.show()
+            }
+        }
+        status.addView(more, LinearLayout.LayoutParams(dp(44), dp(44)))
         col.addView(status, lp())
 
         btMigrate = card(
@@ -429,7 +539,7 @@ class MainActivity : Activity() {
             settings.javaScriptEnabled = true
             isFocusable = true
             isFocusableInTouchMode = true
-            addJavascriptInterface(HidBridge(), "AndroidHid")
+            addJavascriptInterface(Bridge(), "AndroidBridge")
             loadUrl("file:///android_asset/pad.html")
             visibility = View.GONE
         }
@@ -445,16 +555,16 @@ class MainActivity : Activity() {
         fun row(weight: Float, vararg v: Pair<View, Float>) = LinearLayout(this).apply {
             v.forEach { (view, w) -> addView(view, lp(0, MATCH_PARENT, w, 4)) }
         }.also { pad.addView(it, lp(h = 0, weight = weight)) }
-        row(2f, iconButton(R.drawable.ic_prev) { hid?.media(HidRemote.PREV) } to 1f,
-            iconButton(R.drawable.ic_play_pause, filled = true) { hid?.media(HidRemote.PLAY_PAUSE) } to 2f,
-            iconButton(R.drawable.ic_next) { hid?.media(HidRemote.NEXT) } to 1f)
+        row(2f, iconButton(R.drawable.ic_prev, "Previous") { hid?.media(HidRemote.PREV) } to 1f,
+            iconButton(R.drawable.ic_play_pause, "Play or pause", filled = true) { hid?.media(HidRemote.PLAY_PAUSE) } to 2f,
+            iconButton(R.drawable.ic_next, "Next") { hid?.media(HidRemote.NEXT) } to 1f)
         // Arrow keys reach whichever window has focus; players skip 5–10 s per press.
-        row(1.4f, iconButton(R.drawable.ic_back10, "Back") { hid?.key(0x50, 2) } to 1f,
-            iconButton(R.drawable.ic_play, "Space") { hid?.key(0x2C) } to 1f,
-            iconButton(R.drawable.ic_fwd10, "Forward") { hid?.key(0x4F, 2) } to 1f)
-        row(1.4f, iconButton(R.drawable.ic_vol_down) { hid?.media(HidRemote.VOL_DOWN) } to 1f,
-            iconButton(R.drawable.ic_mute) { hid?.media(HidRemote.MUTE) } to 1f,
-            iconButton(R.drawable.ic_vol_up) { hid?.media(HidRemote.VOL_UP) } to 1f)
+        row(1.4f, iconButton(R.drawable.ic_back10, "Back 10 seconds", "Back") { hid?.key(0x50, 2) } to 1f,
+            iconButton(R.drawable.ic_play, "Space key", "Space") { hid?.key(0x2C) } to 1f,
+            iconButton(R.drawable.ic_fwd10, "Forward 10 seconds", "Forward") { hid?.key(0x4F, 2) } to 1f)
+        row(1.4f, iconButton(R.drawable.ic_vol_down, "Volume down") { hid?.media(HidRemote.VOL_DOWN) } to 1f,
+            iconButton(R.drawable.ic_mute, "Mute") { hid?.media(HidRemote.MUTE) } to 1f,
+            iconButton(R.drawable.ic_vol_up, "Volume up") { hid?.media(HidRemote.VOL_UP) } to 1f)
         pad.addView(label("Back and Forward press the arrow keys in the window in front on the PC.", 12f, C.DIM).apply { setPadding(dp(4), dp(6), 0, 0) })
         return pad
     }
@@ -467,18 +577,6 @@ class MainActivity : Activity() {
         btTabRemote.setTextColor(if (!touchpad) C.ON_ACC else C.DIM)
         btTabPad.setTextColor(if (touchpad) C.ON_ACC else C.DIM)
         if (touchpad) btPadWeb.requestFocus()
-    }
-
-    /** Called from the touchpad page; every call becomes a real Bluetooth HID report. */
-    inner class HidBridge {
-        @android.webkit.JavascriptInterface fun move(dx: Int, dy: Int) { hid?.move(dx, dy) }
-        @android.webkit.JavascriptInterface fun button(b: String, action: String) { hid?.button(b, action) }
-        @android.webkit.JavascriptInterface fun scroll(dx: Int, dy: Int) { hid?.scroll(dx, dy) }
-        @android.webkit.JavascriptInterface fun key(name: String, mods: String) { hid?.namedKey(name, mods.split(",").filter { it.isNotEmpty() }) }
-        @android.webkit.JavascriptInterface fun text(s: String) {
-            val skipped = hid?.typeText(s) ?: 0
-            if (skipped > 0) runOnUiThread { Toast.makeText(this@MainActivity, "That character needs Wi-Fi mode (Bluetooth types US-layout keys)", Toast.LENGTH_SHORT).show() }
-        }
     }
 
     @Suppress("MissingPermission")
@@ -526,7 +624,7 @@ class MainActivity : Activity() {
     @Suppress("MissingPermission")
     private fun refreshBtUi() {
         val d = btDevice
-        (btDot.background as GradientDrawable).setColor(if (d != null) Color.parseColor("#86D9A6") else C.DIM)
+        (btDot.background as GradientDrawable).setColor(if (d != null) C.GOOD else C.DIM)
         btTitle.text = if (d != null) "Connected to ${d.name ?: d.address}" else "Not connected"
         btSub.text = if (d != null) "Remote, mouse and keyboard are ready" else "Pick your PC to start"
         btAction.text = if (d != null) "Change" else if (computers().size == 1) "Connect" else "Choose PC"

@@ -12,6 +12,8 @@ struct Inner {
     since: Instant,
     /// When set, seek_abs returns true but does nothing (like Spotify's SMTC session).
     lying_seek: bool,
+    volume: u8,
+    muted: bool,
     log: Vec<String>,
 }
 
@@ -31,6 +33,8 @@ impl MockBackend {
                 pos_ms: 60_000,
                 since: Instant::now(),
                 lying_seek: lying,
+                volume: 50,
+                muted: false,
                 log: vec![],
             }),
         }
@@ -103,6 +107,26 @@ impl Backend for MockBackend {
 
     fn media_key(&self, key: Key) -> Result<()> {
         self.inner.lock().unwrap().log.push(format!("key {key:?}"));
+        Ok(())
+    }
+
+    fn volume(&self) -> Option<(u8, bool)> {
+        let s = self.inner.lock().unwrap();
+        Some((s.volume, s.muted))
+    }
+
+    fn set_volume(&self, level: u8) -> Result<()> {
+        let mut s = self.inner.lock().unwrap();
+        s.log.push(format!("volume {level}"));
+        s.volume = level;
+        s.muted = false;
+        Ok(())
+    }
+
+    fn set_mute(&self, muted: bool) -> Result<()> {
+        let mut s = self.inner.lock().unwrap();
+        s.log.push(format!("mute {muted}"));
+        s.muted = muted;
         Ok(())
     }
 

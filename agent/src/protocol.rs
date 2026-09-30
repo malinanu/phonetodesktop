@@ -28,6 +28,9 @@ pub struct State {
     /// Id of the player the commands go to.
     pub current: Option<String>,
     pub players: Vec<PlayerInfo>,
+    /// Master volume 0-100 and mute state, when the PC reports them.
+    pub volume: Option<u8>,
+    pub muted: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -53,6 +56,8 @@ pub enum Command {
     SeekAbs { pos_ms: i64 },
     /// Master volume in steps of 2%.
     Volume { d: i32 },
+    /// Master volume to an exact level, 0-100.
+    VolumeSet { level: u8 },
     Mute,
     Select { id: String },
     // ---- mouse and keyboard (need the phone's "mouse & keyboard" permission) ----

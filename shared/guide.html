@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <title>Guide · Phone Remote</title>
 <link rel="stylesheet" href="base.css">
+<script src="settings.js"></script>
 <style>
   body { padding:0 20px max(40px,env(safe-area-inset-bottom)); }
   .wrap { max-width:640px; margin:0 auto; }
@@ -97,11 +98,12 @@
   </div>
 
   <h2>Still stuck?</h2>
-  <details><summary>The phone says it can't reach the PC</summary><p>Check that both are on the same Wi-Fi, not a guest network or a VPN. On the PC, make sure Windows calls the network <em>Private</em> (Settings → Network → your Wi-Fi → Private). Then tap the message on the phone to retry.</p></details>
+  <details><summary>The phone says it can't reach the PC</summary><p>The remote shows a message with <em>Try again</em>, <em>Use Bluetooth</em> and <em>Switch PC</em>. Check that both are on the same Wi-Fi, not a guest network or a VPN. On the PC, make sure Windows calls the network <em>Private</em> (Settings → Network → your Wi-Fi → Private). Then tap the message on the phone to retry.</p></details>
   <details><summary>Windows asked about the firewall</summary><p>Allow access on <em>Private networks</em>. If you clicked Cancel, run the installer again or allow "Phone Remote" under Windows Security → Firewall → Allow an app.</p></details>
   <details><summary>Nothing shows as playing</summary><p>Phone Remote sees anything that reports to Windows' media panel: browsers (YouTube, Netflix), Spotify, Media Player and most music apps. Start playback on the PC once, and check the player picker in the top corner if several apps are open.</p></details>
   <details><summary>My video player (VLC, mpv, MPC-HC) shows no progress bar</summary><p>These players do not tell Windows what they are playing, so by default Phone Remote only sees that they make sound. Fix it once: right-click the tray icon and choose <em>Set up video players</em>. That switches on each player's own remote-control interface (VLC's web interface, mpv's IPC, MPC-HC's web interface). Close the player completely, open it again, and play a video. The title, progress bar and exact seek then work, even while paused.</p><p>If the tray item reports a problem for MPC-HC, enable it by hand: <em>View → Options → Player → Web Interface → Listen on port</em>. Players not listed there still get play state, pause, skip and the arrow-key seek fallback.</p></details>
   <details><summary>Skip 10 seconds does nothing in one app</summary><p>A few apps accept the command and ignore it. Phone Remote notices, and next time it sends arrow keys to that player instead, as long as it is the window in front. See <a href="#how">How it works</a>.</p></details>
+  <details><summary>Settings: theme, skip step, touchpad speed</summary><p>Open the <b>⋮</b> menu in the remote and choose <em>Settings</em> (on the Bluetooth tab it is under its <b>⋮</b> button). You can follow your phone's light or dark mode or pick one, set the skip step to 5, 10, 15 or 30 seconds, change the volume step, make the pointer faster or slower, flip the scroll direction, turn tap-to-click and vibration off, and keep the screen on while the app is open.</p></details>
   <details><summary>Using the touchpad and keyboard</summary><p>Open the <em>Touchpad</em> tab (Wi-Fi) or the <em>Touchpad</em> switch on the Bluetooth tab. <b>Drag</b> one finger to move the cursor, <b>tap</b> to click, tap with <b>two fingers</b> to right-click, drag with two fingers to scroll. Tap once and then touch-and-drag to drag an item. Press <em>Keyboard</em> to open your phone's keyboard any time; everything you type goes to the PC, and <em>More</em> adds arrows, Win, Alt+Tab, Copy, Paste and sticky Ctrl/Alt/Shift.</p><p>Over Wi-Fi you can type any language, including Sinhala and emoji. Over Bluetooth the phone behaves like a US keyboard, so only US-layout characters work. Windows does not allow any remote input into windows running as administrator or into the UAC prompt.</p></details>
   <details><summary>Mouse and keyboard say they are turned off</summary><p>Each phone has its own switch on the PC: open Phone Remote, go to <em>Phones</em> and turn on <em>Mouse &amp; keyboard</em> next to that phone. Phones paired with the old shared key cannot use it; add the phone again with the QR code.</p></details>
   <details><summary>Bluetooth: the mouse and keyboard are missing on the PC</summary><p>Windows remembers what a paired Bluetooth device can do. After updating the app, open Windows <em>Settings, Bluetooth &amp; devices</em>, remove this phone, and pair it again (the app shows this reminder once). The Bluetooth tab lists only computers by default; <em>Show all devices</em> lists everything you have paired.</p></details>
@@ -183,7 +185,8 @@
     document.querySelectorAll('.path').forEach(p => p.classList.toggle('on', p.id === b.dataset.p));
   });
   // Show a back link only when we were opened from another page of the agent (the phone remote or the PC pairing page).
-  if (document.referrer && new URL(document.referrer).origin === location.origin) { const b = document.getElementById('back'); b.hidden = false; b.href = document.referrer.split('#')[0]; }
+  if (window.AndroidBridge && window.AndroidBridge.closeOverlay) { var ab = document.getElementById('back'); ab.hidden = false; ab.href = '#'; ab.onclick = function (e) { e.preventDefault(); window.AndroidBridge.closeOverlay(); }; }
+  else if (document.referrer && new URL(document.referrer).origin === location.origin) { const b = document.getElementById('back'); b.hidden = false; b.href = document.referrer.split('#')[0]; }
   show();
 })();
 </script>

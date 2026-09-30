@@ -101,8 +101,8 @@ pub fn ask_allow(name: &str, ip: &str) -> bool {
     }
 }
 
-/// Open the dashboard as a frameless app window (Edge, then Chrome), else the default browser.
-pub fn open_dashboard(url: &str) {
+/// Open `url` as a frameless app window (Edge, then Chrome). False if neither is installed.
+pub fn open_app_window(url: &str, width: u32, height: u32) -> bool {
     use std::os::windows::process::CommandExt;
     let pf = std::env::var("ProgramFiles").unwrap_or_default();
     let pf86 = std::env::var("ProgramFiles(x86)").unwrap_or_default();
@@ -117,15 +117,37 @@ pub fn open_dashboard(url: &str) {
     for exe in candidates.iter().filter(|p| std::path::Path::new(p).exists()) {
         if std::process::Command::new(exe)
             .arg(format!("--app={url}"))
-            .arg("--window-size=1040,760")
+            .arg(format!("--window-size={width},{height}"))
             .creation_flags(0x0800_0000)
             .spawn()
             .is_ok()
         {
-            return;
+            return true;
         }
     }
-    crate::open_url(url);
+    false
+}
+
+/// The dashboard: an app window if possible, else the default browser.
+pub fn open_dashboard(url: &str) {
+    if !open_app_window(url, 1040, 760) {
+        crate::open_url(url);
+    }
+}
+
+/// A phone asked to pair: show the friendly approval window (it answers through the API itself).
+/// Without Edge/Chrome, fall back to a plain Allow/Deny dialog.
+pub fn request_approval(app: std::sync::Arc<crate::server::App>, p: crate::auth::Pending) {
+    let id: String = p.id.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect();
+    let url = format!("http://127.0.0.1:{}/approve?id={id}", app.port);
+    if open_app_window(&url, 460, 560) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let allow = ask_allow(&p.name, &p.ip);
+        app.auth.decide(&p.id, allow);
+        app.poke();
+    });
 }
 
 pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {

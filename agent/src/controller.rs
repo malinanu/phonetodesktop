@@ -106,6 +106,7 @@ impl Controller {
     fn fresh_state(&self) -> Result<State> {
         let players = self.backend.snapshot()?;
         let current = self.pick(&players).map(|p| p.id.clone());
+        let vol = self.backend.volume();
         Ok(State {
             t: "state",
             host: self.host.clone(),
@@ -113,6 +114,8 @@ impl Controller {
             version: env!("CARGO_PKG_VERSION"),
             current,
             players,
+            volume: vol.map(|v| v.0),
+            muted: vol.map(|v| v.1),
         })
     }
 
@@ -133,13 +136,23 @@ impl Controller {
                 Ok(())
             }
             Command::Volume { d } => {
-                let key = if d >= 0 { Key::VolUp } else { Key::VolDown };
-                for _ in 0..d.unsigned_abs().min(25) {
-                    self.backend.media_key(key)?;
+                let steps = d.clamp(-25, 25);
+                if let Some((v, _)) = self.backend.volume() {
+                    // Real level available: each step is 2%.
+                    self.backend.set_volume((v as i32 + steps * 2).clamp(0, 100) as u8)
+                } else {
+                    let key = if steps >= 0 { Key::VolUp } else { Key::VolDown };
+                    for _ in 0..steps.unsigned_abs() {
+                        self.backend.media_key(key)?;
+                    }
+                    Ok(())
                 }
-                Ok(())
             }
-            Command::Mute => self.backend.media_key(Key::Mute),
+            Command::VolumeSet { level } => self.backend.set_volume(level.min(100)),
+            Command::Mute => match self.backend.volume() {
+                Some((_, muted)) => self.backend.set_mute(!muted),
+                None => self.backend.media_key(Key::Mute),
+            },
             Command::MouseMove { .. } | Command::MouseButton { .. } | Command::Scroll { .. } | Command::Text { .. } | Command::Key { .. } => unreachable!("handled above"),
             Command::PlayPause => self.transport(Transport::PlayPause, Key::PlayPause),
             Command::Next => self.transport(Transport::Next, Key::Next),
@@ -287,9 +300,25 @@ mod tests {
     }
 
     #[test]
-    fn volume_sends_media_keys() {
+    fn volume_uses_the_real_level_when_available() {
         let (c, b) = ctl(false);
-        c.execute(Command::Volume { d: -2 }).unwrap();
-        assert_eq!(b.log().iter().filter(|l| *l == "key VolDown").count(), 2);
+        assert_eq!(c.state().unwrap().volume, Some(50));
+        c.execute(Command::Volume { d: -2 }).unwrap(); // two 2% steps down
+        assert_eq!(c.state().unwrap().volume, Some(46));
+        c.execute(Command::VolumeSet { level: 250 }).unwrap(); // clamped
+        assert_eq!(c.state().unwrap().volume, Some(100));
+        c.execute(Command::Volume { d: 25 }).unwrap(); // cannot exceed 100
+        assert_eq!(c.state().unwrap().volume, Some(100));
+        assert!(!b.log().iter().any(|l| l.starts_with("key Vol")), "no key presses when the level is known");
+    }
+
+    #[test]
+    fn mute_toggles_and_is_reported() {
+        let (c, _) = ctl(false);
+        assert_eq!(c.state().unwrap().muted, Some(false));
+        c.execute(Command::Mute).unwrap();
+        assert_eq!(c.state().unwrap().muted, Some(true));
+        c.execute(Command::Mute).unwrap();
+        assert_eq!(c.state().unwrap().muted, Some(false));
     }
 }

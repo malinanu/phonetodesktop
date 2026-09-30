@@ -24,6 +24,9 @@ pub struct Config {
     /// Per-install secret for local player interfaces (VLC HTTP password). Not shown to phones.
     #[serde(default)]
     pub local_secret: String,
+    /// The first-run wizard has been completed (or skipped). Older installs count as done.
+    #[serde(default = "yes")]
+    pub setup_done: bool,
     /// Windows: start-at-login was switched on once by default; afterwards the tray checkbox rules.
     #[serde(default)]
     pub autostart_initialized: bool,
@@ -91,7 +94,7 @@ pub fn load_or_create() -> Result<Config> {
             }
         }
     }
-    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
+    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
     save(&c)?;
     Ok(c)
 }

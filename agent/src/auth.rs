@@ -254,6 +254,16 @@ impl Auth {
         self.save(&i);
     }
 
+    pub fn setup_done(&self) -> bool {
+        self.inner.lock().unwrap().cfg.setup_done
+    }
+
+    pub fn mark_setup_done(&self) {
+        let mut i = self.inner.lock().unwrap();
+        i.cfg.setup_done = true;
+        self.save(&i);
+    }
+
     pub fn legacy_enabled(&self) -> bool {
         self.inner.lock().unwrap().cfg.legacy_shared_auth
     }
@@ -288,6 +298,7 @@ mod tests {
             token: "legacy-secret".into(),
             devices: vec![],
             legacy_shared_auth: legacy,
+            setup_done: true,
             port: 1,
             local_secret: String::new(),
             autostart_initialized: true,

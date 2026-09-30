@@ -24,6 +24,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/pending/{id}/{verb}", post(decide))
         .route("/api/devices/{id}", delete(remove_device))
         .route("/api/devices/{id}/input", post(set_input))
+        .route("/api/setup-done", post(setup_done))
         .route("/api/legacy", post(set_legacy))
         .route("/api/unpair-all", post(unpair_all))
         .route("/api/players", get(players))
@@ -68,6 +69,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "port": app.port,
         "ips": app.ips.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
         "legacy": app.auth.legacy_enabled(),
+        "setup_done": app.auth.setup_done(),
         "autostart": autostart_enabled(),
         "phones_online": app.auth.online_count(),
         "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
@@ -133,6 +135,15 @@ async fn set_input(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>,
     } else {
         StatusCode::NOT_FOUND.into_response()
     }
+}
+
+async fn setup_done(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    app.auth.mark_setup_done();
+    ok()
 }
 
 async fn set_legacy(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
