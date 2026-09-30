@@ -37,6 +37,10 @@ pub trait Backend: Send + Sync {
     /// Send Left/Right arrows to the foreground window if it is a known player.
     /// Returns the number of seconds actually skipped (0 = nothing sent).
     fn focused_seek(&self, secs: i64) -> Result<i64>;
+    /// Human-readable dump for the /debug page.
+    fn debug(&self) -> String {
+        format!("backend: {}\n{:#?}", self.name(), self.snapshot())
+    }
 }
 
 pub fn default_backend(force_mock: bool) -> Box<dyn Backend> {

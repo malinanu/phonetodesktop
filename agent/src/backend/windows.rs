@@ -75,41 +75,143 @@ fn now_winrt_ticks() -> i64 {
     d.as_nanos() as i64 / 100 + UNIX_TO_WINRT_TICKS
 }
 
-fn describe(s: &Session) -> Result<PlayerInfo> {
-    let id = s.SourceAppUserModelId()?.to_string_lossy();
-    let info = s.GetPlaybackInfo()?;
-    let playing = info.PlaybackStatus()? == Status::Playing;
-    let rate = info
-        .PlaybackRate()
-        .and_then(|r| r.Value())
-        .unwrap_or(1.0)
-        .clamp(0.0, 8.0);
-    let (title, artist) = match s.TryGetMediaPropertiesAsync().and_then(|op| op.get()) {
-        Ok(p) => (
-            p.Title().map(|t| t.to_string_lossy()).unwrap_or_default(),
-            p.Artist().map(|t| t.to_string_lossy()).unwrap_or_default(),
-        ),
-        Err(_) => Default::default(),
+/// Read everything we can about a session. A failing property degrades that field only;
+/// the session itself is never dropped (errors are collected for /debug).
+fn describe(s: &Session, errs: &mut Vec<String>) -> Option<PlayerInfo> {
+    let id = match s.SourceAppUserModelId() {
+        Ok(h) => h.to_string_lossy(),
+        Err(e) => {
+            errs.push(format!("SourceAppUserModelId: {e}"));
+            return None;
+        }
     };
+    let mut note = |what: &str, e: windows::core::Error| errs.push(format!("{id}: {what}: {e}"));
+
+    let (mut playing, mut rate, mut pos_enabled) = (false, 1.0f64, false);
+    match s.GetPlaybackInfo() {
+        Ok(info) => {
+            match info.PlaybackStatus() {
+                Ok(st) => playing = st == Status::Playing,
+                Err(e) => note("PlaybackStatus", e),
+            }
+            rate = info.PlaybackRate().and_then(|r| r.Value()).unwrap_or(1.0).clamp(0.0, 8.0);
+            pos_enabled = info.Controls().and_then(|c| c.IsPlaybackPositionEnabled()).unwrap_or(false);
+        }
+        Err(e) => note("GetPlaybackInfo", e),
+    }
+
+    let (mut title, mut artist) = (String::new(), String::new());
+    match s.TryGetMediaPropertiesAsync().and_then(|op| op.get()) {
+        Ok(p) => {
+            title = p.Title().map(|t| t.to_string_lossy()).unwrap_or_default();
+            artist = p.Artist().map(|t| t.to_string_lossy()).unwrap_or_default();
+        }
+        Err(e) => note("MediaProperties", e),
+    }
 
     let (mut pos_ms, mut dur_ms, mut can_seek) = (0, 0, false);
-    if let Ok(t) = s.GetTimelineProperties() {
-        let start = t.StartTime()?.Duration;
-        let end = t.EndTime()?.Duration;
-        let mut pos = t.Position()?.Duration;
-        let updated = t.LastUpdatedTime()?.UniversalTime;
-        if playing && updated > 0 {
-            let age = now_winrt_ticks() - updated;
-            // Ignore absurd ages (clock skew, apps that never refresh the stamp).
-            if (0..86_400 * 10_000_000i64).contains(&age) {
-                pos += (age as f64 * rate) as i64;
+    let timeline = s.GetTimelineProperties().and_then(|t| {
+        Ok((t.StartTime()?.Duration, t.EndTime()?.Duration, t.Position()?.Duration, t.LastUpdatedTime()?.UniversalTime))
+    });
+    match timeline {
+        Ok((start, end, mut pos, updated)) => {
+            if playing && updated > 0 {
+                let age = now_winrt_ticks() - updated;
+                // Ignore absurd ages (clock skew, apps that never refresh the stamp).
+                if (0..86_400 * 10_000_000i64).contains(&age) {
+                    pos += (age as f64 * rate) as i64;
+                }
+            }
+            dur_ms = (end - start).max(0) / TICKS_PER_MS;
+            pos_ms = (pos - start).clamp(0, (end - start).max(0)) / TICKS_PER_MS;
+            can_seek = end > start && pos_enabled;
+        }
+        Err(e) => note("Timeline", e),
+    }
+    Some(PlayerInfo { app: friendly_app(&id), id, title, artist, playing, pos_ms, dur_ms, can_seek })
+}
+
+/// Apps currently producing audio on the default output, by executable stem (lowercase).
+/// Catches players that register no media session (VLC 3, mpv, many games).
+fn active_audio_apps(errs: &mut Vec<String>) -> Vec<String> {
+    match audio_apps() {
+        Ok(v) => v,
+        Err(e) => {
+            errs.push(format!("audio sessions: {e}"));
+            vec![]
+        }
+    }
+}
+
+fn audio_apps() -> Result<Vec<String>> {
+    use windows::core::Interface;
+    use windows::Win32::Media::Audio::{
+        eMultimedia, eRender, AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
+        MMDeviceEnumerator,
+    };
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+    let mut out = vec![];
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let dev = en.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
+        let mgr: IAudioSessionManager2 = dev.Activate(CLSCTX_ALL, None)?;
+        let list = mgr.GetSessionEnumerator()?;
+        for i in 0..list.GetCount()? {
+            let ctl = list.GetSession(i)?;
+            if ctl.GetState()? != AudioSessionStateActive {
+                continue;
+            }
+            let pid = ctl.cast::<IAudioSessionControl2>()?.GetProcessId()?;
+            if pid == 0 {
+                continue; // system sounds
+            }
+            if let Some(exe) = exe_of_pid(pid) {
+                let stem = exe.trim_end_matches(".exe").to_lowercase();
+                if !out.contains(&stem) {
+                    out.push(stem);
+                }
             }
         }
-        dur_ms = (end - start) / TICKS_PER_MS;
-        pos_ms = (pos - start).clamp(0, (end - start).max(0)) / TICKS_PER_MS;
-        can_seek = end > start && info.Controls().and_then(|c| c.IsPlaybackPositionEnabled()).unwrap_or(false);
     }
-    Ok(PlayerInfo { app: friendly_app(&id), id, title, artist, playing, pos_ms, dur_ms, can_seek })
+    Ok(out)
+}
+
+const IGNORED_AUDIO: &[&str] = &["phone-remote", "audiodg", "system", "svchost", "explorer", "applicationframehost"];
+
+fn collect(errs: &mut Vec<String>) -> Result<Vec<PlayerInfo>> {
+    let mgr = manager()?;
+    let current = mgr
+        .GetCurrentSession()
+        .ok()
+        .and_then(|s| s.SourceAppUserModelId().ok())
+        .map(|h| h.to_string_lossy());
+    let mut out: Vec<PlayerInfo> = mgr.GetSessions()?.into_iter().filter_map(|s| describe(&s, errs)).collect();
+    if let Some(cur) = current {
+        if let Some(i) = out.iter().position(|p| p.id == cur) {
+            let p = out.remove(i);
+            out.insert(0, p);
+        }
+    }
+    // Nothing with a media session is playing: surface apps that are making sound anyway.
+    if !out.iter().any(|p| p.playing) {
+        for app in active_audio_apps(errs) {
+            if IGNORED_AUDIO.contains(&app.as_str()) {
+                continue;
+            }
+            out.push(PlayerInfo {
+                id: format!("audio:{app}"),
+                app: app.clone(),
+                title: "Audio is playing".into(),
+                artist: "This app shares no track details".into(),
+                playing: true,
+                pos_ms: 0,
+                dur_ms: 0,
+                can_seek: false,
+            });
+        }
+    }
+    Ok(out)
 }
 
 impl Backend for WindowsBackend {
@@ -118,23 +220,30 @@ impl Backend for WindowsBackend {
     }
 
     fn snapshot(&self) -> Result<Vec<PlayerInfo>> {
-        let mgr = manager()?;
-        let current = mgr
-            .GetCurrentSession()
-            .ok()
-            .and_then(|s| s.SourceAppUserModelId().ok())
-            .map(|h| h.to_string_lossy());
-        let mut out: Vec<PlayerInfo> = mgr.GetSessions()?.into_iter().filter_map(|s| describe(&s).ok()).collect();
-        if let Some(cur) = current {
-            if let Some(i) = out.iter().position(|p| p.id == cur) {
-                let p = out.remove(i);
-                out.insert(0, p);
-            }
+        collect(&mut Vec::new())
+    }
+
+    fn debug(&self) -> String {
+        let mut errs = Vec::new();
+        let snap = collect(&mut errs);
+        let mut s = String::from("Phone Remote diagnostics (windows-gsmtc)\n\n");
+        match snap {
+            Ok(p) if p.is_empty() => s.push_str("No sessions found. Windows reports nothing playing and no app is making sound.\n"),
+            Ok(p) => p.iter().for_each(|p| s.push_str(&format!("{p:#?}\n"))),
+            Err(e) => s.push_str(&format!("snapshot failed: {e:#}\n")),
         }
-        Ok(out)
+        s.push_str("\nErrors:\n");
+        if errs.is_empty() {
+            s.push_str("  none\n");
+        }
+        errs.iter().for_each(|e| s.push_str(&format!("  {e}\n")));
+        s
     }
 
     fn transport(&self, id: &str, what: Transport) -> Result<bool> {
+        if id.starts_with("audio:") {
+            return Ok(false); // no session: the controller falls back to the system media key
+        }
         let s = find_session(id)?;
         Ok(match what {
             Transport::PlayPause => s.TryTogglePlayPauseAsync()?.get()?,
@@ -144,6 +253,9 @@ impl Backend for WindowsBackend {
     }
 
     fn seek_abs(&self, id: &str, pos_ms: i64) -> Result<bool> {
+        if id.starts_with("audio:") {
+            return Ok(false);
+        }
         let s = find_session(id)?;
         let start = s.GetTimelineProperties()?.StartTime()?.Duration;
         // The API takes 100 ns ticks, not ms or seconds.
@@ -203,6 +315,12 @@ fn foreground_exe() -> Option<String> {
         }
         let mut pid = 0u32;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        exe_of_pid(pid)
+    }
+}
+
+fn exe_of_pid(pid: u32) -> Option<String> {
+    unsafe {
         let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buf = [0u16; 512];
         let mut len = buf.len() as u32;

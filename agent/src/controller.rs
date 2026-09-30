@@ -45,6 +45,10 @@ impl Controller {
             .or_else(|| players.first())
     }
 
+    pub fn debug(&self) -> String {
+        self.backend.debug()
+    }
+
     pub fn state(&self) -> Result<State> {
         let players = self.backend.snapshot()?;
         let current = self.pick(&players).map(|p| p.id.clone());

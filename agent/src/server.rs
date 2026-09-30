@@ -62,6 +62,7 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/", get(|| async { Html(INDEX) }))
         .route("/ws", get(ws_upgrade))
         .route("/pair", get(pair_page))
+        .route("/debug", get(debug_page))
         .route("/guide", get(|| async { Html(GUIDE) }))
         .route("/base.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "max-age=3600")], BASE_CSS) }))
         .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
@@ -109,6 +110,16 @@ async fn pair_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, State(app): State
 }
 
 const PAIR_PAGE: &str = include_str!("../web/pair.html");
+
+/// Loopback-only diagnostics: what the agent can see right now, and why sessions may be missing.
+async fn debug_page(ConnectInfo(peer): ConnectInfo<SocketAddr>, State(app): State<Arc<App>>) -> Response {
+    if !peer.ip().is_loopback() {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let c = app.controller.clone();
+    let text = tokio::task::spawn_blocking(move || c.debug()).await.unwrap_or_default();
+    ([(header::CONTENT_TYPE, "text/plain; charset=utf-8"), (header::CACHE_CONTROL, "no-store")], text).into_response()
+}
 
 async fn ws_upgrade(ws: WebSocketUpgrade, headers: HeaderMap, State(app): State<Arc<App>>) -> Response {
     // Block cross-site WebSocket hijacking: a browser Origin must match our own Host.
