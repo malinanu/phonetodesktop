@@ -126,12 +126,12 @@
 
   <section id="home">
     <span class="kicker">Overview</span>
-    <h1 id="hState">Running</h1>
+    <h1 id="hState">Starting…</h1>
     <p class="lead" id="hSub"></p>
-    <div class="stat"><div><b id="hPhones">0</b><span>phones connected</span></div><div><b id="hTotal">0</b><span>phones paired</span></div></div>
+    <div class="stat"><div><b id="hPhones">0</b><span id="hPhonesLabel">phones connected</span></div><div><b id="hTotal">0</b><span id="hTotalLabel">phones paired</span></div></div>
     <div class="now" id="hNow"></div>
     <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a><button class="btn" id="hFiles">Send files</button></div>
-    <div class="now" id="hFilesSetup" hidden><span class="kicker">Send files</span><p style="margin:6px 0 10px">Send files of any size between your devices. Enter the address of your file server first.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn primary" id="hFilesSave">Save</button></div><p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div>
+    <div class="now" id="hFilesSetup" hidden><span class="kicker">Send files</span><p style="margin:6px 0 6px">Send files of any size between your devices, privately. This needs your Send files server: enter its address once.</p><p class="dim" style="margin:0 0 10px">It looks like files.example.com. It is the server you set up following the guide (“Set up Send files”); if someone set Phone Remote up for you, ask them for it.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn primary" id="hFilesSave">Save</button></div><p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div>
   </section>
 
   <section id="phones">
@@ -225,6 +225,9 @@
     const now = data.now, p = now && now.players.find(x => x.id === now.current);
     $('hSub').textContent = `Listening on ${data.ips[0] || '127.0.0.1'}:${data.port}.`;
     $('hPhones').textContent = data.phones_online;
+    $('hPhonesLabel').textContent = data.phones_online === 1 ? 'phone connected' : 'phones connected';
+    $('hTotalLabel').textContent = data.devices.length === 1 ? 'phone paired' : 'phones paired';
+    $('hState').textContent = data.phones_online ? (data.phones_online === 1 ? 'A phone is connected' : `${data.phones_online} phones connected`) : (data.devices.length || data.legacy ? 'Waiting for a phone' : 'Ready to pair');
     $('hFiles').textContent = data.files_url ? 'Send files' : 'Set up Send files';
     $('hTotal').textContent = data.devices.length + (data.legacy ? '+' : '');
     const box = $('hNow'); box.textContent = '';
@@ -279,11 +282,18 @@
     $('allowV1').checked = data.allow_v1;
     const rn = $('restartNote');
     rn.hidden = !data.restarts;
-    if (data.restarts) rn.textContent = `Phone Remote restarted itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} after an unexpected stop (last exit: ${data.last_exit || 'unknown'}). Details are in Activity.`;
+    const dismissed = (() => { try { return sessionStorage.getItem('restartDismissed') === String(data.restarts); } catch (e) { return false; } })();
+    rn.hidden = !data.restarts || dismissed;
+    if (data.restarts) {
+      rn.textContent = `Phone Remote had to restart itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} (error ${data.last_exit || 'unknown'}). It is running again; the Activity page has the details. `;
+      const x = el('button', 'btn small', 'Dismiss');
+      x.onclick = () => { try { sessionStorage.setItem('restartDismissed', String(data.restarts)); } catch (e) {} rn.hidden = true; };
+      rn.append(x);
+    }
     renderApproval(); renderHome(); renderPhones();
   }
 
-  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); $('navSetup').hidden = data.setup_done; if (first && !data.setup_done && !location.hash) location.hash = '#setup'; } catch (e) { $('hState').textContent = 'Not running'; } }
+  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); $('navSetup').hidden = data.setup_done; if (first && !data.setup_done && !location.hash) location.hash = '#setup'; } catch (e) { $('hState').textContent = 'Not responding'; $('hSub').textContent = 'Phone Remote is restarting or stopped. This page keeps trying.'; } }
 
   async function loadQr() {
     try {

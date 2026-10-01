@@ -40,6 +40,19 @@ object FilesUrl {
     /** The address the user typed in Settings ("" if none). */
     fun overrideOf(settingsJson: String): String = overrideRe.find(settingsJson)?.groupValues?.get(1) ?: ""
 
+    /**
+     * [settingsJson] with the address set to [url] (an already cleaned address, or "" to clear it). Every other
+     * setting is kept as it is. Used by the Files tab so the address can be entered where it is needed.
+     */
+    fun withOverride(settingsJson: String, url: String): String {
+        val entry = "\"filesUrl\":\"$url\""
+        if (overrideRe.containsMatchIn(settingsJson)) return overrideRe.replaceFirst(settingsJson, Regex.escapeReplacement(entry))
+        val body = settingsJson.trim()
+        if (!body.startsWith("{") || !body.endsWith("}")) return "{$entry}"
+        val inner = body.substring(1, body.length - 1).trim()
+        return if (inner.isEmpty()) "{$entry}" else "{$inner,$entry}"
+    }
+
     /** The address to open: the Settings override if valid, else the address baked in at build time, else null. */
     fun resolve(settingsJson: String, buildDefault: String): String? =
         clean(overrideOf(settingsJson)) ?: clean(buildDefault)

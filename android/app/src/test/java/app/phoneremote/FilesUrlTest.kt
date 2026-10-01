@@ -34,4 +34,19 @@ class FilesUrlTest {
         assertEquals("https://default.example.com", FilesUrl.resolve("""{"filesUrl":""}""", "default.example.com"))
         assertNull(FilesUrl.resolve("", ""))
     }
+
+    @Test fun withOverrideKeepsOtherSettings() {
+        assertEquals("""{"filesUrl":"https://a.example.com"}""", FilesUrl.withOverride("{}", "https://a.example.com"))
+        assertEquals("""{"filesUrl":"https://a.example.com"}""", FilesUrl.withOverride("", "https://a.example.com"))
+        assertEquals("""{"theme":"dark","skip":15,"filesUrl":"https://a.example.com"}""", FilesUrl.withOverride("""{"theme":"dark","skip":15}""", "https://a.example.com"))
+        assertEquals("""{"theme":"dark","filesUrl":"https://b.example.com"}""", FilesUrl.withOverride("""{"theme":"dark","filesUrl":"https://a.example.com"}""", "https://b.example.com"))
+        assertEquals("""{"filesUrl":""}""", FilesUrl.withOverride("""{"filesUrl":"https://a.example.com"}""", ""))
+    }
+
+    @Test fun withOverrideRoundTrips() {
+        val json = FilesUrl.withOverride("""{"theme":"light"}""", "https://files.example.com")
+        assertEquals("https://files.example.com", FilesUrl.resolve(json, ""))
+        assertEquals("light", Theme.themeOf(json))
+        assertNull(FilesUrl.resolve(FilesUrl.withOverride(json, ""), ""))
+    }
 }

@@ -21,6 +21,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -72,6 +73,10 @@ class MainActivity : Activity() {
     private lateinit var filesView: View
     private lateinit var filesBody: TextView
     private lateinit var filesOpen: Button
+    private lateinit var filesSetup: LinearLayout
+    private lateinit var filesInput: EditText
+    private lateinit var filesError: TextView
+    private lateinit var filesChange: Button
     private var filesMode = false
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
@@ -376,6 +381,7 @@ class MainActivity : Activity() {
      * through a service worker or the File System Access API, which a WebView cannot hand to the system downloader.
      */
     private fun buildFilesView(): View {
+        val scroll = android.widget.ScrollView(this).apply { isFillViewport = true }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM
@@ -397,7 +403,7 @@ class MainActivity : Activity() {
         }
         filesOpen = button("Open Send files", filled = true) {
             val url = filesUrl()
-            if (url == null) openOverlay("settings")
+            if (url == null) showFilesSetup(true)
             else try {
                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
             } catch (_: android.content.ActivityNotFoundException) {
@@ -405,19 +411,65 @@ class MainActivity : Activity() {
             }
         }
         col.addView(filesOpen, lp().apply { topMargin = dp(20) })
-        col.addView(button("Change server address") { openOverlay("settings") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
-        return col
+        // Where the address is entered: right here, because without it nothing on this tab can work.
+        filesSetup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, 0) }
+        filesSetup.addView(label("Server address", 13f, C.DIM, bold = true))
+        filesInput = EditText(this).apply {
+            hint = "files.yourdomain.com"
+            setHintTextColor(C.DIM)
+            setTextColor(C.FG)
+            textSize = 17f
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine()
+            background = bg(C.CARD)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        filesSetup.addView(filesInput, lp().apply { topMargin = dp(6) })
+        filesError = label("", 14f, C.BAD).apply { visibility = View.GONE; setPadding(0, dp(6), 0, 0) }
+        filesSetup.addView(filesError)
+        filesSetup.addView(button("Save address", filled = true) { saveFilesAddress() }, lp().apply { topMargin = dp(10) })
+        filesSetup.addView(label("This is the address of your own Send files server (see the guide, “Set up Send files”). If someone set Phone Remote up for you, ask them for it. It looks like files.example.com.", 14f, C.DIM).apply { setPadding(0, dp(12), 0, 0) })
+        col.addView(filesSetup, lp().apply { topMargin = dp(12) })
+        filesChange = button("Change server address") { showFilesSetup(true) }.apply { background = null; setTextColor(C.DIM) }
+        col.addView(filesChange, lp().apply { topMargin = dp(4) })
+        scroll.addView(col)
+        return scroll
     }
 
     private fun refreshFiles() {
         val url = filesUrl()
         if (url == null) {
-            filesBody.text = "Send files of any size to any device, privately. First add your file server address in Settings."
-            filesOpen.text = "Open Settings"
+            filesBody.text = "Send files of any size between your devices, privately. This needs your Send files server: enter its address once below."
+            filesOpen.visibility = View.GONE
+            filesChange.visibility = View.GONE
+            showFilesSetup(true)
         } else {
             filesBody.text = "Send files of any size to any device, privately. They open in your browser, which is what lets big files save straight to storage."
+            filesOpen.visibility = View.VISIBLE
             filesOpen.text = "Open Send files"
+            filesChange.visibility = View.VISIBLE
+            showFilesSetup(false)
         }
+    }
+
+    private fun showFilesSetup(show: Boolean) {
+        filesSetup.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            filesInput.setText(FilesUrl.overrideOf(store.settingsJson()))
+            filesError.visibility = View.GONE
+        }
+    }
+
+    private fun saveFilesAddress() {
+        val raw = filesInput.text.toString().trim()
+        val clean = FilesUrl.clean(raw)
+        if (raw.isNotEmpty() && clean == null) {
+            filesError.text = "That doesn’t look right. Use an https address such as files.example.com."
+            filesError.visibility = View.VISIBLE
+            return
+        }
+        store.saveSettings(FilesUrl.withOverride(store.settingsJson(), clean ?: ""))
+        refreshFiles()
     }
 
     /** Full-screen Guide or Settings on top of the current screen. */
@@ -477,7 +529,7 @@ class MainActivity : Activity() {
         contentDescription = text
         setOnClickListener { click() }
         addView(android.widget.ImageView(this@MainActivity).apply { setImageResource(icon) }, LinearLayout.LayoutParams(dp(24), dp(24)))
-        addView(label(text, 12f, bold = true).apply { setPadding(0, dp(2), 0, 0) })
+        addView(label(text, 12f, bold = true).apply { setPadding(0, dp(2), 0, 0); gravity = Gravity.CENTER })
     }
 
     private fun styleNav(item: LinearLayout, selected: Boolean) {
