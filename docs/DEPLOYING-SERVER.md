@@ -40,6 +40,30 @@ Before the first release exists, build locally instead: `docker build -t ghcr.io
 - Windows agent: users can override with `"files_url": "https://..."` in `%APPDATA%\phone-remote\config.json`. Empty and no build default = the "Send files" buttons are hidden.
 - Website: set the link in `site/index.html` (Send files section) to the same URL.
 
+## Deploy with Portainer
+Use `deploy/docker-compose.portainer.yml`. Unlike `deploy/docker-compose.yml` it has no bind mounts (Caddy's config is inline), so it works when pasted into Portainer's editor. Not yet tried on a real Portainer host: check `https://<domain>/api/health` after deploying.
+
+1. **Prepare the host** as in steps 1-2 above: DNS record, and ports 80, 443 (TCP+UDP), 3478 (TCP+UDP), 50000-50100 (UDP) open.
+2. **Get the image.** Either push a `v*` tag so the release workflow publishes `ghcr.io/malinanu/phonetodesktop-files` (then make that package public), or, before the first release, build on the host: in the file, comment out `image:` under `filesync` and `init` and uncomment the `build:` line (replace `<branch>`).
+3. In Portainer: **Stacks → Add stack**, then either
+   - *Web editor*: paste the contents of `deploy/docker-compose.portainer.yml`, or
+   - *Repository*: URL `https://github.com/malinanu/phonetodesktop`, reference `refs/heads/main` (or your branch), compose path `deploy/docker-compose.portainer.yml`.
+4. Under **Environment variables** add:
+
+   | Variable | Value |
+   | --- | --- |
+   | `FILES_DOMAIN` | `files.example.com` (required; the stack refuses to start without it) |
+   | `FILES_TAG` | optional release tag, e.g. `1.0.0` (default `latest`) |
+   | `TURN_EXTERNAL_IP` | only if the host is behind NAT, e.g. `203.0.113.7/10.0.0.5` (`<public>/<private>`) |
+
+5. **Deploy the stack.** `files-init` exits 0 after creating the secret; the other four containers stay running.
+6. **Upgrade:** open the stack, change `FILES_TAG` if you pin it, tick *Re-pull image and redeploy*, and update.
+
+Notes:
+- **Behind a home router:** forward 80, 443 and the TURN ports to the host and set `TURN_EXTERNAL_IP`. Without it, relayed (cross-network) transfers fail because coturn advertises its private address.
+- **Ports 80/443 already used** (Traefik, Nginx Proxy Manager): remove the `caddy` service and `configs` block and proxy your domain to `files-app:80` on a shared network, with WebSocket support on and the original `Host` header kept (FileSync needs it). Keep publishing the TURN ports from the `coturn` service.
+- Keep the `keys` and `caddy-data` volumes when removing or recreating the stack.
+
 ## Operating it
 - **Upgrade:** `docker compose pull && docker compose up -d`. Pin `FILES_TAG=1.2.3` to control upgrades.
 - **Back up:** only the `keys` volume matters (the signing secret). Losing it just means a new secret; nothing else is stored. `caddy-data` holds the certificate and is re-issued automatically.

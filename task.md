@@ -58,6 +58,9 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 - [x] T7.3 `/security-review` of the new surface (no high-confidence findings)
 - [ ] T7.4 CI green, PR ready, tag `v1.1.0` only after T3.5 and T7.2
 
+## Portainer
+- [x] Portainer-ready stack `deploy/docker-compose.portainer.yml` (inline Caddy config, optional `TURN_EXTERNAL_IP`) + runbook section. Rendered and checked with `docker compose config`; not run on a real Portainer/Docker host
+
 ## Needs a human (cannot be done from this environment)
 T0.3, T3.5, T7.1 (if no Docker), T7.2, VPS provisioning and DNS, Play Console.
 
