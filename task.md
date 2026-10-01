@@ -82,7 +82,7 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [x] C3 ~~Optional PC PIN~~ dropped: the owner already has to approve every new device on the PC, and a changed key is re-approved
 - [x] C4 Tests incl. migration: configs from the previous version (device with token, no pubkey) load and round-trip
 
-- [ ] C5 (added after your choice of pinned HTTPS) TLS with a per-PC self-signed certificate: generate/store key, serve HTTPS and HTTP on the one port, put the key fingerprint in the QR, verify with curl --pinnedpubkey
+- [x] C5 (added after your choice of pinned HTTPS) TLS with a per-PC self-signed ECDSA P-256 certificate; HTTPS + HTTP on one port (first-byte sniffing, handshake in its own task so a silent client cannot block others); fingerprint in the QR; plain HTTP refused from the network when older phones are off. Verified with the real binary: QR fingerprint == openssl's SHA-256 of the served public key; `curl --pinnedpubkey` accepts the right pin and rejects a wrong one; TLS 1.3 + ALPN http/1.1; silent connection does not delay others; plain-from-network refused when v1 off; plus a test with a real pinning rustls client doing the v2 login over wss and a wrong pin refused. NOT yet verified on macOS/Windows runners (ring builds C code; CI will tell)
 
 ### D. Account service (optional cloud)
 - [ ] D1 `account/` FastAPI + Postgres: users, devices, certificates, revocations

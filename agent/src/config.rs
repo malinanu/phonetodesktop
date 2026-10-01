@@ -65,10 +65,15 @@ pub struct Device {
     pub platform: String,
 }
 
-fn path() -> Result<PathBuf> {
+/// The agent's private folder (config, TLS key). Created on first use.
+pub fn dir() -> Result<PathBuf> {
     let dir = dirs::config_dir().context("no config dir")?.join("phone-remote");
     std::fs::create_dir_all(&dir)?;
-    Ok(dir.join("config.json"))
+    Ok(dir)
+}
+
+fn path() -> Result<PathBuf> {
+    Ok(dir()?.join("config.json"))
 }
 
 pub fn new_token() -> String {

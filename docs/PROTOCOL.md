@@ -49,7 +49,21 @@ The phone signs these exact bytes (`auth_message` in `agent/src/auth.rs`):
 `{"t":"auth","token":"<device token>","device":"<id>"}` after pairing with `{"t":"pair","code":…,"device":…,"name":…}`
 (no `pk`); the approval message then carries `device_token`. Plain bearer token over plain HTTP.
 
-## Transport
-Phone ⇄ computer traffic is plain HTTP today. The planned next step (task C5) serves HTTPS with a self-signed,
-per-computer certificate whose public-key fingerprint travels in the QR code, so phones can pin it. Device keys
-(above) stay the way a phone proves who it is.
+## Transport (HTTPS with a pinned key)
+The agent listens on one port and speaks **both** TLS and plain HTTP (it looks at the first byte of each connection).
+
+- Each computer makes one self-signed ECDSA P-256 certificate on first run (`tls-key.der`, `tls-cert.der` in its
+  config folder, key file readable only by the owner). The key never changes; only the certificate is renewed, long
+  before it expires, so the fingerprint below stays valid.
+- The QR payload is `http://<ip>:<port>/#k=<code>&id=<pc id>&n=<name>&fp=<fingerprint>`. It stays an `http://` link so
+  a plain camera app can still open the browser remote while older phones are allowed. **`fp`** is the
+  base64url (no padding) SHA-256 of the certificate's **SubjectPublicKeyInfo** (the same value as
+  `curl --pinnedpubkey sha256//…` once converted to standard base64).
+- A phone connects to `wss://<ip>:<port>/ws` and accepts the certificate **only if** the SHA-256 of its
+  SubjectPublicKeyInfo equals `fp`. Ignore the host name, validity dates and certificate chain; still verify the
+  TLS handshake signature as usual (proof that the server holds the key). TLS 1.2 and 1.3 are offered, ALPN `http/1.1`.
+- Plain HTTP is always served to this computer itself (the dashboard). From the network it is served only while
+  the owner leaves *Allow older phone apps* on; otherwise the agent answers with a short "install the secure app"
+  notice and closes the connection.
+- Device keys (above) are still how a phone proves who it is; TLS stops anyone on the Wi-Fi from reading or
+  changing the traffic.

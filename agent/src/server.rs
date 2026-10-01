@@ -54,6 +54,8 @@ pub struct App {
     pub vlc_password: String,
     /// Validated address of the "Send files" server, if one is configured.
     pub files_url: Option<String>,
+    /// SHA-256 of this computer's TLS public key (base64url). Goes into the QR so phones can pin it.
+    pub tls_fp: Option<String>,
     pub on_pending: Option<PendingHook>,
     tx: watch::Sender<String>,
     notify: Notify,
@@ -61,11 +63,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>) -> Arc<Self> {
-        Self::with_auth(Auth::new(cfg.clone()), controller, cfg, host, ips, on_pending)
+    pub fn new(controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>, tls_fp: Option<String>) -> Arc<Self> {
+        Self::with_auth(Auth::new(cfg.clone()), controller, cfg, host, ips, on_pending, tls_fp)
     }
 
-    fn with_auth(auth: Auth, controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>) -> Arc<Self> {
+    fn with_auth(auth: Auth, controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>, tls_fp: Option<String>) -> Arc<Self> {
         Arc::new(App {
             controller,
             auth,
@@ -75,6 +77,7 @@ impl App {
             ips,
             vlc_password: crate::backend::vlc_password(&cfg.local_secret),
             files_url: crate::config::files_url(cfg),
+            tls_fp,
             on_pending,
             tx: watch::channel(String::new()).0,
             notify: Notify::new(),
@@ -89,12 +92,15 @@ impl App {
             .collect()
     }
 
-    /// What the QR carries: where the PC is, a short-lived pairing code, and who the PC is.
+    /// What the QR carries: where the PC is, a short-lived pairing code, who the PC is and, for secure phones,
+    /// the fingerprint (`fp`) of its TLS key. It stays an `http://` link so a plain camera app still opens the
+    /// browser remote (while older phones are allowed); the phone app connects with `https://` and pins `fp`.
     pub fn pair_urls(&self) -> Vec<String> {
         let code = self.auth.code();
         let ips: Vec<Ipv4Addr> = if self.ips.is_empty() { vec![Ipv4Addr::LOCALHOST] } else { self.ips.clone() };
+        let fp = self.tls_fp.as_deref().map(|f| format!("&fp={f}")).unwrap_or_default();
         ips.iter()
-            .map(|ip| format!("http://{ip}:{}/#k={code}&id={}&n={}", self.port, self.pc_id, Self::enc(&self.host)))
+            .map(|ip| format!("http://{ip}:{}/#k={code}&id={}&n={}{fp}", self.port, self.pc_id, Self::enc(&self.host)))
             .collect()
     }
 
@@ -516,8 +522,8 @@ mod tests {
 
     type Client = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-    async fn start() -> (Arc<App>, u16) {
-        let cfg = Config {
+    fn test_config() -> Config {
+        Config {
             pc_id: "pc-test".into(),
             token: "legacy".into(),
             devices: vec![],
@@ -528,10 +534,14 @@ mod tests {
             autostart_initialized: true,
             files_url: String::new(),
             allow_v1: true,
-        };
+        }
+    }
+
+    async fn start() -> (Arc<App>, u16) {
+        let cfg = test_config();
         let backend: Arc<dyn crate::backend::Backend> = Arc::new(MockBackend::new());
         let controller = Arc::new(Controller::new(backend, "host".into()));
-        let app = App::with_auth(Auth::in_memory(cfg.clone()), controller, &cfg, "host".into(), vec![], None);
+        let app = App::with_auth(Auth::in_memory(cfg.clone()), controller, &cfg, "host".into(), vec![], None, None);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let svc = router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
@@ -657,6 +667,119 @@ mod tests {
         assert_eq!(next(&mut old_pair, "auth").await["err"], "v2_required");
 
         assert_eq!(login(port, &sk, "dev1").await["ok"], true);
+    }
+
+    // ---- the same protocol over TLS with a pinned key ----
+
+    /// A client that trusts exactly one public key (by fingerprint) and nothing else, like the phone app.
+    #[derive(Debug)]
+    struct PinVerifier {
+        fingerprint: String,
+        provider: Arc<tokio_rustls::rustls::crypto::CryptoProvider>,
+    }
+
+    impl tokio_rustls::rustls::client::danger::ServerCertVerifier for PinVerifier {
+        fn verify_server_cert(
+            &self,
+            end_entity: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+            _intermediates: &[tokio_rustls::rustls::pki_types::CertificateDer<'_>],
+            _server_name: &tokio_rustls::rustls::pki_types::ServerName<'_>,
+            _ocsp: &[u8],
+            _now: tokio_rustls::rustls::pki_types::UnixTime,
+        ) -> Result<tokio_rustls::rustls::client::danger::ServerCertVerified, tokio_rustls::rustls::Error> {
+            match crate::tls::spki_from_cert(end_entity.as_ref()) {
+                Some(spki) if crate::tls::fingerprint_of_spki(spki) == self.fingerprint => Ok(tokio_rustls::rustls::client::danger::ServerCertVerified::assertion()),
+                _ => Err(tokio_rustls::rustls::Error::General("public key does not match the pinned fingerprint".into())),
+            }
+        }
+        fn verify_tls12_signature(&self, m: &[u8], c: &tokio_rustls::rustls::pki_types::CertificateDer<'_>, d: &tokio_rustls::rustls::DigitallySignedStruct) -> Result<tokio_rustls::rustls::client::danger::HandshakeSignatureValid, tokio_rustls::rustls::Error> {
+            tokio_rustls::rustls::crypto::verify_tls12_signature(m, c, d, &self.provider.signature_verification_algorithms)
+        }
+        fn verify_tls13_signature(&self, m: &[u8], c: &tokio_rustls::rustls::pki_types::CertificateDer<'_>, d: &tokio_rustls::rustls::DigitallySignedStruct) -> Result<tokio_rustls::rustls::client::danger::HandshakeSignatureValid, tokio_rustls::rustls::Error> {
+            tokio_rustls::rustls::crypto::verify_tls13_signature(m, c, d, &self.provider.signature_verification_algorithms)
+        }
+        fn supported_verify_schemes(&self) -> Vec<tokio_rustls::rustls::SignatureScheme> {
+            self.provider.signature_verification_algorithms.supported_schemes()
+        }
+    }
+
+    /// Start the real listener (TLS and plain HTTP on one port). Returns the app, the port, and the pin a phone
+    /// would read from the QR.
+    async fn start_tls() -> (Arc<App>, u16, String) {
+        use axum::serve::ListenerExt;
+        let dir = std::env::temp_dir().join(format!("pr-srv-tls-{}-{}", std::process::id(), rand::random::<u32>()));
+        let identity = crate::tls::load_or_create(&dir, "test-pc").unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let cfg = test_config();
+        let backend: Arc<dyn crate::backend::Backend> = Arc::new(MockBackend::new());
+        let controller = Arc::new(Controller::new(backend, "host".into()));
+        let app = App::with_auth(Auth::in_memory(cfg.clone()), controller, &cfg, "host".into(), vec![], None, Some(identity.fingerprint.clone()));
+        let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = tcp.local_addr().unwrap().port();
+        let a = app.clone();
+        let listener = crate::tls::SniffListener::new(tcp, crate::tls::acceptor(&identity).unwrap(), Arc::new(move || a.auth.v1_allowed())).unwrap().tap_io(|_| {});
+        let svc = router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
+        tokio::spawn(async move { axum::serve(listener, svc).await });
+        (app, port, identity.fingerprint)
+    }
+
+    async fn tls_connect(port: u16, pin: &str) -> Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>, std::io::Error> {
+        let provider = Arc::new(tokio_rustls::rustls::crypto::ring::default_provider());
+        let cfg = tokio_rustls::rustls::ClientConfig::builder_with_provider(provider.clone())
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(PinVerifier { fingerprint: pin.to_string(), provider }))
+            .with_no_client_auth();
+        let tcp = tokio::net::TcpStream::connect(("127.0.0.1", port)).await?;
+        let name = tokio_rustls::rustls::pki_types::ServerName::try_from("localhost").unwrap();
+        tokio_rustls::TlsConnector::from(Arc::new(cfg)).connect(name, tcp).await
+    }
+
+    #[tokio::test]
+    async fn the_pinned_key_logs_in_over_wss_and_a_wrong_pin_is_refused() {
+        let (app, port, pin) = start_tls().await;
+        let sk = SigningKey::from_bytes(&[5u8; 32]);
+
+        // Pair over plain HTTP from this computer (always allowed), exactly as the dashboard-side flow would.
+        pair_v2(&app, port, &sk, "dev1").await;
+
+        // Log in over TLS, trusting only the fingerprint from the QR.
+        let tls = tls_connect(port, &pin).await.expect("the right pin must be accepted");
+        let (mut ws, _) = tokio_tungstenite::client_async(format!("wss://127.0.0.1:{port}/ws"), tls).await.unwrap();
+        ws.send(WsMsg::text(serde_json::json!({"t":"challenge","device":"dev1"}).to_string())).await.unwrap();
+        let nonce = loop {
+            let m = ws.next().await.unwrap().unwrap();
+            if let WsMsg::Text(t) = m {
+                let v: serde_json::Value = serde_json::from_str(t.as_str()).unwrap();
+                if v["t"] == "challenge" {
+                    break v["nonce"].as_str().unwrap().to_string();
+                }
+            }
+        };
+        ws.send(WsMsg::text(serde_json::json!({"t":"auth_sig","device":"dev1","sig":sign(&sk, "pc-test", "dev1", &nonce)}).to_string())).await.unwrap();
+        let auth = loop {
+            if let WsMsg::Text(t) = ws.next().await.unwrap().unwrap() {
+                let v: serde_json::Value = serde_json::from_str(t.as_str()).unwrap();
+                if v["t"] == "auth" {
+                    break v;
+                }
+            }
+        };
+        assert_eq!(auth["ok"], true);
+
+        // Someone pretending to be this computer (a different key) is refused before any data is sent.
+        let wrong = crate::tls::fingerprint_of_spki(b"some other key");
+        assert!(tls_connect(port, &wrong).await.is_err(), "a different fingerprint must fail the handshake");
+    }
+
+    #[tokio::test]
+    async fn the_qr_carries_the_fingerprint() {
+        let (app, _port, pin) = start_tls().await;
+        // no LAN addresses in the test app, so it falls back to 127.0.0.1
+        let url = app.pair_urls().remove(0);
+        assert!(url.starts_with("http://127.0.0.1:1/#k="), "{url}");
+        assert!(url.ends_with(&format!("&fp={pin}")), "{url}");
     }
 
     #[tokio::test]

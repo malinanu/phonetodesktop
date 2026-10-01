@@ -22,7 +22,7 @@
 
   <h2>What stays on your devices</h2>
   <ul>
-    <li><b>Pairing data.</b> The PC keeps a list of phones you have approved (a name and a revocable key). The phone keeps the key for each PC it is paired with, plus your settings (theme, step sizes and similar). This is stored only on those devices. <code>phone-remote rotate</code> on the PC revokes every phone.</li>
+    <li><b>Pairing data.</b> The PC keeps a list of phones you have approved (a name and a public key that you can revoke). The phone keeps the key for each PC it is paired with, plus your settings (theme, step sizes and similar). This is stored only on those devices. <code>phone-remote rotate</code> on the PC revokes every phone.</li>
     <li><b>Media commands.</b> Play, pause, seek, volume and similar commands travel directly between your phone and your PC over your local network, or over Bluetooth. The PC agent also reads the title and playback position of the current media session so the phone can show what's playing. That information is shown on your phone and is not sent anywhere else.</li>
     <li><b>Logs.</b> The desktop agent (Windows, macOS or Linux) writes a local activity log on the computer (viewable in its dashboard). It is never uploaded.</li>
     <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
@@ -45,7 +45,7 @@
   <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
 
   <h2>Network traffic</h2>
-  <p>Send files uses HTTPS. Wi-Fi remote-control mode uses plain HTTP and WebSocket between devices on the same private network; the PC agent only accepts connections from private (LAN) addresses and requires a paired key. Use it on networks you trust.</p>
+  <p>Send files uses HTTPS. Remote control between your phone and your computer uses an encrypted HTTPS connection that the phone pins to your computer's own key, so other people on the same Wi-Fi cannot read or change it. Phones with an older version of the app use plain HTTP until you switch that off in the computer's dashboard. The computer only accepts connections from private (LAN) addresses and requires a paired device.</p>
 
   <h2>Children</h2>
   <p>The app is not directed at children and collects no data from anyone.</p>
