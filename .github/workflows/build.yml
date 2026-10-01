@@ -81,4 +81,18 @@ jobs:
           codesign --verify --deep --strict "/tmp/pr-dmg/Phone Remote.app"
           plutil -lint "/tmp/pr-dmg/Phone Remote.app/Contents/Info.plist"
           hdiutil detach /tmp/pr-dmg
+  mobile:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - name: Build the PC agent (the live tests talk to the real binary)
+        run: cargo build --manifest-path agent/Cargo.toml
+      - run: flutter pub get
+        working-directory: mobile
+      - run: flutter analyze
+        working-directory: mobile
+      - run: flutter test
+        working-directory: mobile
 
