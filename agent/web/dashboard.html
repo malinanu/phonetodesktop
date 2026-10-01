@@ -65,6 +65,13 @@
   #toast.show { opacity:1; transform:none; }
   .emptybox { padding:26px 0; color:var(--ink-dim); } .emptybox b { display:block; color:var(--ink); font-size:17px; margin-bottom:4px; }
   .emptybox .btn { margin-top:14px; }
+  nav details.more { margin-top:6px; } nav details.more summary { cursor:pointer; list-style:none; padding:10px 12px; border-radius:12px; color:var(--ink-dim); font-weight:600; font-size:15px; } nav details.more summary::-webkit-details-marker { display:none; }
+  nav details.more summary::after { content:"▾"; margin-left:8px; } nav details.more[open] summary::after { content:"▴"; } nav details.more summary:hover { background:var(--surface); color:var(--ink); }
+  nav details.more a { padding-left:24px; }
+  .steps { list-style:none; margin:0; padding:0; display:grid; gap:18px; } .steps li { display:flex; gap:14px; align-items:flex-start; font-size:18px; line-height:1.35; }
+  .steps li > span { flex:none; width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; font-weight:800; }
+  .okline.big { padding:20px 22px; font-size:22px; border-radius:20px; align-items:center; } .okline.big b { display:block; font-size:26px; } .okline.big span:not(.tick) { display:block; font-weight:500; font-size:16px; opacity:.9; }
+  .okline.big .tick { font-size:34px; line-height:1; }
   [hidden] { display:none !important; }
   @media (prefers-reduced-motion:reduce) { .waiting .sp { animation:none; } }
 </style>
@@ -75,11 +82,14 @@
   <nav>
     <a href="#setup" data-v="setup" id="navSetup" hidden>Finish setup</a>
     <a href="#home" data-v="home">Home</a>
-    <a href="#phones" data-v="phones">Phones <span class="n" id="pcount" hidden></span></a>
-    <a href="#players" data-v="players">Video players</a>
-    <a href="#settings" data-v="settings">Settings</a>
-    <a href="#activity" data-v="activity">Activity</a>
+    <a href="#phones" data-v="phones">My phones <span class="n" id="pcount" hidden></span></a>
     <a href="#help" data-v="help">Help</a>
+    <details class="more" id="moreNav">
+      <summary>More</summary>
+      <a href="#players" data-v="players">Video players</a>
+      <a href="#settings" data-v="settings">Settings</a>
+      <a href="#activity" data-v="activity">Activity</a>
+    </details>
   </nav>
   <div class="rail-foot" id="ver"></div>
 </aside>
@@ -125,22 +135,43 @@
   </section>
 
   <section id="home">
-    <span class="kicker">Overview</span>
-    <h1 id="hState">Starting…</h1>
-    <p class="lead" id="hSub"></p>
-    <div class="stat"><div><b id="hPhones">0</b><span id="hPhonesLabel">phones connected</span></div><div><b id="hTotal">0</b><span id="hTotalLabel">phones paired</span></div></div>
+    <!-- No phone yet: one instruction at a time, with the code right here -->
+    <div id="heroNew">
+      <h1>Connect your phone</h1>
+      <p class="lead">It takes about a minute, and you only do it once.</p>
+      <div class="qrbox"><div class="qr" id="hQr"></div>
+        <ol class="steps">
+          <li><span>1</span><div>Put <b>Phone Remote</b> on your phone and join the <b>same Wi-Fi</b> as this computer.</div></li>
+          <li><span>2</span><div>Open the app and tap <b>Scan QR code</b>.</div></li>
+          <li><span>3</span><div>Point the camera at the picture. Then click <b>Allow</b> here.</div></li>
+        </ol></div>
+    </div>
+    <!-- Phone paired but not connected right now -->
+    <div id="heroWait" hidden>
+      <h1>Waiting for your phone</h1>
+      <p class="lead">Open the <b>Phone Remote</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.</p>
+      <p><a class="btn" href="#help">My phone does not connect</a></p>
+    </div>
+    <!-- Connected -->
+    <div id="heroOn" hidden>
+      <div class="okline on big"><span class="tick">✓</span><div><b id="hOnTitle">Your phone is connected</b><span id="hOnSub">You can control this computer from your phone.</span></div></div>
+      <p class="lead" style="margin-top:20px">Play a video or a song on this computer, then use your phone to pause, skip or change the volume.</p>
+    </div>
     <div class="now" id="hNow"></div>
-    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a><button class="btn" id="hFiles">Send files</button></div>
+    <div class="links">
+      <button class="btn" id="hFiles">Send files</button>
+      <a class="btn" href="#phones">Connect another phone</a>
+    </div>
     <div class="now" id="hFilesSetup" hidden><span class="kicker">Send files</span><p style="margin:6px 0 6px">Send files of any size between your devices, privately. This needs your Send files server: enter its address once.</p><p class="dim" style="margin:0 0 10px">It looks like files.example.com. It is the server you set up following the guide (“Set up Send files”); if someone set Phone Remote up for you, ask them for it.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn primary" id="hFilesSave">Save</button></div><p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div>
   </section>
 
   <section id="phones">
     <span class="kicker">Devices</span>
-    <h1>Your phones</h1>
-    <p class="lead">Each phone has its own key. Remove one and only that phone loses access.</p>
+    <h1>My phones</h1>
+    <p class="lead">The phones that can control this computer. Remove a phone to stop it.</p>
     <div id="devList"></div>
     <div id="legacyBox"></div>
-    <h2>Add a phone</h2>
+    <h2>Connect another phone</h2>
     <div class="qrbox"><div class="qr" id="qr"></div>
       <div><p>On the same Wi-Fi, open the <b>Phone Remote</b> app and tap <b>Scan QR code</b>, or point the phone camera at this code.</p>
       <p>You will be asked here to <b>allow</b> the new phone. The code works for 15 minutes.</p>
@@ -163,9 +194,9 @@
     <h1>Settings</h1>
     <div class="row"><div class="grow"><b>Start with Windows</b><span>Run quietly in the tray when you sign in.</span></div><label class="switch"><input type="checkbox" id="autostart"><i></i></label></div>
     <div class="row"><div class="grow"><b id="setName">This PC</b><span id="setAddr"></span></div></div>
-    <div class="row"><div class="grow"><b>Allow older phone apps</b><span>Older versions log in with a token over plain HTTP, which anyone on the same Wi-Fi could copy. Turn this off once your phones are updated: only phones with a device key can connect.</span></div><label class="switch"><input type="checkbox" id="allowV1"><i></i></label></div>
+    <div class="row"><div class="grow"><b>Allow old versions of the phone app</b><span>Leave this on if a phone that worked before stopped working. Turn it off for better security once every phone has the newest app.</span></div><label class="switch"><input type="checkbox" id="allowV1"><i></i></label></div>
     <h2>Danger zone</h2>
-    <div class="row"><div class="grow"><b>Unpair all phones</b><span>Every phone has to be approved again.</span></div><button class="btn small danger" id="unpair">Unpair all</button></div>
+    <div class="row"><div class="grow"><b>Remove all phones</b><span>Every phone will have to connect again.</span></div><button class="btn small danger" id="unpair">Remove all</button></div>
   </section>
 
   <section id="activity">
@@ -205,7 +236,8 @@
     document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === view));
     document.querySelectorAll('nav a').forEach(a => a.toggleAttribute('aria-current', a.dataset.v === view) || a.removeAttribute('aria-current'));
     document.querySelectorAll('nav a').forEach(a => { if (a.dataset.v === view) a.setAttribute('aria-current', 'page'); });
-    if (view === 'phones') loadQr();
+    if (view === 'phones' || view === 'home') loadQr();
+    const mn = document.getElementById('moreNav'); if (mn && ['players','settings','activity'].includes(view)) mn.open = true;
     if (view === 'setup') renderWizard();
     if (view === 'players') loadPlayers();
     if (view === 'activity') loadLog();
@@ -223,13 +255,20 @@
 
   function renderHome() {
     const now = data.now, p = now && now.players.find(x => x.id === now.current);
-    $('hSub').textContent = `Listening on ${data.ips[0] || '127.0.0.1'}:${data.port}.`;
-    $('hPhones').textContent = data.phones_online;
-    $('hPhonesLabel').textContent = data.phones_online === 1 ? 'phone connected' : 'phones connected';
-    $('hTotalLabel').textContent = data.devices.length === 1 ? 'phone paired' : 'phones paired';
-    $('hState').textContent = data.phones_online ? (data.phones_online === 1 ? 'A phone is connected' : `${data.phones_online} phones connected`) : (data.devices.length || data.legacy ? 'Waiting for a phone' : 'Ready to pair');
+    const paired = data.devices.length > 0 || data.legacy;
+    $('heroNew').hidden = paired;
+    $('heroWait').hidden = !paired || data.phones_online > 0;
+    $('heroOn').hidden = !data.phones_online;
+    $('heroWait').querySelector('h1').textContent = 'Waiting for your phone';
+    $('heroWait').querySelector('.lead').innerHTML = 'Open the <b>Phone Remote</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.';
+    if (data.phones_online) {
+      const names = data.devices.filter(d => d.online).map(d => d.name);
+      $('hOnTitle').textContent = data.phones_online === 1 ? 'Your phone is connected' : `${data.phones_online} phones are connected`;
+      $('hOnSub').textContent = names.length ? names.join(', ') : 'You can control this computer from your phone.';
+    }
     $('hFiles').textContent = data.files_url ? 'Send files' : 'Set up Send files';
-    $('hTotal').textContent = data.devices.length + (data.legacy ? '+' : '');
+    $('hNow').hidden = !paired;
+    document.querySelector('#home .links').hidden = !paired;
     const box = $('hNow'); box.textContent = '';
     box.append(el('span', 'kicker', 'Now playing on this PC'));
     if (p) {
@@ -293,12 +332,12 @@
     renderApproval(); renderHome(); renderPhones();
   }
 
-  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); $('navSetup').hidden = data.setup_done; if (first && !data.setup_done && !location.hash) location.hash = '#setup'; } catch (e) { $('hState').textContent = 'Not responding'; $('hSub').textContent = 'Phone Remote is restarting or stopped. This page keeps trying.'; } }
+  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); } catch (e) { $('heroNew').hidden = true; $('heroOn').hidden = true; $('heroWait').hidden = false; $('heroWait').querySelector('h1').textContent = 'Phone Remote is restarting…'; $('heroWait').querySelector('.lead').textContent = 'This page reconnects by itself in a few seconds.'; } }
 
   async function loadQr() {
     try {
       const q = await api('/api/qr');
-      $('qr').innerHTML = q.codes[0].svg;
+      $('qr').innerHTML = q.codes[0].svg; $('hQr').innerHTML = q.codes[0].svg;
       const o = $('others'); o.textContent = '';
       q.codes.slice(1).forEach(c => { const d = el('div'); d.style.cssText = 'background:#fff;border-radius:14px;padding:10px;width:200px;margin:12px 0 4px'; d.innerHTML = c.svg; o.append(d, el('pre', null, c.url)); });
       $('otherAddrs').hidden = q.codes.length < 2;
