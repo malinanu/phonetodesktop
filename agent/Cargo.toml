@@ -13,6 +13,7 @@ path = "src/main.rs"
 anyhow = "1"
 axum = { version = "0.8", features = ["ws"] }
 base64 = "0.22"
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
 dirs = "6"
 if-addrs = "0.13"
 mdns-sd = "0.13"
@@ -51,6 +52,10 @@ features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ]
+
+[dev-dependencies]
+tokio-tungstenite = "0.26"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
 [profile.release]
 lto = true

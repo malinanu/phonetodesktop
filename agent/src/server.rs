@@ -62,9 +62,13 @@ pub struct App {
 
 impl App {
     pub fn new(controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>) -> Arc<Self> {
+        Self::with_auth(Auth::new(cfg.clone()), controller, cfg, host, ips, on_pending)
+    }
+
+    fn with_auth(auth: Auth, controller: Arc<Controller>, cfg: &Config, host: String, ips: Vec<Ipv4Addr>, on_pending: Option<PendingHook>) -> Arc<Self> {
         Arc::new(App {
             controller,
-            auth: Auth::new(cfg.clone()),
+            auth,
             host,
             pc_id: cfg.pc_id.clone(),
             port: cfg.port,
@@ -340,6 +344,11 @@ async fn authenticate(sock: &mut WebSocket, app: &Arc<App>, peer: SocketAddr) ->
         return fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"locked"})).await;
     }
     match msg {
+        ClientMsg::Auth { .. } | ClientMsg::Pair { pk: None, .. } if !app.auth.v1_allowed() => {
+            // Older phones are switched off on this PC: they must update to the key-based login.
+            fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"v2_required"})).await
+        }
+        ClientMsg::Challenge { device } => challenge_login(sock, app, device).await,
         ClientMsg::Auth { token, device } => {
             let res = match &device {
                 Some(id) => app.auth.check_device(id, &token),
@@ -355,24 +364,67 @@ async fn authenticate(sock: &mut WebSocket, app: &Arc<App>, peer: SocketAddr) ->
                 Err(AuthErr::LegacyOff) => fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"revoked"})).await,
             }
         }
-        ClientMsg::Pair { code, device, name } => pair(sock, app, peer, code, device, name).await,
+        ClientMsg::Pair { code, device, name, pk, platform } => {
+            let key = pk.map(|pk| (pk, platform.unwrap_or_default()));
+            pair(sock, app, peer, code, device, name, key).await
+        }
         _ => None,
     }
 }
 
+/// Protocol v2 login: send a fresh random nonce, then check the phone's signature over it.
+/// The nonce belongs to this connection only, so a recorded login cannot be replayed.
+async fn challenge_login(sock: &mut WebSocket, app: &Arc<App>, device: String) -> Option<Login> {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use rand::RngCore;
+    let mut nonce = [0u8; 32];
+    rand::rng().fill_bytes(&mut nonce);
+    let _ = sock.send(text(serde_json::json!({"t":"challenge","nonce":URL_SAFE_NO_PAD.encode(nonce)}).to_string())).await;
+    let reply = tokio::time::timeout(Duration::from_secs(5), sock.recv()).await;
+    let sig = match reply {
+        Ok(Some(Ok(Message::Text(t)))) => match serde_json::from_str::<ClientMsg>(t.as_str()) {
+            Ok(ClientMsg::AuthSig { device: d, sig }) if d == device => sig,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    match app.auth.verify_signature(&device, &nonce, &sig) {
+        Ok(name) => Some(Login { device: Some(device), name }),
+        Err(AuthErr::Revoked) => fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"revoked"})).await,
+        Err(_) => {
+            app.record_fail();
+            fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"bad token"})).await
+        }
+    }
+}
+
+/// The "approved" message. A key-based (v2) phone gets no token.
+fn approved(token: &str) -> String {
+    if token.is_empty() {
+        serde_json::json!({"t":"pair","status":"approved","v":2}).to_string()
+    } else {
+        serde_json::json!({"t":"pair","status":"approved","device_token":token}).to_string()
+    }
+}
+
 /// First contact from a QR scan. The phone waits here until the PC's owner answers.
-async fn pair(sock: &mut WebSocket, app: &Arc<App>, peer: SocketAddr, code: String, device: String, name: String) -> Option<Login> {
+async fn pair(sock: &mut WebSocket, app: &Arc<App>, peer: SocketAddr, code: String, device: String, name: String, key: Option<(String, String)>) -> Option<Login> {
     if device.is_empty() || device.len() > 64 {
         return None;
     }
-    match app.auth.request_pairing(&code, &device, &name, &peer.ip().to_string()) {
+    let result = match &key {
+        Some((pk, platform)) => app.auth.request_pairing_v2(&code, &device, &name, &peer.ip().to_string(), pk, platform),
+        None => app.auth.request_pairing(&code, &device, &name, &peer.ip().to_string()),
+    };
+    match result {
         Err(PairErr::BadCode) => {
             app.record_fail();
             return fail(sock, serde_json::json!({"t":"pair","status":"bad_code"})).await;
         }
         Err(PairErr::Expired) => return fail(sock, serde_json::json!({"t":"pair","status":"expired"})).await,
+        Err(PairErr::BadKey) => return fail(sock, serde_json::json!({"t":"pair","status":"bad_key"})).await,
         Ok(Some(token)) => {
-            let _ = sock.send(text(serde_json::json!({"t":"pair","status":"approved","device_token":token}).to_string())).await;
+            let _ = sock.send(text(approved(&token))).await;
             return Some(Login { device: Some(device), name });
         }
         Ok(None) => {}
@@ -387,7 +439,7 @@ async fn pair(sock: &mut WebSocket, app: &Arc<App>, peer: SocketAddr, code: Stri
         match app.auth.take_decision(&device) {
             Some(Decision::Approved(token)) => {
                 crate::log::log(&format!("pairing approved: {name}"));
-                let _ = sock.send(text(serde_json::json!({"t":"pair","status":"approved","device_token":token}).to_string())).await;
+                let _ = sock.send(text(approved(&token))).await;
                 return Some(Login { device: Some(device), name });
             }
             Some(Decision::Denied) => {
@@ -452,6 +504,167 @@ mod tests {
     fn bucket_limits_per_second() {
         let mut b = Bucket::new(3);
         assert_eq!((0..5).filter(|_| b.allow()).count(), 3);
+    }
+
+    // ---- protocol v2 over a real WebSocket ----
+
+    use crate::backend::mock::MockBackend;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use ed25519_dalek::{Signer, SigningKey};
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::Message as WsMsg;
+
+    type Client = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+    async fn start() -> (Arc<App>, u16) {
+        let cfg = Config {
+            pc_id: "pc-test".into(),
+            token: "legacy".into(),
+            devices: vec![],
+            legacy_shared_auth: false,
+            setup_done: true,
+            port: 1,
+            local_secret: String::new(),
+            autostart_initialized: true,
+            files_url: String::new(),
+            allow_v1: true,
+        };
+        let backend: Arc<dyn crate::backend::Backend> = Arc::new(MockBackend::new());
+        let controller = Arc::new(Controller::new(backend, "host".into()));
+        let app = App::with_auth(Auth::in_memory(cfg.clone()), controller, &cfg, "host".into(), vec![], None);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let svc = router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
+        tokio::spawn(async move { axum::serve(listener, svc).await });
+        (app, port)
+    }
+
+    async fn connect(port: u16) -> Client {
+        tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}/ws")).await.unwrap().0
+    }
+
+    async fn send(c: &mut Client, v: serde_json::Value) {
+        c.send(WsMsg::text(v.to_string())).await.unwrap();
+    }
+
+    /// The next JSON message of type `t` (state broadcasts are skipped).
+    async fn next(c: &mut Client, t: &str) -> serde_json::Value {
+        loop {
+            let m = tokio::time::timeout(Duration::from_secs(5), c.next()).await.expect("timed out").expect("closed").unwrap();
+            if let WsMsg::Text(txt) = m {
+                let v: serde_json::Value = serde_json::from_str(txt.as_str()).unwrap();
+                if v["t"] == t {
+                    return v;
+                }
+            }
+        }
+    }
+
+    fn sign(sk: &SigningKey, pc: &str, device: &str, nonce_b64: &str) -> String {
+        let nonce = URL_SAFE_NO_PAD.decode(nonce_b64).unwrap();
+        URL_SAFE_NO_PAD.encode(sk.sign(&crate::auth::auth_message(pc, device, &nonce)).to_bytes())
+    }
+
+    /// Pair a key-based phone and have the owner approve it.
+    async fn pair_v2(app: &Arc<App>, port: u16, sk: &SigningKey, device: &str) {
+        let mut c = connect(port).await;
+        let pk = URL_SAFE_NO_PAD.encode(sk.verifying_key().to_bytes());
+        send(&mut c, serde_json::json!({"t":"pair","code":app.auth.code(),"device":device,"name":"Test phone","pk":pk,"platform":"android"})).await;
+        assert_eq!(next(&mut c, "pair").await["status"], "pending");
+        let owner = app.clone();
+        let dev = device.to_string();
+        tokio::spawn(async move {
+            loop {
+                if owner.auth.decide(&dev, true) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        });
+        let done = next(&mut c, "pair").await;
+        assert_eq!(done["status"], "approved");
+        assert_eq!(done["v"], 2);
+        assert!(done.get("device_token").is_none(), "no token for a key-based phone");
+    }
+
+    async fn login(port: u16, sk: &SigningKey, device: &str) -> serde_json::Value {
+        let mut c = connect(port).await;
+        send(&mut c, serde_json::json!({"t":"challenge","device":device})).await;
+        let nonce = next(&mut c, "challenge").await["nonce"].as_str().unwrap().to_string();
+        send(&mut c, serde_json::json!({"t":"auth_sig","device":device,"sig":sign(sk, "pc-test", device, &nonce)})).await;
+        next(&mut c, "auth").await
+    }
+
+    #[tokio::test]
+    async fn v2_pair_then_login_with_a_signature() {
+        let (app, port) = start().await;
+        let sk = SigningKey::from_bytes(&[5u8; 32]);
+        pair_v2(&app, port, &sk, "dev1").await;
+        let ok = login(port, &sk, "dev1").await;
+        assert_eq!(ok["ok"], true);
+        assert_eq!(ok["input"], true);
+    }
+
+    #[tokio::test]
+    async fn a_recorded_login_cannot_be_replayed() {
+        let (app, port) = start().await;
+        let sk = SigningKey::from_bytes(&[5u8; 32]);
+        pair_v2(&app, port, &sk, "dev1").await;
+
+        // Record a valid login...
+        let mut a = connect(port).await;
+        send(&mut a, serde_json::json!({"t":"challenge","device":"dev1"})).await;
+        let nonce_a = next(&mut a, "challenge").await["nonce"].as_str().unwrap().to_string();
+        let sig_a = sign(&sk, "pc-test", "dev1", &nonce_a);
+        send(&mut a, serde_json::json!({"t":"auth_sig","device":"dev1","sig":sig_a.clone()})).await;
+        assert_eq!(next(&mut a, "auth").await["ok"], true);
+
+        // ...and replay its signature on a new connection (which has a new nonce).
+        let mut b = connect(port).await;
+        send(&mut b, serde_json::json!({"t":"challenge","device":"dev1"})).await;
+        let nonce_b = next(&mut b, "challenge").await["nonce"].as_str().unwrap().to_string();
+        assert_ne!(nonce_a, nonce_b);
+        send(&mut b, serde_json::json!({"t":"auth_sig","device":"dev1","sig":sig_a})).await;
+        let r = next(&mut b, "auth").await;
+        assert_eq!((r["ok"].clone(), r["err"].clone()), (false.into(), "bad token".into()));
+    }
+
+    #[tokio::test]
+    async fn wrong_key_and_unknown_or_revoked_devices_are_refused() {
+        let (app, port) = start().await;
+        let sk = SigningKey::from_bytes(&[5u8; 32]);
+        pair_v2(&app, port, &sk, "dev1").await;
+        let stranger = SigningKey::from_bytes(&[6u8; 32]);
+        assert_eq!(login(port, &stranger, "dev1").await["err"], "bad token");
+        assert_eq!(login(port, &sk, "nobody").await["err"], "revoked");
+        assert!(app.auth.revoke("dev1"));
+        assert_eq!(login(port, &sk, "dev1").await["err"], "revoked");
+    }
+
+    #[tokio::test]
+    async fn turning_v1_off_refuses_old_phones_but_not_key_based_ones() {
+        let (app, port) = start().await;
+        let sk = SigningKey::from_bytes(&[5u8; 32]);
+        pair_v2(&app, port, &sk, "dev1").await;
+        app.auth.set_v1_allowed(false);
+
+        let mut old = connect(port).await;
+        send(&mut old, serde_json::json!({"t":"auth","token":"anything","device":"dev1"})).await;
+        assert_eq!(next(&mut old, "auth").await["err"], "v2_required");
+
+        let mut old_pair = connect(port).await;
+        send(&mut old_pair, serde_json::json!({"t":"pair","code":app.auth.code(),"device":"old1","name":"Old"})).await;
+        assert_eq!(next(&mut old_pair, "auth").await["err"], "v2_required");
+
+        assert_eq!(login(port, &sk, "dev1").await["ok"], true);
+    }
+
+    #[tokio::test]
+    async fn an_invalid_public_key_is_refused_at_pairing() {
+        let (app, port) = start().await;
+        let mut c = connect(port).await;
+        send(&mut c, serde_json::json!({"t":"pair","code":app.auth.code(),"device":"d","name":"x","pk":"AAAA","platform":"web"})).await;
+        assert_eq!(next(&mut c, "pair").await["status"], "bad_key");
     }
 }
 

@@ -162,6 +162,7 @@
     <h1>Settings</h1>
     <div class="row"><div class="grow"><b>Start with Windows</b><span>Run quietly in the tray when you sign in.</span></div><label class="switch"><input type="checkbox" id="autostart"><i></i></label></div>
     <div class="row"><div class="grow"><b id="setName">This PC</b><span id="setAddr"></span></div></div>
+    <div class="row"><div class="grow"><b>Allow older phone apps</b><span>Older versions log in with a token over plain HTTP, which anyone on the same Wi-Fi could copy. Turn this off once your phones are updated: only phones with a device key can connect.</span></div><label class="switch"><input type="checkbox" id="allowV1"><i></i></label></div>
     <h2>Danger zone</h2>
     <div class="row"><div class="grow"><b>Unpair all phones</b><span>Every phone has to be approved again.</span></div><button class="btn small danger" id="unpair">Unpair all</button></div>
   </section>
@@ -233,7 +234,9 @@
     }
     data.devices.forEach(d => {
       const r = el('div', 'row'), dot = el('span', 'dot' + (d.online ? ' on' : ''));
-      const g = el('div', 'grow'); g.append(el('b', null, d.name), el('span', null, d.online ? 'Connected now' : 'Last seen ' + ago(d.last_seen)));
+      const g = el('div', 'grow');
+      const kind = (d.platform ? d.platform.charAt(0).toUpperCase() + d.platform.slice(1) + ' · ' : '') + (d.v === 2 ? 'secured with a device key' : 'older app (token login)');
+      g.append(el('b', null, d.name), el('span', null, (d.online ? 'Connected now' : 'Last seen ' + ago(d.last_seen)) + ' · ' + kind));
       const b = el('button', 'btn small danger', removing === d.id ? 'Click again to remove' : 'Remove');
       b.onclick = async () => { if (removing !== d.id) { removing = d.id; renderPhones(); setTimeout(() => { if (removing === d.id) { removing = null; renderPhones(); } }, 4000); return; } removing = null; await api('/api/devices/' + encodeURIComponent(d.id), 'DELETE'); refresh(); };
       const sw = el('label', 'switch'), inp = el('input'); inp.type = 'checkbox'; inp.checked = d.input; sw.title = 'Mouse & keyboard';
@@ -264,6 +267,7 @@
     $('ver').textContent = `Agent v${data.version} · ${data.host}`;
     $('setName').textContent = data.host; $('setAddr').textContent = `${data.ips.join(', ') || '127.0.0.1'} · port ${data.port}`;
     $('autostart').checked = data.autostart;
+    $('allowV1').checked = data.allow_v1;
     const rn = $('restartNote');
     rn.hidden = !data.restarts;
     if (data.restarts) rn.textContent = `Phone Remote restarted itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} after an unexpected stop (last exit: ${data.last_exit || 'unknown'}). Details are in Activity.`;
@@ -292,6 +296,7 @@
 
   async function loadLog() { const r = await api('/api/log'); $('logBox').textContent = r.lines.join('\n') || 'Nothing logged yet.'; }
   $('logRefresh').onclick = loadLog;
+  $('allowV1').onchange = async e => { await api('/api/allow-v1', 'POST', { enabled: e.target.checked }); refresh(); };
   $('autostart').onchange = async e => { await api('/api/autostart', 'POST', { enabled: e.target.checked }); };
   $('unpair').onclick = async e => { if (e.target.dataset.sure) { await api('/api/unpair-all', 'POST'); e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; refresh(); } else { e.target.dataset.sure = 1; e.target.textContent = 'Click again to confirm'; setTimeout(() => { e.target.textContent = 'Unpair all'; delete e.target.dataset.sure; }, 4000); } };
 

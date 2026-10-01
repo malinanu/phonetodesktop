@@ -26,6 +26,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/devices/{id}/input", post(set_input))
         .route("/api/setup-done", post(setup_done))
         .route("/api/legacy", post(set_legacy))
+        .route("/api/allow-v1", post(set_allow_v1))
         .route("/api/unpair-all", post(unpair_all))
         .route("/api/players", get(players))
         .route("/api/players/setup", post(players_setup))
@@ -62,7 +63,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         .auth
         .devices()
         .into_iter()
-        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online, "input": d.input_allowed}))
+        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online, "input": d.input_allowed, "platform": d.platform, "v": if d.pubkey.is_empty() { 1 } else { 2 }}))
         .collect();
     Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -70,6 +71,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "port": app.port,
         "ips": app.ips.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
         "legacy": app.auth.legacy_enabled(),
+        "allow_v1": app.auth.v1_allowed(),
         "setup_done": app.auth.setup_done(),
         "autostart": autostart_enabled(),
         "files_url": app.files_url,
@@ -154,6 +156,16 @@ async fn set_legacy(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>
         Err(r) => return r,
     };
     app.auth.set_legacy(body["enabled"].as_bool().unwrap_or(false));
+    ok()
+}
+
+/// Turn the older bearer-token login (protocol v1, plain HTTP) on or off. Off = only key-based phones may connect.
+async fn set_allow_v1(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    app.auth.set_v1_allowed(body["enabled"].as_bool().unwrap_or(true));
     ok()
 }
 

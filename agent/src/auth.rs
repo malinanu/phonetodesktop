@@ -23,6 +23,8 @@ pub enum AuthErr {
 pub enum PairErr {
     BadCode,
     Expired,
+    /// The public key is not a valid Ed25519 key.
+    BadKey,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -37,6 +39,7 @@ pub struct Pending {
     pub name: String,
     pub ip: String,
     pub age_s: u64,
+    pub platform: String,
 }
 
 struct PendingEntry {
@@ -44,6 +47,8 @@ struct PendingEntry {
     name: String,
     ip: String,
     at: Instant,
+    /// Protocol v2: (public key, platform). `None` = a v1 phone that will be given a bearer token.
+    key: Option<(String, String)>,
 }
 
 struct Inner {
@@ -73,13 +78,33 @@ fn now_s() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
+/// The exact bytes a phone signs to log in (protocol v2). Bound to this PC and this device so a signature
+/// cannot be replayed to another PC, and to the connection's fresh nonce so it cannot be replayed at all.
+pub fn auth_message(pc_id: &str, device: &str, nonce: &[u8]) -> Vec<u8> {
+    let mut m = Vec::with_capacity(32 + pc_id.len() + device.len() + nonce.len());
+    m.extend_from_slice(b"PRv2-auth\0");
+    m.extend_from_slice(pc_id.as_bytes());
+    m.push(0);
+    m.extend_from_slice(device.as_bytes());
+    m.push(0);
+    m.extend_from_slice(nonce);
+    m
+}
+
+/// A valid 32-byte Ed25519 public key from its base64url text.
+fn parse_pubkey(pk: &str) -> Option<ed25519_dalek::VerifyingKey> {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    let bytes: [u8; 32] = URL_SAFE_NO_PAD.decode(pk).ok()?.try_into().ok()?;
+    ed25519_dalek::VerifyingKey::from_bytes(&bytes).ok()
+}
+
 impl Auth {
     pub fn new(cfg: Config) -> Self {
         Self::build(cfg, true)
     }
 
     #[cfg(test)]
-    fn in_memory(cfg: Config) -> Self {
+    pub(crate) fn in_memory(cfg: Config) -> Self {
         Self::build(cfg, false)
     }
 
@@ -131,11 +156,52 @@ impl Auth {
     pub fn check_device(&self, id: &str, token: &str) -> Result<String, AuthErr> {
         let mut i = self.inner.lock().unwrap();
         let Some(d) = i.cfg.devices.iter_mut().find(|d| d.id == id) else { return Err(AuthErr::Revoked) };
-        if !ct_eq(&d.token, token) {
+        // A key-based (v2) phone has no token: an empty one must never match an empty guess.
+        if d.token.is_empty() || !ct_eq(&d.token, token) {
             return Err(AuthErr::BadToken);
         }
         d.last_seen = now_s();
         Ok(d.name.clone())
+    }
+
+    /// Protocol v2 login: the phone signed `auth_message(pc_id, device, nonce)` with its private key.
+    /// Returns the device's name. Unknown device -> `Revoked` (the phone forgets this PC); wrong signature
+    /// or a device without a key -> `BadToken`.
+    pub fn verify_signature(&self, device: &str, nonce: &[u8], sig_b64: &str) -> Result<String, AuthErr> {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        let mut i = self.inner.lock().unwrap();
+        let pc_id = i.cfg.pc_id.clone();
+        let Some(d) = i.cfg.devices.iter_mut().find(|d| d.id == device) else { return Err(AuthErr::Revoked) };
+        let Some(key) = parse_pubkey(&d.pubkey) else { return Err(AuthErr::BadToken) };
+        let Some(sig) = URL_SAFE_NO_PAD.decode(sig_b64).ok().and_then(|b| ed25519_dalek::Signature::from_slice(&b).ok()) else {
+            return Err(AuthErr::BadToken);
+        };
+        if key.verify_strict(&auth_message(&pc_id, device, nonce), &sig).is_err() {
+            return Err(AuthErr::BadToken);
+        }
+        d.last_seen = now_s();
+        Ok(d.name.clone())
+    }
+
+    /// Does this device log in with a key (v2)?
+    #[cfg(test)]
+    pub fn has_key(&self, device: &str) -> bool {
+        self.inner.lock().unwrap().cfg.devices.iter().any(|d| d.id == device && !d.pubkey.is_empty())
+    }
+
+    pub fn v1_allowed(&self) -> bool {
+        self.inner.lock().unwrap().cfg.allow_v1
+    }
+
+    pub fn set_v1_allowed(&self, on: bool) {
+        let mut i = self.inner.lock().unwrap();
+        i.cfg.allow_v1 = on;
+        self.save(&i);
+    }
+
+    #[cfg(test)]
+    pub fn pc_id(&self) -> String {
+        self.inner.lock().unwrap().cfg.pc_id.clone()
     }
 
     pub fn check_legacy(&self, token: &str) -> Result<(), AuthErr> {
@@ -155,6 +221,20 @@ impl Auth {
     /// A phone scanned the QR. Returns Ok(Some(token)) when the phone is already known (re-scan),
     /// Ok(None) when it now waits for the owner's approval.
     pub fn request_pairing(&self, code: &str, device: &str, name: &str, ip: &str) -> Result<Option<String>, PairErr> {
+        self.request_pairing_inner(code, device, name, ip, None)
+    }
+
+    /// Protocol v2: the phone also sends its public key. `Ok(Some(""))` means "already known with this key":
+    /// approved without bothering the owner and without any token.
+    pub fn request_pairing_v2(&self, code: &str, device: &str, name: &str, ip: &str, pk: &str, platform: &str) -> Result<Option<String>, PairErr> {
+        if parse_pubkey(pk).is_none() {
+            return Err(PairErr::BadKey);
+        }
+        let platform: String = platform.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').take(16).collect();
+        self.request_pairing_inner(code, device, name, ip, Some((pk.to_string(), platform)))
+    }
+
+    fn request_pairing_inner(&self, code: &str, device: &str, name: &str, ip: &str, key: Option<(String, String)>) -> Result<Option<String>, PairErr> {
         let mut i = self.inner.lock().unwrap();
         if !ct_eq(&i.code, code) {
             return Err(PairErr::BadCode);
@@ -164,16 +244,28 @@ impl Auth {
         }
         let name: String = name.chars().filter(|c| !c.is_control()).take(40).collect();
         if let Some(d) = i.cfg.devices.iter_mut().find(|d| d.id == device) {
-            // Known phone scanning again: no need to bother the owner.
-            d.token = config::new_token();
-            d.name = name;
-            let t = d.token.clone();
-            self.save(&i);
-            return Ok(Some(t));
+            match &key {
+                // Known v1 phone scanning again: no need to bother the owner.
+                None if d.pubkey.is_empty() => {
+                    d.token = config::new_token();
+                    d.name = name;
+                    let t = d.token.clone();
+                    self.save(&i);
+                    return Ok(Some(t));
+                }
+                // Known v2 phone with the SAME key: fine. A different key is a different device claiming this id,
+                // so it goes through the owner's approval like any new phone.
+                Some((pk, _)) if *pk == d.pubkey => {
+                    d.name = name;
+                    self.save(&i);
+                    return Ok(Some(String::new()));
+                }
+                _ => {}
+            }
         }
         i.pending.retain(|p| p.id != device && p.at.elapsed() < PENDING_TTL);
         i.decisions.remove(device);
-        i.pending.push(PendingEntry { id: device.into(), name, ip: ip.into(), at: Instant::now() });
+        i.pending.push(PendingEntry { id: device.into(), name, ip: ip.into(), at: Instant::now(), key });
         Ok(None)
     }
 
@@ -182,7 +274,13 @@ impl Auth {
         i.pending.retain(|p| p.at.elapsed() < PENDING_TTL);
         i.pending
             .iter()
-            .map(|p| Pending { id: p.id.clone(), name: p.name.clone(), ip: p.ip.clone(), age_s: p.at.elapsed().as_secs() })
+            .map(|p| Pending {
+                id: p.id.clone(),
+                name: p.name.clone(),
+                ip: p.ip.clone(),
+                age_s: p.at.elapsed().as_secs(),
+                platform: p.key.as_ref().map(|(_, pf)| pf.clone()).unwrap_or_default(),
+            })
             .collect()
     }
 
@@ -192,9 +290,13 @@ impl Auth {
         let Some(pos) = i.pending.iter().position(|p| p.id == device) else { return false };
         let p = i.pending.remove(pos);
         if approve {
-            let token = config::new_token();
+            // A key-based phone gets no token at all: the PC keeps only its public key.
+            let (token, pubkey, platform) = match p.key {
+                Some((pk, pf)) => (String::new(), pk, pf),
+                None => (config::new_token(), String::new(), String::new()),
+            };
             i.cfg.devices.retain(|d| d.id != p.id);
-            i.cfg.devices.push(Device { id: p.id.clone(), name: p.name, token: token.clone(), created: now_s(), last_seen: now_s(), input_allowed: true });
+            i.cfg.devices.push(Device { id: p.id.clone(), name: p.name, token: token.clone(), created: now_s(), last_seen: now_s(), input_allowed: true, pubkey, platform });
             i.decisions.insert(p.id, Decision::Approved(token));
             self.save(&i);
         } else {
@@ -303,6 +405,7 @@ mod tests {
             local_secret: String::new(),
             autostart_initialized: true,
             files_url: String::new(),
+            allow_v1: true,
         };
         c.devices.clear();
         Auth::in_memory(c)
@@ -397,4 +500,118 @@ mod tests {
         a.set_online("p", false);
         assert_eq!(a.online_count(), 0);
     }
+
+    // ---- protocol v2 (device keys) ----
+
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn keypair(seed: u8) -> (SigningKey, String) {
+        let sk = SigningKey::from_bytes(&[seed; 32]);
+        let pk = URL_SAFE_NO_PAD.encode(sk.verifying_key().to_bytes());
+        (sk, pk)
+    }
+
+    fn sign(sk: &SigningKey, pc: &str, device: &str, nonce: &[u8]) -> String {
+        URL_SAFE_NO_PAD.encode(sk.sign(&auth_message(pc, device, nonce)).to_bytes())
+    }
+
+    /// An Auth with one approved key-based phone.
+    fn with_v2_phone() -> (Auth, SigningKey) {
+        let a = auth(false);
+        let (sk, pk) = keypair(7);
+        let code = a.code();
+        assert_eq!(a.request_pairing_v2(&code, "ph", "Pixel", "ip", &pk, "android"), Ok(None));
+        assert!(a.decide("ph", true));
+        (a, sk)
+    }
+
+    #[test]
+    fn v2_pairing_stores_the_key_and_no_token() {
+        let a = auth(false);
+        let (_, pk) = keypair(1);
+        let code = a.code();
+        a.request_pairing_v2(&code, "ph", "Pixel 7", "ip", &pk, "android").unwrap();
+        assert_eq!(a.pending()[0].platform, "android");
+        assert!(a.decide("ph", true));
+        let Some(Decision::Approved(token)) = a.take_decision("ph") else { panic!("not approved") };
+        assert_eq!(token, "", "a key-based phone must never be given a token");
+        let (d, _) = a.devices().into_iter().next().unwrap();
+        assert_eq!((d.pubkey.as_str(), d.token.as_str(), d.platform.as_str()), (pk.as_str(), "", "android"));
+        assert!(a.has_key("ph"));
+    }
+
+    #[test]
+    fn a_valid_signature_logs_in() {
+        let (a, sk) = with_v2_phone();
+        let nonce = [9u8; 32];
+        assert_eq!(a.verify_signature("ph", &nonce, &sign(&sk, &a.pc_id(), "ph", &nonce)), Ok("Pixel".into()));
+    }
+
+    #[test]
+    fn signatures_are_bound_to_nonce_pc_and_device() {
+        let (a, sk) = with_v2_phone();
+        let nonce = [9u8; 32];
+        let good = sign(&sk, &a.pc_id(), "ph", &nonce);
+        // another connection's nonce: replay
+        assert_eq!(a.verify_signature("ph", &[8u8; 32], &good), Err(AuthErr::BadToken));
+        // signed for a different PC
+        assert_eq!(a.verify_signature("ph", &nonce, &sign(&sk, "other-pc", "ph", &nonce)), Err(AuthErr::BadToken));
+        // signed for a different device id
+        assert_eq!(a.verify_signature("ph", &nonce, &sign(&sk, &a.pc_id(), "someone", &nonce)), Err(AuthErr::BadToken));
+        // someone else's key
+        let (other, _) = keypair(99);
+        assert_eq!(a.verify_signature("ph", &nonce, &sign(&other, &a.pc_id(), "ph", &nonce)), Err(AuthErr::BadToken));
+    }
+
+    #[test]
+    fn malformed_signatures_and_unknown_devices_are_refused() {
+        let (a, _) = with_v2_phone();
+        for bad in ["", "not base64!!", "AAAA", &URL_SAFE_NO_PAD.encode([0u8; 64])] {
+            assert_eq!(a.verify_signature("ph", &[1u8; 32], bad), Err(AuthErr::BadToken), "{bad:?}");
+        }
+        assert_eq!(a.verify_signature("nobody", &[1u8; 32], "AAAA"), Err(AuthErr::Revoked));
+        assert!(a.revoke("ph"));
+        let (sk, _) = keypair(7);
+        assert_eq!(a.verify_signature("ph", &[1u8; 32], &sign(&sk, &a.pc_id(), "ph", &[1u8; 32])), Err(AuthErr::Revoked));
+    }
+
+    #[test]
+    fn a_key_based_phone_cannot_log_in_with_an_empty_token() {
+        let (a, _) = with_v2_phone();
+        assert_eq!(a.check_device("ph", ""), Err(AuthErr::BadToken));
+    }
+
+    #[test]
+    fn invalid_public_keys_are_rejected() {
+        let a = auth(false);
+        let code = a.code();
+        for bad in ["", "short", "!!!", &URL_SAFE_NO_PAD.encode([1u8; 31]), &URL_SAFE_NO_PAD.encode([1u8; 33])] {
+            assert_eq!(a.request_pairing_v2(&code, "p", "x", "ip", bad, "web"), Err(PairErr::BadKey), "{bad:?}");
+        }
+        assert!(a.pending().is_empty());
+    }
+
+    #[test]
+    fn rescanning_with_the_same_key_is_silent_but_a_new_key_needs_approval() {
+        let (a, _) = with_v2_phone();
+        let code = a.code();
+        let (_, same) = keypair(7);
+        assert_eq!(a.request_pairing_v2(&code, "ph", "Renamed", "ip", &same, "android"), Ok(Some(String::new())));
+        assert!(a.pending().is_empty());
+        // Another device claiming the same id must not take it over without the owner's OK.
+        let (_, other) = keypair(8);
+        assert_eq!(a.request_pairing_v2(&code, "ph", "Impostor", "ip", &other, "android"), Ok(None));
+        assert_eq!(a.pending().len(), 1);
+        let (_, pk_now) = { let d = a.devices().into_iter().next().unwrap().0; (d.id.clone(), d.pubkey) };
+        assert_eq!(pk_now, same, "the stored key must not change before approval");
+    }
+
+    #[test]
+    fn a_v1_phone_cannot_hijack_a_v2_device_id() {
+        let (a, _) = with_v2_phone();
+        let code = a.code();
+        assert_eq!(a.request_pairing(&code, "ph", "Old app", "ip"), Ok(None), "needs the owner's approval, no silent token");
+    }
 }
+

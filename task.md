@@ -77,10 +77,12 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [x] B3 Privacy policy, README and first-run notes per platform (SmartScreen, Gatekeeper, Linux)
 
 ### C. Local device identity (auth v2)
-- [ ] C1 Protocol v2: device public key at pairing, challenge-response, replay protection, v1 behind a flag
-- [ ] C2 Trust list with platform / pubkey / last seen; dashboard Devices page
-- [ ] C3 Optional PC PIN / approve every new device
-- [ ] C4 Tests incl. migration from v1 configs
+- [x] C1 Protocol v2 in the agent: Ed25519 public key at pairing (no token handed out), per-connection challenge/response bound to PC id + device id + nonce, v1 behind `allow_v1`; documented in docs/PROTOCOL.md. Verified: 10 unit tests (replay, wrong PC/device/key, malformed, key takeover) and 5 real-WebSocket end-to-end tests
+- [x] C2 Trust list stores platform / pubkey; dashboard Phones page shows type, login method and last seen; new switch 'Allow older phone apps'
+- [x] C3 ~~Optional PC PIN~~ dropped: the owner already has to approve every new device on the PC, and a changed key is re-approved
+- [x] C4 Tests incl. migration: configs from the previous version (device with token, no pubkey) load and round-trip
+
+- [ ] C5 (added after your choice of pinned HTTPS) TLS with a per-PC self-signed certificate: generate/store key, serve HTTPS and HTTP on the one port, put the key fingerprint in the QR, verify with curl --pinnedpubkey
 
 ### D. Account service (optional cloud)
 - [ ] D1 `account/` FastAPI + Postgres: users, devices, certificates, revocations

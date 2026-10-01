@@ -34,6 +34,10 @@ pub struct Config {
     /// time (`PHONE_REMOTE_FILES_URL`), if any. When neither is set the feature is hidden.
     #[serde(default)]
     pub files_url: String,
+    /// Still accept phones that log in with the older bearer token over plain HTTP (protocol v1).
+    /// Switch off once every phone has been updated to the key-based protocol.
+    #[serde(default = "yes")]
+    pub allow_v1: bool,
 }
 
 fn yes() -> bool {
@@ -52,6 +56,13 @@ pub struct Device {
     /// May this phone move the mouse and type? Switchable per phone in the dashboard.
     #[serde(default = "yes")]
     pub input_allowed: bool,
+    /// Protocol v2: the phone's Ed25519 public key (base64url, 32 bytes). The PC stores only this, never a secret.
+    /// Empty for phones paired with the older bearer token (`token`).
+    #[serde(default)]
+    pub pubkey: String,
+    /// What kind of device it is ("android", "ios", "web", ...), shown in the dashboard.
+    #[serde(default)]
+    pub platform: String,
 }
 
 fn path() -> Result<PathBuf> {
@@ -98,7 +109,7 @@ pub fn load_or_create() -> Result<Config> {
             }
         }
     }
-    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token(), files_url: String::new() };
+    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token(), files_url: String::new(), allow_v1: true };
     save(&c)?;
     Ok(c)
 }
@@ -185,7 +196,7 @@ mod tests {
 
     #[test]
     fn config_value_is_used_when_valid() {
-        let mut c = Config { pc_id: String::new(), token: String::new(), devices: vec![], legacy_shared_auth: false, port: 1, local_secret: String::new(), setup_done: true, autostart_initialized: true, files_url: "files.example.com".into() };
+        let mut c = Config { pc_id: String::new(), token: String::new(), devices: vec![], legacy_shared_auth: false, port: 1, local_secret: String::new(), setup_done: true, autostart_initialized: true, files_url: "files.example.com".into(), allow_v1: true };
         assert_eq!(files_url(&c).as_deref(), Some("https://files.example.com"));
         c.files_url = "http://insecure.example.com".into();
         assert_eq!(files_url(&c), option_env!("PHONE_REMOTE_FILES_URL").and_then(clean_files_url));
@@ -196,4 +207,18 @@ mod tests {
         let c: Config = serde_json::from_str(r#"{"token":"t","port":8765}"#).unwrap();
         assert_eq!(c.files_url, "");
     }
+
+    #[test]
+    fn phones_paired_before_device_keys_still_load() {
+        // A config written by the previous version: devices have a token and no pubkey/platform.
+        let json = r#"{"token":"t","port":8765,"devices":[{"id":"p1","name":"Pixel","token":"abc","created":1,"last_seen":2,"input_allowed":true}]}"#;
+        let c: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(c.devices.len(), 1);
+        assert_eq!((c.devices[0].pubkey.as_str(), c.devices[0].platform.as_str()), ("", ""));
+        assert!(c.allow_v1, "older phones keep working until the owner switches them off");
+        // And it round-trips with the new fields.
+        let again: Config = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
+        assert_eq!(again.devices, c.devices);
+    }
 }
+
