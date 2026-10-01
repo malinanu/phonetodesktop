@@ -147,15 +147,21 @@ class _PairScreenState extends State<PairScreen> {
 }
 
 /// Opens the camera and returns the first Phone Remote code it sees.
-Future<PairingInfo?> scanQr(BuildContext context) => Navigator.of(context).push<PairingInfo>(MaterialPageRoute(builder: (_) => const ScanPage()));
+Future<PairingInfo?> scanQr(BuildContext context) => Navigator.of(context).push<PairingInfo>(
+      MaterialPageRoute(builder: (_) => ScanPage<PairingInfo>(accept: PairingInfo.parse, title: 'Scan the code on your PC', notOurs: 'That is not a Phone Remote code')),
+    );
 
-class ScanPage extends StatefulWidget {
-  const ScanPage({super.key});
+/// Scans for a QR code whose text [accept] turns into a result (null = not the code we want). Pops with that result.
+class ScanPage<T extends Object> extends StatefulWidget {
+  const ScanPage({super.key, required this.accept, required this.title, required this.notOurs});
+  final T? Function(String? raw) accept;
+  final String title;
+  final String notOurs;
   @override
-  State<ScanPage> createState() => _ScanPageState();
+  State<ScanPage<T>> createState() => _ScanPageState<T>();
 }
 
-class _ScanPageState extends State<ScanPage> {
+class _ScanPageState<T extends Object> extends State<ScanPage<T>> {
   final _controller = MobileScannerController(formats: const [BarcodeFormat.qrCode], detectionSpeed: DetectionSpeed.noDuplicates);
   bool _notOurs = false;
 
@@ -169,7 +175,7 @@ class _ScanPageState extends State<ScanPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: const Text('Scan the code on your PC')),
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: Text(widget.title)),
       body: Stack(children: [
         MobileScanner(
           controller: _controller,
@@ -187,7 +193,7 @@ class _ScanPageState extends State<ScanPage> {
           ),
           onDetect: (capture) {
             for (final b in capture.barcodes) {
-              final info = PairingInfo.parse(b.rawValue);
+              final info = widget.accept(b.rawValue);
               if (info != null) {
                 Navigator.of(context).pop(info);
                 return;
@@ -197,9 +203,9 @@ class _ScanPageState extends State<ScanPage> {
           },
         ),
         if (_notOurs)
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
-            child: Padding(padding: EdgeInsets.all(24), child: Text('That is not a Phone Remote code', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600))),
+            child: Padding(padding: const EdgeInsets.all(24), child: Text(widget.notOurs, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600))),
           ),
       ]),
     );

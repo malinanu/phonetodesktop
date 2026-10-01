@@ -223,6 +223,12 @@ impl Auth {
         }
     }
 
+    pub fn set_files_enabled(&self, on: bool) {
+        let mut i = self.inner.lock().unwrap();
+        i.cfg.files_enabled = on;
+        self.save(&i);
+    }
+
     /// The "Send files" address in effect: the one set by the user, else the one baked into the build.
     pub fn files_url(&self) -> Option<String> {
         config::files_url(&self.inner.lock().unwrap().cfg)
@@ -493,6 +499,7 @@ mod tests {
             files_url: String::new(),
             allow_v1: true,
             account: None,
+            files_enabled: true,
         };
         c.devices.clear();
         Auth::in_memory(c)

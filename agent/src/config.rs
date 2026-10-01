@@ -41,6 +41,9 @@ pub struct Config {
     /// The account this PC has joined (optional). Phones of that account then log in with a certificate.
     #[serde(default)]
     pub account: Option<crate::account::AccountTrust>,
+    /// Serve the built-in "Send files" page to the home network (on the agent's port + 1).
+    #[serde(default = "yes")]
+    pub files_enabled: bool,
 }
 
 fn yes() -> bool {
@@ -117,7 +120,7 @@ pub fn load_or_create() -> Result<Config> {
             }
         }
     }
-    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token(), files_url: String::new(), allow_v1: true, account: None };
+    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token(), files_url: String::new(), allow_v1: true, account: None, files_enabled: true };
     save(&c)?;
     Ok(c)
 }
@@ -204,7 +207,7 @@ mod tests {
 
     #[test]
     fn config_value_is_used_when_valid() {
-        let mut c = Config { pc_id: String::new(), token: String::new(), devices: vec![], legacy_shared_auth: false, port: 1, local_secret: String::new(), setup_done: true, autostart_initialized: true, files_url: "files.example.com".into(), allow_v1: true, account: None };
+        let mut c = Config { pc_id: String::new(), token: String::new(), devices: vec![], legacy_shared_auth: false, port: 1, local_secret: String::new(), setup_done: true, autostart_initialized: true, files_url: "files.example.com".into(), allow_v1: true, account: None, files_enabled: true };
         assert_eq!(files_url(&c).as_deref(), Some("https://files.example.com"));
         c.files_url = "http://insecure.example.com".into();
         assert_eq!(files_url(&c), option_env!("PHONE_REMOTE_FILES_URL").and_then(clean_files_url));

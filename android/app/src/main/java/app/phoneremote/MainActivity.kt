@@ -77,6 +77,8 @@ class MainActivity : Activity() {
     private lateinit var filesInput: EditText
     private lateinit var filesError: TextView
     private lateinit var filesChange: Button
+    private lateinit var filesScan: Button
+    private lateinit var filesSteps: LinearLayout
     private var filesMode = false
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
@@ -392,26 +394,26 @@ class MainActivity : Activity() {
         col.addView(label("Send files.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
         filesBody = label("", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) }
         col.addView(filesBody)
+        filesSteps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         listOf(
-            "Open it here and on the other device",
-            "Share the room link or QR code",
-            "Pick files; they go straight between devices",
+            "On your computer, click Send files.",
+            "Here, tap the big button and point the camera at the code on the computer screen.",
+            "Pick files. They go straight between the two devices.",
         ).forEachIndexed { i, t ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
             row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
             row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
-            col.addView(row)
+            filesSteps.addView(row)
         }
-        filesOpen = button("Open Send files", filled = true) {
-            val url = filesUrl()
-            if (url == null) showFilesSetup(true)
-            else try {
-                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-            } catch (_: android.content.ActivityNotFoundException) {
-                Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show()
-            }
+        col.addView(filesSteps)
+        filesScan = button("Scan the code on the computer", filled = true) { scanFilesCode() }.apply { minHeight = dp(60); textSize = 17f }
+        col.addView(filesScan, lp().apply { topMargin = dp(20) })
+        filesOpen = button("Open Send files") {
+            val url = filesUrl() ?: localFilesUrl()
+            if (url == null) showMode(false)
+            else openInBrowser(url)
         }
-        col.addView(filesOpen, lp().apply { topMargin = dp(20) })
+        col.addView(filesOpen, lp().apply { topMargin = dp(8) })
         // Where the address is entered: right here, because without it nothing on this tab can work.
         filesSetup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, 0) }
         filesSetup.addView(label("Server address", 13f, C.DIM, bold = true))
@@ -429,28 +431,76 @@ class MainActivity : Activity() {
         filesError = label("", 14f, C.BAD).apply { visibility = View.GONE; setPadding(0, dp(6), 0, 0) }
         filesSetup.addView(filesError)
         filesSetup.addView(button("Save address", filled = true) { saveFilesAddress() }, lp().apply { topMargin = dp(10) })
-        filesSetup.addView(label("This is the address of your own Send files server (see the guide, “Set up Send files”). If someone set Phone Remote up for you, ask them for it. It looks like files.example.com.", 14f, C.DIM).apply { setPadding(0, dp(12), 0, 0) })
+        filesSetup.addView(label("Only needed to send files between different networks, over the internet. It is the address of the server you set up (see the guide, “Set up Send files”), such as files.example.com. Leave it empty for normal use.", 14f, C.DIM).apply { setPadding(0, dp(12), 0, 0) })
         col.addView(filesSetup, lp().apply { topMargin = dp(12) })
-        filesChange = button("Change server address") { showFilesSetup(true) }.apply { background = null; setTextColor(C.DIM) }
+        filesChange = button("Use my own Send files server instead") { showFilesSetup(true) }.apply { background = null; setTextColor(C.DIM) }
         col.addView(filesChange, lp().apply { topMargin = dp(4) })
         scroll.addView(col)
         return scroll
     }
 
-    private fun refreshFiles() {
-        val url = filesUrl()
-        if (url == null) {
-            filesBody.text = "Send files of any size between your devices, privately. This needs your Send files server: enter its address once below."
-            filesOpen.visibility = View.GONE
-            filesChange.visibility = View.GONE
-            showFilesSetup(true)
-        } else {
-            filesBody.text = "Send files of any size to any device, privately. They open in your browser, which is what lets big files save straight to storage."
-            filesOpen.visibility = View.VISIBLE
-            filesOpen.text = "Open Send files"
-            filesChange.visibility = View.VISIBLE
-            showFilesSetup(false)
+    /** The built-in Send files page of the PC this phone is connected to, or null if no PC is saved. */
+    private fun localFilesUrl(): String? = store.active()?.let { FilesUrl.local(it.host, it.port) }
+
+    private fun openInBrowser(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** Scan the room code the computer's Send files page shows, then continue in the browser. */
+    private fun scanFilesCode() {
+        val pc = store.active()
+        if (pc == null && filesUrl() == null) { showMode(false); return }
+        val opts = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        GmsBarcodeScanning.getClient(this, opts).startScan()
+            .addOnSuccessListener { code ->
+                val raw = code.rawValue
+                val own = filesUrl()?.trimEnd('/')
+                val ownLink = own != null && FilesUrl.clean(raw) != null && raw?.trim()?.startsWith(own) == true
+                if ((pc != null && FilesUrl.isLocalLink(raw, pc.host, pc.port)) || ownLink) {
+                    openInBrowser(raw!!.trim())
+                } else {
+                    Toast.makeText(this, "That is not the Send files code. On the computer, click Send files and scan the code it shows.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .addOnFailureListener { Toast.makeText(this, "Scan failed: ${it.message}", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun refreshFiles() {
+        val custom = filesUrl()
+        val local = localFilesUrl()
+        when {
+            custom != null -> {
+                filesBody.text = "You are using your own Send files server. Open it on both devices, then share the room link or QR code."
+                filesSteps.visibility = View.GONE
+                filesScan.visibility = View.VISIBLE
+                filesOpen.visibility = View.VISIBLE
+                filesChange.text = "Change or remove my own server"
+                filesChange.visibility = View.VISIBLE
+            }
+            local != null -> {
+                filesBody.text = "Send files of any size between this phone and your computer. Nothing is uploaded to the internet."
+                filesSteps.visibility = View.VISIBLE
+                filesScan.visibility = View.VISIBLE
+                filesOpen.visibility = View.VISIBLE
+                filesChange.text = "Use my own Send files server instead"
+                filesChange.visibility = View.VISIBLE
+            }
+            else -> {
+                filesBody.text = "First connect this phone to your computer on the Remote tab. Then you can send files between them."
+                filesSteps.visibility = View.GONE
+                filesScan.visibility = View.GONE
+                filesOpen.visibility = View.VISIBLE
+                filesOpen.text = "Go to Remote"
+                filesChange.text = "Use my own Send files server instead"
+                filesChange.visibility = View.VISIBLE
+            }
+        }
+        if (custom != null || local != null) filesOpen.text = "Open Send files on this phone"
+        showFilesSetup(false)
     }
 
     private fun showFilesSetup(show: Boolean) {

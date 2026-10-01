@@ -9,6 +9,7 @@ mod backend;
 mod config;
 mod controller;
 mod discovery;
+mod files;
 mod guardian;
 mod log;
 mod net;
@@ -287,6 +288,22 @@ async fn serve(
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     });
+    // Send files: the same page FileSync serves, built in, on the next port up. Failure to bind is not fatal.
+    if let Some(port) = cfg.port.checked_add(1) {
+        match tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port))).await {
+            Ok(l) => {
+                app.files_port.store(port, std::sync::atomic::Ordering::Relaxed);
+                let svc = files::router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
+                log::log(&format!("Send files on port {port}"));
+                tokio::spawn(async move {
+                    if let Err(e) = axum::serve(l, svc).await {
+                        log::log(&format!("Send files stopped: {e}"));
+                    }
+                });
+            }
+            Err(e) => log::log(&format!("Send files unavailable (port {port}): {e}")),
+        }
+    }
     let svc = server::router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
     match identity.as_ref().map(tls::acceptor) {
         Some(Ok(acceptor)) => {

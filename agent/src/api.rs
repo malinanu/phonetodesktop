@@ -33,6 +33,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/autostart", post(set_autostart))
         .route("/api/open-files", post(open_files))
         .route("/api/files-url", post(set_files_url))
+        .route("/api/files-enabled", post(set_files_enabled))
         .route("/api/log", get(log_tail))
 }
 
@@ -76,6 +77,8 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "setup_done": app.auth.setup_done(),
         "autostart": autostart_enabled(),
         "files_url": app.auth.files_url(),
+        "files_local_port": app.files_port.load(std::sync::atomic::Ordering::Relaxed),
+        "files_enabled": app.files_enabled.load(std::sync::atomic::Ordering::Relaxed),
         "phones_online": app.auth.online_count(),
         "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
         "last_exit": std::env::var("PR_LAST_EXIT").unwrap_or_default(),
@@ -235,12 +238,17 @@ async fn open_files(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>
         Ok(a) => a,
         Err(r) => return r,
     };
-    match app.auth.files_url() {
-        Some(url) => {
-            crate::open_url(&url);
-            ok()
-        }
-        None => (StatusCode::NOT_FOUND, Json(json!({"ok": false, "error": "no file server configured"}))).into_response(),
+    // Your own server if you set one up, otherwise the built-in page on this computer.
+    if let Some(url) = app.auth.files_url() {
+        crate::open_url(&url);
+        return ok();
+    }
+    let port = app.files_port.load(std::sync::atomic::Ordering::Relaxed);
+    if port != 0 && app.files_enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        crate::open_url(&format!("http://localhost:{port}/"));
+        ok()
+    } else {
+        (StatusCode::NOT_FOUND, Json(json!({"ok": false, "error": "Send files is switched off"}))).into_response()
     }
 }
 
@@ -255,6 +263,18 @@ async fn set_files_url(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
     } else {
         (StatusCode::BAD_REQUEST, Json(json!({"ok": false, "error": "Use an https:// address, for example files.example.com"}))).into_response()
     }
+}
+
+/// Switch the built-in Send files page on or off (takes effect at once).
+async fn set_files_enabled(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    let on = body["enabled"].as_bool().unwrap_or(true);
+    app.files_enabled.store(on, std::sync::atomic::Ordering::Relaxed);
+    app.auth.set_files_enabled(on);
+    ok()
 }
 
 async fn log_tail(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {

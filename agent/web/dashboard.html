@@ -162,7 +162,7 @@
       <button class="btn" id="hFiles">Send files</button>
       <a class="btn" href="#phones">Connect another phone</a>
     </div>
-    <div class="now" id="hFilesSetup" hidden><span class="kicker">Send files</span><p style="margin:6px 0 6px">Send files of any size between your devices, privately. This needs your Send files server: enter its address once.</p><p class="dim" style="margin:0 0 10px">It looks like files.example.com. It is the server you set up following the guide (“Set up Send files”); if someone set Phone Remote up for you, ask them for it.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn primary" id="hFilesSave">Save</button></div><p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div>
+    <p class="dim" id="hFilesHint" style="margin-top:14px"></p>
   </section>
 
   <section id="phones">
@@ -195,6 +195,10 @@
     <div class="row"><div class="grow"><b>Start with Windows</b><span>Run quietly in the tray when you sign in.</span></div><label class="switch"><input type="checkbox" id="autostart"><i></i></label></div>
     <div class="row"><div class="grow"><b id="setName">This PC</b><span id="setAddr"></span></div></div>
     <div class="row"><div class="grow"><b>Allow old versions of the phone app</b><span>Leave this on if a phone that worked before stopped working. Turn it off for better security once every phone has the newest app.</span></div><label class="switch"><input type="checkbox" id="allowV1"><i></i></label></div>
+    <div class="row"><div class="grow"><b>Send files on this network</b><span>Lets your phone and this computer send files to each other. Only devices on your Wi-Fi can use it.</span></div><label class="switch"><input type="checkbox" id="filesOn"><i></i></label></div>
+    <div class="row" style="align-items:flex-start"><div class="grow"><b>Use my own Send files server (optional)</b><span>Only needed to send files between different networks, over the internet. Leave it empty for normal use.</span>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn small" id="hFilesSave">Save</button></div>
+      <p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div></div>
     <h2>Danger zone</h2>
     <div class="row"><div class="grow"><b>Remove all phones</b><span>Every phone will have to connect again.</span></div><button class="btn small danger" id="unpair">Remove all</button></div>
   </section>
@@ -243,13 +247,11 @@
     if (view === 'activity') loadLog();
   }
   addEventListener('hashchange', route);
-  $('hFiles').addEventListener('click', () => {
-    if (data.files_url) { api('/api/open-files', 'POST').catch(() => {}); return; }
-    $('hFilesSetup').hidden = !$('hFilesSetup').hidden;
-  });
+  $('hFiles').addEventListener('click', () => { api('/api/open-files', 'POST').catch(() => toast('Send files is switched off. Turn it on in Settings.')); });
+  $('filesOn').addEventListener('change', async e => { await api('/api/files-enabled', 'POST', { enabled: e.target.checked }); refresh(); });
   $('hFilesSave').addEventListener('click', async () => {
     const err = $('hFilesErr'); err.hidden = true;
-    try { await api('/api/files-url', 'POST', { url: $('hFilesUrl').value }); $('hFilesSetup').hidden = true; refresh(); }
+    try { await api('/api/files-url', 'POST', { url: $('hFilesUrl').value }); toast('Saved'); refresh(); }
     catch (e) { err.textContent = 'Use an https:// address, for example files.example.com'; err.hidden = false; }
   });
 
@@ -266,7 +268,9 @@
       $('hOnTitle').textContent = data.phones_online === 1 ? 'Your phone is connected' : `${data.phones_online} phones are connected`;
       $('hOnSub').textContent = names.length ? names.join(', ') : 'You can control this computer from your phone.';
     }
-    $('hFiles').textContent = data.files_url ? 'Send files' : 'Set up Send files';
+    $('hFiles').textContent = 'Send files';
+    $('hFiles').hidden = !data.files_enabled && !data.files_url;
+    $('hFilesHint').textContent = data.files_enabled || data.files_url ? 'To send files: click Send files here, then open Phone Remote on your phone and tap Files.' : '';
     $('hNow').hidden = !paired;
     document.querySelector('#home .links').hidden = !paired;
     const box = $('hNow'); box.textContent = '';
@@ -318,6 +322,8 @@
     $('ver').textContent = `Agent v${data.version} · ${data.host}`;
     $('setName').textContent = data.host; $('setAddr').textContent = `${data.ips.join(', ') || '127.0.0.1'} · port ${data.port}`;
     $('autostart').checked = data.autostart;
+    $('filesOn').checked = !!data.files_enabled;
+    if (document.activeElement !== $('hFilesUrl')) $('hFilesUrl').value = data.files_url || '';
     $('allowV1').checked = data.allow_v1;
     const rn = $('restartNote');
     rn.hidden = !data.restarts;

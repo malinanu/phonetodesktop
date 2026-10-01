@@ -55,6 +55,9 @@ pub struct App {
     /// SHA-256 of this computer's TLS public key (base64url). Goes into the QR so phones can pin it.
     pub tls_fp: Option<String>,
     pub on_pending: Option<PendingHook>,
+    /// Send files (the built-in page) is switched on, and the port it listens on (0 = not running).
+    pub files_enabled: std::sync::atomic::AtomicBool,
+    pub files_port: std::sync::atomic::AtomicU16,
     tx: watch::Sender<String>,
     notify: Notify,
     fails: Mutex<(u32, Instant)>,
@@ -76,6 +79,8 @@ impl App {
             vlc_password: crate::backend::vlc_password(&cfg.local_secret),
             tls_fp,
             on_pending,
+            files_enabled: std::sync::atomic::AtomicBool::new(cfg.files_enabled),
+            files_port: std::sync::atomic::AtomicU16::new(0),
             tx: watch::channel(String::new()).0,
             notify: Notify::new(),
             fails: Mutex::new((0, Instant::now())),
@@ -536,6 +541,7 @@ mod tests {
             files_url: String::new(),
             allow_v1: true,
             account: None,
+            files_enabled: true,
         }
     }
 

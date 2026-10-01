@@ -1,8 +1,10 @@
 # Deploying the "Send files" server
 
-Phone Remote itself needs no server. Only **Send files** (the imported FileSync app in `filesync/`) does:
-a small signaling server helps two devices find each other, and a TURN relay (coturn) carries the encrypted
-traffic when a direct connection is impossible. File bytes are never stored on the server.
+**This is optional.** Phone Remote needs no server, and **Send files already works without one**: the PC program
+serves the FileSync page itself on the home network (port + 1), phones scan its code, and files go directly
+between the two devices. Deploy this server only if you want Send files **between different networks, over the
+internet**: a small signaling server helps two devices find each other, and a TURN relay (coturn) carries the
+encrypted traffic when a direct connection is impossible. File bytes are never stored on the server.
 
 ## What you need
 - A VPS with a public IPv4 address: 1 vCPU / 1 GB RAM is enough to start; Linux with Docker + Docker Compose v2.

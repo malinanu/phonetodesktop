@@ -92,7 +92,7 @@ class _HomeShellState extends State<HomeShell> {
               child: IndexedStack(index: _tab, children: [
                 RemoteScreen(link: link, settings: widget.settings),
                 TouchpadScreen(link: link, settings: widget.settings),
-                FilesScreen(settings: widget.settings, onOpenSettings: _openSettings),
+                FilesScreen(settings: widget.settings, pc: link.active, onOpenSettings: _openSettings, onGoToRemote: () => setState(() => _tab = 0)),
                 if (widget.bluetooth != null) BluetoothScreen(controller: widget.bluetooth!, settings: widget.settings),
               ]),
             ),

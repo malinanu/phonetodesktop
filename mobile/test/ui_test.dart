@@ -175,30 +175,74 @@ void main() {
   });
 
   group('files', () {
-    testWidgets('opens the configured address in the browser', (tester) async {
+    const pc = PcRecord(id: 'pc-1', name: 'Desk PC', host: '192.168.1.20', port: 8765, fingerprint: 'fp');
+
+    testWidgets('with a connected computer it needs no setup: scan its code, or open its page', (tester) async {
+      Uri? opened;
+      final settings = await newSettings();
+      String? scanned;
+      await pumpScreen(
+        tester,
+        FilesScreen(
+          settings: settings,
+          pc: pc,
+          open: (u) async {
+            opened = u;
+            return true;
+          },
+          scan: (ctx, accept) async {
+            expect(accept('http://192.168.1.20:8766/abc-defg-hij'), isTrue);
+            expect(accept('http://192.168.1.99:8766/abc'), isFalse, reason: 'only this computer’s page');
+            expect(accept('https://evil.example.com/x'), isFalse);
+            scanned = 'http://192.168.1.20:8766/abc-defg-hij';
+            return scanned;
+          },
+        ),
+        size: const Size(390, 1100),
+      );
+      await shot(tester, 'files');
+      expect(find.text('Scan the code on the computer'), findsOneWidget);
+      expect(find.textContaining('Set up'), findsNothing);
+      await tester.tap(find.text('Scan the code on the computer'));
+      await tester.pumpAndSettle();
+      expect(opened.toString(), 'http://192.168.1.20:8766/abc-defg-hij');
+      opened = null;
+      await tester.tap(find.text('Open Send files on this phone'));
+      await tester.pump();
+      expect(opened.toString(), 'http://192.168.1.20:8766/');
+    });
+
+    testWidgets('before a computer is connected it points to the Remote tab', (tester) async {
+      var wentToRemote = false;
+      final settings = await newSettings();
+      await pumpScreen(tester, FilesScreen(settings: settings, onGoToRemote: () => wentToRemote = true));
+      expect(find.text('Scan the code on the computer'), findsNothing);
+      await tester.tap(find.text('Go to Remote'));
+      expect(wentToRemote, isTrue);
+    });
+
+    testWidgets('your own server, if set, is what opens, and an insecure one is ignored', (tester) async {
       Uri? opened;
       final settings = await newSettings({'filesUrl': 'files.example.com'});
-      await pumpScreen(tester, FilesScreen(settings: settings, open: (u) async {
+      await pumpScreen(tester, FilesScreen(settings: settings, pc: pc, open: (u) async {
         opened = u;
         return true;
       }));
-      await shot(tester, 'files');
-      await tester.tap(find.text('Open Send files'));
+      await tester.tap(find.text('Open Send files on this phone'));
       await tester.pump();
       expect(opened.toString(), 'https://files.example.com');
-    });
 
-    testWidgets('asks for an address when none is set, and never opens an insecure one', (tester) async {
-      Uri? opened;
       var settingsOpened = false;
-      final settings = await newSettings({'filesUrl': 'http://insecure.example.com'});
-      await pumpScreen(tester, FilesScreen(settings: settings, open: (u) async {
+      final insecure = await newSettings({'filesUrl': 'http://insecure.example.com'});
+      await pumpScreen(tester, FilesScreen(settings: insecure, pc: pc, open: (u) async {
         opened = u;
         return true;
       }, onOpenSettings: () => settingsOpened = true));
-      expect(find.text('Open Settings'), findsOneWidget);
-      await tester.tap(find.text('Open Settings'));
-      expect(opened, isNull);
+      opened = null;
+      await tester.tap(find.text('Open Send files on this phone'));
+      await tester.pump();
+      expect(opened.toString(), 'http://192.168.1.20:8766/', reason: 'falls back to the computer, never the insecure address');
+      await tester.tap(find.text('Use my own Send files server instead'));
       expect(settingsOpened, isTrue);
     });
   });
@@ -287,6 +331,7 @@ void main() {
       await tester.tap(find.text('Files'));
       await tester.pump();
       expect(find.text('Send files.'), findsOneWidget);
+      expect(find.text('Scan the code on the computer'), findsOneWidget);
     });
 
     testWidgets('with no PC paired the first screen is the pairing screen', (tester) async {

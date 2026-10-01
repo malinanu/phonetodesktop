@@ -27,6 +27,24 @@ class FilesUrl {
     return 'https://${authority.toLowerCase()}$tail';
   }
 
+  /// The built-in Send files page of a PC: the Phone Remote program serves it on its own port plus one.
+  /// [host] is the address the phone already uses to reach the PC.
+  static String? local(String host, int agentPort) {
+    if (!_host.hasMatch(host) || agentPort < 1 || agentPort > 65534) return null;
+    return 'http://$host:${agentPort + 1}/';
+  }
+
+  /// Is [raw] (a scanned code) a link to that PC's built-in Send files page, such as a room link?
+  static bool isLocalLink(String? raw, String host, int agentPort) {
+    final base = local(host, agentPort);
+    final s = raw?.trim();
+    if (base == null || s == null || s.contains(RegExp(r'\s'))) return false;
+    final prefix = base.substring(0, base.length - 1);
+    if (!s.toLowerCase().startsWith(prefix.toLowerCase())) return false;
+    final rest = s.substring(prefix.length);
+    return (rest.isEmpty || '/?#'.contains(rest[0])) && _tail.hasMatch(rest);
+  }
+
   /// The address typed in Settings if valid, else the one baked in at build time (`--dart-define=FILES_URL=...`).
   static String? resolve(String override, String buildDefault) => clean(override) ?? clean(buildDefault);
 }

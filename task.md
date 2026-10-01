@@ -117,3 +117,11 @@ T0.3, T3.5, T7.1 (if no Docker), T7.2, VPS provisioning and DNS, Play Console. P
 ## Bug review (code-review, high)
 Fixed: cmd.exe metacharacters accepted in `files_url` (agent, Android and Settings validators now identical, with tests); arm64 image build lacked QEMU; Kotlin port check accepted `+443`; Settings page validated more loosely than the app; HSTS typo; uvicorn access log contradicted the privacy wording; Files tab lost on activity recreate.
 Not changed (upstream FileSync behaviour, worth an upstream issue): `signaling.py` does a blocking DNS lookup on the event loop and caches failures forever; the credentials rate limit is global behind a proxy (documented in DEPLOYING-SERVER.md).
+
+## Send files built in (user request: merge both systems into one)
+- [x] The PC program serves the FileSync page and a Rust port of its signaling relay on the home network (port + 1, `agent/src/files.rs`, assets embedded by `agent/build.rs`); no server, no address, no configuration.
+- [x] Real browser transfer (Chromium, Blob and Service Worker sinks, 20-50 MiB, SHA-256 verified) against the built-in server using FileSync's own `e2e/run.mjs`; 8 unit tests for the relay.
+- [x] Share link/QR carries the PC's LAN address (not localhost): `/api/share-origin` + small change in `filesync/web/js/modules/script.js`.
+- [x] Windows dashboard: Send files button opens it; Settings has an on/off switch and an optional own-server address. Android + Flutter Files tabs: scan the code on the computer, or open the page; own server is optional.
+- [ ] Not verified on real devices: phone browser over Wi-Fi to a Windows PC (mDNS/obfuscated ICE candidates, Windows firewall prompt for the new port). Phone-side receiving buffers in memory (HTTP), documented.
+- [ ] Cross-network transfer still needs the optional hosted server (TURN).

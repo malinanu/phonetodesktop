@@ -1,7 +1,9 @@
 package app.phoneremote
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FilesUrlTest {
@@ -48,5 +50,25 @@ class FilesUrlTest {
         assertEquals("https://files.example.com", FilesUrl.resolve(json, ""))
         assertEquals("light", Theme.themeOf(json))
         assertNull(FilesUrl.resolve(FilesUrl.withOverride(json, ""), ""))
+    }
+
+    @Test fun localAddressIsThePcPortPlusOne() {
+        assertEquals("http://192.168.1.8:8766/", FilesUrl.local("192.168.1.8", 8765))
+        assertEquals("http://malin-pc.local:8766/", FilesUrl.local("malin-pc.local", 8765))
+        assertNull(FilesUrl.local("", 8765))
+        assertNull(FilesUrl.local("bad host", 8765))
+        assertNull(FilesUrl.local("192.168.1.8", 65535))
+        assertNull(FilesUrl.local("192.168.1.8", 0))
+    }
+
+    @Test fun onlyLinksToThatPcsSendFilesPageAreAccepted() {
+        val host = "192.168.1.8"
+        for (ok in listOf("http://192.168.1.8:8766/", "http://192.168.1.8:8766", "http://192.168.1.8:8766/abc-defg-hij", "http://192.168.1.8:8766/abc-defg-hij?sink=blob")) {
+            assertTrue("should accept: $ok", FilesUrl.isLocalLink(ok, host, 8765))
+        }
+        for (bad in listOf(null, "", "https://192.168.1.8:8766/", "http://192.168.1.9:8766/x", "http://192.168.1.8:8765/x", "http://192.168.1.8:87660/x",
+            "http://192.168.1.8:8766.evil.com/x", "http://192.168.1.8:8766@evil.com/", "http://192.168.1.8:8766/a b", "javascript:alert(1)", "http://192.168.1.8:8766/<x>")) {
+            assertFalse("should reject: $bad", FilesUrl.isLocalLink(bad, host, 8765))
+        }
     }
 }

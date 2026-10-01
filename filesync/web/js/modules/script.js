@@ -37,10 +37,24 @@ async function loadVersion() {
   } catch {}
 }
 
+// Address other devices use to reach this page. Normally the page's own origin. When the page is served by
+// the Phone Remote program on a computer, that origin may be "localhost", which a phone cannot open, so the
+// program says which address to put in the link and QR code. Hosted deployments have no such endpoint.
+async function loadShareOrigin() {
+  try {
+    const res = await fetch('/api/share-origin');
+    if (!res.ok) return window.location.origin;
+    const data = await res.json();
+    return typeof data.origin === 'string' && /^https?:\/\/[A-Za-z0-9.:-]+$/.test(data.origin) ? data.origin : window.location.origin;
+  } catch { return window.location.origin; }
+}
+let share_origin = window.location.origin
+
 // On Load
 async function onLoad() {
   // Load version badge
   await loadVersion();
+  share_origin = await loadShareOrigin();
 
   // Check WebRTC browser compatibility
   if (typeof RTCPeerConnection === 'undefined') {
@@ -73,7 +87,7 @@ async function onLoad() {
 
     // Init UI Components
     dom.transfer_div.style.display = 'block'
-    dom.transfer_url_value.textContent = `${window.location.origin}/${new_room_id}`
+    dom.transfer_url_value.textContent = `${share_origin}/${new_room_id}`
     dom.transfer_users_list_host_name.innerHTML = user.name + ' (You)'
     dom.transfer_users_count.innerHTML = ' (1)'
     dom.transfer_add_password.style.display = 'block';
@@ -97,7 +111,7 @@ async function onLoad() {
   else {
     // Init UI Componente
     dom.connect_div.style.display = 'block'
-    dom.transfer_url_value.textContent = `${window.location.origin}/${room_id}`
+    dom.transfer_url_value.textContent = `${share_origin}/${room_id}`
     qr.set({value: dom.transfer_url_value.textContent});
 
     // Init peer connection. See host-path comment above — same contract.

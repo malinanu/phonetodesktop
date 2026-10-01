@@ -53,6 +53,26 @@ object FilesUrl {
         return if (inner.isEmpty()) "{$entry}" else "{$inner,$entry}"
     }
 
+    /**
+     * The built-in Send files page of a PC: the Phone Remote program serves it on its own port plus one.
+     * [host] is the address the phone already uses to reach the PC. Null if either part is unusable.
+     */
+    fun local(host: String, agentPort: Int): String? {
+        if (!hostRe.matches(host) || agentPort !in 1..65534) return null
+        return "http://$host:${agentPort + 1}/"
+    }
+
+    /** Is [raw] (a scanned code) a link to that PC's built-in Send files page, e.g. a room link? */
+    fun isLocalLink(raw: String?, host: String, agentPort: Int): Boolean {
+        val base = local(host, agentPort) ?: return false
+        val s = raw?.trim() ?: return false
+        if (s.any { it.isWhitespace() }) return false
+        val prefix = base.dropLast(1) // http://host:port
+        if (!s.startsWith(prefix, ignoreCase = true)) return false
+        val rest = s.substring(prefix.length)
+        return (rest.isEmpty() || rest[0] == '/' || rest[0] == '?' || rest[0] == '#') && tailRe.matches(rest)
+    }
+
     /** The address to open: the Settings override if valid, else the address baked in at build time, else null. */
     fun resolve(settingsJson: String, buildDefault: String): String? =
         clean(overrideOf(settingsJson)) ?: clean(buildDefault)

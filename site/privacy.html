@@ -18,7 +18,7 @@
   <h1>Privacy Policy</h1>
   <p class="dim">Last updated: 1 October 2026 (added Send files)</p>
 
-  <p>Phone Remote has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> uses a small server that introduces devices to each other and, when a direct connection is impossible, relays encrypted data. <b>The developer does not collect personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
+  <p>Phone Remote has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> works on your own Wi-Fi: the Phone Remote program on your computer serves the page and introduces the two devices, and files go straight between them, so no server of ours is involved. Only if you choose to use a Send files server (your own, for sending over the internet) does a small server introduce devices and, when a direct connection is impossible, relay encrypted data. <b>The developer does not collect personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
 
   <h2>What stays on your devices</h2>
   <ul>
@@ -28,7 +28,8 @@
     <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
   </ul>
 
-  <h2>Send files: what the server sees</h2>
+  <h2>Send files: what the server sees (only if you use one)</h2>
+  <p>By default Send files runs on your computer and only on your home network; the points below apply to a Send files server you set up yourself for sending over the internet.</p>
   <ul>
     <li><b>File contents.</b> Files travel directly between devices, encrypted (WebRTC/DTLS). They never pass through the server unencrypted and are never stored. When a direct route is impossible the relay forwards the same encrypted traffic without being able to read it.</li>
     <li><b>Connection setup.</b> To connect two devices, the server forwards short setup messages between them (random device ids and network-address details needed to connect). These are held in memory only while connected and are not written to disk.</li>
@@ -45,7 +46,7 @@
   <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
 
   <h2>Network traffic</h2>
-  <p>Send files uses HTTPS. Remote control between your phone and your computer uses an encrypted HTTPS connection that the phone pins to your computer's own key, so other people on the same Wi-Fi cannot read or change it. Phones with an older version of the app use plain HTTP until you switch that off in the computer's dashboard. The computer only accepts connections from private (LAN) addresses and requires a paired device.</p>
+  <p>Send files transfers are always encrypted end to end (WebRTC), and a Send files server you set up yourself should use HTTPS. Remote control between your phone and your computer uses an encrypted HTTPS connection that the phone pins to your computer's own key, so other people on the same Wi-Fi cannot read or change it. Phones with an older version of the app use plain HTTP until you switch that off in the computer's dashboard. The computer only accepts connections from private (LAN) addresses and requires a paired device.</p>
 
   <h2>Children</h2>
   <p>The app is not directed at children and collects no data from anyone.</p>
