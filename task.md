@@ -22,11 +22,11 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 - [x] T2.4 Contrast ≥ 4.5:1 in both themes
 
 ## Phase 3 — Server, deploy, release (VPS)
-- [ ] T3.1 `deploy/docker-compose.yml` + `deploy/Caddyfile` (HTTPS, coturn, secret init)
-- [ ] T3.2 Release workflow builds and pushes the image to GHCR on `v*` tags
-- [ ] T3.3 `docs/DEPLOYING-SERVER.md` runbook
-- [ ] T3.4 Hardening notes (real client IP, TURN limits, exposed paths)
-- [ ] T3.5 Local compose smoke test (needs Docker + two browsers)
+- [x] T3.1 `deploy/docker-compose.yml` + `deploy/Caddyfile` (HTTPS, coturn, secret init)
+- [x] T3.2 Release workflow builds and pushes the image to GHCR on `v*` tags
+- [x] T3.3 `docs/DEPLOYING-SERVER.md` runbook
+- [x] T3.4 Hardening notes (real client IP, TURN limits, exposed paths)
+- [ ] T3.5 Local compose smoke test (needs Docker + two browsers) — partly done: app tested without Docker (health, uuid, credentials, WebSocket register OK; no Docker daemon in this environment)
 
 ## Phase 4 — Android "Files" tab
 - [ ] T4.1 Third tab with a hardened WebView

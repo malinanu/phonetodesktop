@@ -1,0 +1,86 @@
+# Production stack for the Phone Remote "Send files" server (FileSync).
+#   cp .env.example .env && $EDITOR .env && docker compose up -d
+# Adapted from filesync/deploy/docker-compose-ssl.yml. See docs/DEPLOYING-SERVER.md.
+services:
+  caddy:
+    image: caddy:2
+    container_name: files-caddy
+    ports:
+      - "80:80"      # needed for the certificate challenge and the redirect to https
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - FILES_DOMAIN=${FILES_DOMAIN:?set FILES_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - filesync
+    restart: unless-stopped
+
+  filesync:
+    image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
+    container_name: files-app
+    environment:
+      - SECRET_FILE=/keys/secret
+    volumes:
+      - keys:/keys:ro
+    depends_on:
+      coturn:
+        condition: service_started
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:alpine
+    container_name: files-coturn
+    entrypoint: ["/bin/sh", "-c"]
+    # Private ranges are denied as relay targets so the relay can't be used to reach this host's
+    # internal network. The quotas cap how many relay sessions one user / the whole server can hold;
+    # add --max-bps / --bps-capacity if relay bandwidth ever becomes a cost problem.
+    command:
+      - |
+        secret=$$(cat /keys/secret) && exec turnserver \
+          --fingerprint \
+          --use-auth-secret \
+          --no-multicast-peers \
+          --denied-peer-ip=10.0.0.0-10.255.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --user-quota=10 \
+          --total-quota=200 \
+          --no-cli \
+          --realm=${FILES_DOMAIN} \
+          --static-auth-secret="$$secret" \
+          --listening-port=3478 \
+          --min-port=50000 \
+          --max-port=50100
+    environment:
+      - FILES_DOMAIN=${FILES_DOMAIN}
+    volumes:
+      - keys:/keys:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "50000-50100:50000-50100/udp"
+    restart: unless-stopped
+
+  # One-shot: creates the shared signing secret on first start (kept in the keys volume).
+  init:
+    image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
+    container_name: files-init
+    command: python3 api/init_secret.py
+    volumes:
+      - keys:/keys
+
+volumes:
+  caddy-data:
+  keys:
