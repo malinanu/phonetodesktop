@@ -15,8 +15,10 @@ dependencies:
   http: ^1.6.0
   mobile_scanner: ^7.4.2
   multicast_dns: ^0.3.3+1
+  nsd: ^5.0.1
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
+  wakelock_plus: ^1.8.1
 
 dev_dependencies:
   flutter_test:
