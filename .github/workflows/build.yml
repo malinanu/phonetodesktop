@@ -37,3 +37,48 @@ jobs:
       - run: gradle -p android testDebugUnitTest assembleDebug
       - uses: actions/upload-artifact@v4
         with: { name: phone-remote-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }
+  agent-linux:
+    runs-on: ubuntu-22.04   # oldest supported glibc, same as the release build
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --manifest-path agent/Cargo.toml
+      - run: cargo clippy --manifest-path agent/Cargo.toml   # informational: warnings do not fail the build
+      - name: Live tests (real D-Bus MPRIS player and a real X11 server)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq dbus xvfb
+          pip install dbus-next python-xlib
+          cd agent
+          dbus-run-session -- sh -c 'python3 tests-support/fake_mpris.py /tmp/fake.log & P=$!; sleep 2; cargo test live_player_roundtrip -- --ignored; R=$?; kill $P; exit $R'
+          xvfb-run -a sh -c 'python3 tests-support/x11_probe.py /tmp/x.log 8 & sleep 2; cargo test live_x11_input -- --ignored; R=$?; sleep 7; cat /tmp/x.log; exit $R'
+          grep -q "button 4" /tmp/x.log && grep -q "key a state=4" /tmp/x.log && grep -q "0x1008ff14" /tmp/x.log
+      - name: Package smoke test (.deb and tarball)
+        run: |
+          cargo build --release --manifest-path agent/Cargo.toml
+          cargo install cargo-deb --locked
+          (cd agent && cargo deb --no-build)
+          dpkg-deb -I agent/target/debian/*.deb
+          installer/linux/make-tarball.sh 0.0.0 x86_64 agent/target/release/phone-remote dist
+          T=$(mktemp -d); tar -xzf dist/*.tar.gz -C "$T"; HOME="$T/home" sh "$T"/phone-remote-0.0.0-linux-x86_64/install.sh
+          test -x "$T/home/.local/bin/phone-remote"
+      - name: Release helper tests
+        run: python3 -m unittest -v test_make_latest
+        working-directory: installer
+  agent-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add x86_64-apple-darwin
+      - run: cargo test --manifest-path agent/Cargo.toml
+      - run: cargo build --release --manifest-path agent/Cargo.toml
+      - run: ./agent/target/release/phone-remote --help
+      - name: Build the .app and .dmg (ad-hoc signed) to catch packaging breakage
+        run: |
+          cargo build --release --manifest-path agent/Cargo.toml --target x86_64-apple-darwin
+          lipo -create -output phone-remote-universal agent/target/release/phone-remote agent/target/x86_64-apple-darwin/release/phone-remote
+          installer/macos/make-dmg.sh 0.0.0 phone-remote-universal dist
+          hdiutil verify dist/PhoneRemote-0.0.0-macos.dmg
+          hdiutil attach dist/PhoneRemote-0.0.0-macos.dmg -mountpoint /tmp/pr-dmg -nobrowse
+          codesign --verify --deep --strict "/tmp/pr-dmg/Phone Remote.app"
+          plutil -lint "/tmp/pr-dmg/Phone Remote.app/Contents/Info.plist"
+          hdiutil detach /tmp/pr-dmg
+

@@ -1,6 +1,6 @@
 # Phone Remote
 
-Control media on a Windows PC from an Android phone, over the local network (Wi-Fi) or Bluetooth.
+Control media on a Windows, macOS or Linux computer from a phone, over the local network (Wi-Fi), or from an Android phone over Bluetooth.
 
 ```
 agent/     Rust desktop agent (Windows GSMTC backend, tray app), serves the phone UI + WebSocket
@@ -21,6 +21,9 @@ The remote's **⋮ menu → Settings** (and the same page from the Bluetooth tab
 
 ## Guide pages
 `shared/guide.html` holds two pages, *Get connected in 60 seconds* and *What happens when you tap play*. The PC serves it at `/guide` (tray menu → Guide) and the Android app bundles it (top bar → Guide).
+
+## Desktop agent (Windows, macOS, Linux)
+The same Rust agent runs on all three. Downloads: the website, or the GitHub release (Windows `.exe`, macOS `.dmg`, Linux `.deb` / `.tar.gz`). On macOS and Linux open it with `phone-remote open` (or from the applications menu); `phone-remote autostart on` starts it at login. Linux players are read over MPRIS (title, progress, seek); on macOS the media keys, volume, mouse and keyboard work but song title and progress are not available. See [docs/DESKTOP-TESTING.md](docs/DESKTOP-TESTING.md).
 
 ## Windows agent
 Download `phone-remote.exe` from the CI artifacts (or `cargo build --release` in `agent/`), then:

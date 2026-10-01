@@ -68,13 +68,13 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [x] A1 Linux `Backend`: MPRIS (zbus), volume via wpctl/pactl, input via enigo (X11/XTest). Verified live here: MPRIS roundtrip against a fake player on a private D-Bus, and X11 mouse/scroll/text/Ctrl+key/media-key events seen by a probe window under Xvfb. Not done: uinput for Wayland-only desktops (documented limit)
 - [ ] A2 macOS `Backend` (enigo media keys + input, volume via osascript; no now-playing): implemented and `cargo check --target aarch64-apple-darwin` is clean, but NOT run on a real Mac (needs the G1 manual check)
 - [ ] A3 Tray / autostart / log folder / open-url cross-platform: DONE for open-url (open / xdg-open), start-at-login (macOS LaunchAgent with KeepAlive, Linux XDG autostart; `phone-remote autostart on|off|status`; dashboard toggle), log folder (already per-OS), and the `phone-remote open` launcher (starts the agent detached, shows the dashboard); verified live on Linux. NOT done: a tray icon on macOS/Linux (the dashboard in the browser is the UI there for now); macOS parts compile-checked only
-- [ ] A4 Packaging + CI matrix: Windows installer, macOS .dmg (signed/notarized), Linux AppImage + .deb; `cargo test` + `clippy` on all three
-- [ ] A5 mDNS + firewall notes per OS
+- [ ] A4 Packaging + CI matrix. DONE and verified here: Linux .deb (built, inspected, extracted and run) + generic tarball with `install.sh` (installed/removed in a throwaway home); CI jobs `agent-linux` (tests, clippy, live D-Bus + X11 tests, package smoke) and `agent-macos`; release jobs for Linux amd64/arm64 and macOS universal; `actionlint` clean. Changed: no AppImage (the .deb + tarball cover it). NOT yet exercised: the macOS dmg script and both new CI jobs (they run on GitHub, not here); signing/notarization needs the Apple secrets
+- [x] A5 mDNS + firewall notes per OS: website first-run notes (Windows private network, macOS Local Network + Accessibility, Linux X11/XWayland); `Info.plist` has NSLocalNetworkUsageDescription + NSBonjourServices. Not verified on a real Mac/Linux LAN
 
 ### B. Website downloads
-- [ ] B1 OS detection and per-platform downloads + checksums + store badges (hidden until URLs exist)
-- [ ] B2 Release workflow publishes `latest.json`; site reads it
-- [ ] B3 Privacy policy / guide / SmartScreen + Gatekeeper notes per platform
+- [x] B1 OS detection and per-platform downloads + checksums + store badges (hidden until URLs exist): rendered in Chromium with a generated latest.json under Windows, macOS, Linux ARM64 and Android user agents; no JS errors, no overflow at phone width
+- [x] B2 Release workflow publishes `latest.json` + `SHA256SUMS` (`installer/make_latest.py`, 5 tests); Pages workflow fetches it at deploy time and rebuilds on each release; store/files links filled from repo variables with strict validation
+- [x] B3 Privacy policy, README and first-run notes per platform (SmartScreen, Gatekeeper, Linux)
 
 ### C. Local device identity (auth v2)
 - [ ] C1 Protocol v2: device public key at pairing, challenge-response, replay protection, v1 behind a flag

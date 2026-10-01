@@ -3,6 +3,7 @@ name = "phone-remote-agent"
 version = "0.2.0"
 edition = "2021"
 description = "Desktop agent that lets a phone control media playback over the local network"
+license = "MIT"
 
 [[bin]]
 name = "phone-remote"
@@ -56,3 +57,22 @@ lto = true
 codegen-units = 1
 strip = true
 opt-level = "s"
+
+# Debian/Ubuntu package: `cargo deb` (see .github/workflows/release.yml)
+[package.metadata.deb]
+name = "phone-remote"
+maintainer = "malinanu <malinanu@users.noreply.github.com>"
+copyright = "2026 malinanu"
+license-file = ["../LICENSE", "0"]
+section = "sound"
+priority = "optional"
+depends = "$auto"
+# Volume control uses wpctl (PipeWire) or pactl (PulseAudio).
+recommends = "pipewire-bin | pulseaudio-utils"
+extended-description = "Phone Remote lets your phone control this computer's media (play, pause, skip, seek, volume), touchpad and keyboard over your local network. Open it from the applications menu, scan the QR code with the phone app, and approve the phone."
+assets = [
+  ["target/release/phone-remote", "usr/bin/", "755"],
+  ["../installer/linux/phone-remote.desktop", "usr/share/applications/", "644"],
+  ["../installer/assets/phone-remote.png", "usr/share/icons/hicolor/512x512/apps/phone-remote.png", "644"],
+  ["../README.md", "usr/share/doc/phone-remote/README.md", "644"],
+]

@@ -6,6 +6,8 @@ on:
     # The repo's default branch is currently claude/phone-media-remote-ddrl6t; drop it once the default is renamed to main.
     branches: [main, claude/phone-media-remote-ddrl6t]
     paths: ["site/**", "shared/base.css", "shared/font.woff2", ".github/workflows/pages.yml"]
+  release:
+    types: [published]     # rebuild so the site picks up the new latest.json
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,14 +26,39 @@ jobs:
       - uses: actions/checkout@v4
       - name: Add the shared design system
         run: cp shared/base.css shared/font.woff2 site/
-      - name: Fill in the Send files address (repo variable FILES_URL; the button stays hidden if unset)
+      - name: Latest release manifest (the page lists the downloads from it)
+        run: |
+          if curl -fsSL "https://github.com/${{ github.repository }}/releases/latest/download/latest.json" -o site/latest.json \
+             && python3 -c "import json,sys; d=json.load(open('site/latest.json')); assert isinstance(d.get('assets'), list)"; then
+            echo "latest.json: $(python3 -c "import json; print(json.load(open('site/latest.json'))['version'])")"
+          else
+            rm -f site/latest.json
+            echo "No release manifest yet; the page falls back to the releases link."
+          fi
+      - name: Fill in the Send files and store links (repo variables; a button stays hidden if its variable is unset or invalid)
         env:
           FILES_URL: ${{ vars.FILES_URL }}
+          APP_STORE_URL: ${{ vars.APP_STORE_URL }}
+          PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
         run: |
-          # Only a plain https origin is accepted (letters, digits, dots, dashes, optional port).
-          if [[ "$FILES_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$ ]]; then
-            sed -i "s|__FILES_URL__|${FILES_URL}|g" site/index.html
-          fi
+          python3 - <<'PY'
+          import os, re
+          path = "site/index.html"
+          html = open(path, encoding="utf-8").read()
+          rules = {
+              "__FILES_URL__": ("FILES_URL", r"^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$"),
+              "__APP_STORE_URL__": ("APP_STORE_URL", r"^https://apps\.apple\.com/[A-Za-z0-9._~/?=%-]+$"),
+              "__PLAY_STORE_URL__": ("PLAY_STORE_URL", r"^https://play\.google\.com/store/apps/details\?id=[A-Za-z0-9._]+$"),
+          }
+          for token, (var, rx) in rules.items():
+              value = os.environ.get(var, "")
+              if re.match(rx, value):
+                  html = html.replace(token, value)
+                  print(f"{var}: set")
+              else:
+                  print(f"{var}: not set or not valid, button stays hidden")
+          open(path, "w", encoding="utf-8").write(html)
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }

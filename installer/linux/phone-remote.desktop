@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Phone Remote
+GenericName=Phone media remote
+Comment=Control this computer's media from your phone
+Exec=phone-remote open
+Icon=phone-remote
+Terminal=false
+Categories=AudioVideo;Utility;
+Keywords=remote;phone;media;control;
+StartupNotify=false
