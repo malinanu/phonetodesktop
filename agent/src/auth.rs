@@ -223,6 +223,21 @@ impl Auth {
         }
     }
 
+    /// The "Send files" address in effect: the one set by the user, else the one baked into the build.
+    pub fn files_url(&self) -> Option<String> {
+        config::files_url(&self.inner.lock().unwrap().cfg)
+    }
+
+    /// Set (or, with an empty string, clear) the "Send files" address. Only a valid https address is stored.
+    pub fn set_files_url(&self, raw: &str) -> bool {
+        let raw = raw.trim();
+        let stored = if raw.is_empty() { String::new() } else { match config::clean_files_url(raw) { Some(u) => u, None => return false } };
+        let mut i = self.inner.lock().unwrap();
+        i.cfg.files_url = stored;
+        self.save(&i);
+        true
+    }
+
     /// The account this PC has joined, if any.
     pub fn account(&self) -> Option<AccountTrust> {
         self.inner.lock().unwrap().cfg.account.clone()
@@ -684,6 +699,18 @@ mod tests {
         let (a, _) = with_v2_phone();
         let code = a.code();
         assert_eq!(a.request_pairing(&code, "ph", "Old app", "ip"), Ok(None), "needs the owner's approval, no silent token");
+    }
+
+    #[test]
+    fn the_files_address_is_validated_stored_and_clearable() {
+        let a = auth(false);
+        assert!(a.set_files_url("  Files.Example.com "));
+        assert_eq!(a.files_url().as_deref(), Some("https://files.example.com"));
+        assert!(!a.set_files_url("http://insecure.example.com"), "plain http is refused");
+        assert!(!a.set_files_url("files.example.com; calc"), "shell characters are refused");
+        assert_eq!(a.files_url().as_deref(), Some("https://files.example.com"), "a refused address changes nothing");
+        assert!(a.set_files_url(""));
+        assert_eq!(a.files_url(), option_env!("PHONE_REMOTE_FILES_URL").and_then(crate::config::clean_files_url));
     }
 
     // ---- account certificates ----

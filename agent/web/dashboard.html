@@ -130,7 +130,8 @@
     <p class="lead" id="hSub"></p>
     <div class="stat"><div><b id="hPhones">0</b><span>phones connected</span></div><div><b id="hTotal">0</b><span>phones paired</span></div></div>
     <div class="now" id="hNow"></div>
-    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a><button class="btn" id="hFiles" hidden>Send files</button></div>
+    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a><button class="btn" id="hFiles">Send files</button></div>
+    <div class="now" id="hFilesSetup" hidden><span class="kicker">Send files</span><p style="margin:6px 0 10px">Send files of any size between your devices. Enter the address of your file server first.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn primary" id="hFilesSave">Save</button></div><p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div>
   </section>
 
   <section id="phones">
@@ -210,13 +211,21 @@
     if (view === 'activity') loadLog();
   }
   addEventListener('hashchange', route);
-  $('hFiles').addEventListener('click', () => { api('/api/open-files', 'POST').catch(() => {}); });
+  $('hFiles').addEventListener('click', () => {
+    if (data.files_url) { api('/api/open-files', 'POST').catch(() => {}); return; }
+    $('hFilesSetup').hidden = !$('hFilesSetup').hidden;
+  });
+  $('hFilesSave').addEventListener('click', async () => {
+    const err = $('hFilesErr'); err.hidden = true;
+    try { await api('/api/files-url', 'POST', { url: $('hFilesUrl').value }); $('hFilesSetup').hidden = true; refresh(); }
+    catch (e) { err.textContent = 'Use an https:// address, for example files.example.com'; err.hidden = false; }
+  });
 
   function renderHome() {
     const now = data.now, p = now && now.players.find(x => x.id === now.current);
     $('hSub').textContent = `Listening on ${data.ips[0] || '127.0.0.1'}:${data.port}.`;
     $('hPhones').textContent = data.phones_online;
-    $('hFiles').hidden = !data.files_url;
+    $('hFiles').textContent = data.files_url ? 'Send files' : 'Set up Send files';
     $('hTotal').textContent = data.devices.length + (data.legacy ? '+' : '');
     const box = $('hNow'); box.textContent = '';
     box.append(el('span', 'kicker', 'Now playing on this PC'));

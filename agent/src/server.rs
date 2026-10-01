@@ -52,8 +52,6 @@ pub struct App {
     pub port: u16,
     pub ips: Vec<Ipv4Addr>,
     pub vlc_password: String,
-    /// Validated address of the "Send files" server, if one is configured.
-    pub files_url: Option<String>,
     /// SHA-256 of this computer's TLS public key (base64url). Goes into the QR so phones can pin it.
     pub tls_fp: Option<String>,
     pub on_pending: Option<PendingHook>,
@@ -76,7 +74,6 @@ impl App {
             port: cfg.port,
             ips,
             vlc_password: crate::backend::vlc_password(&cfg.local_secret),
-            files_url: crate::config::files_url(cfg),
             tls_fp,
             on_pending,
             tx: watch::channel(String::new()).0,
