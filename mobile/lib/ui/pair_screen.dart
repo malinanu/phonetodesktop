@@ -22,11 +22,14 @@ Future<PairResult> _realPair(PairingInfo info, ConnectionController link, void F
 
 /// First run, or "Add a PC": scan the code shown on the PC, then wait for its owner to allow this phone.
 class PairScreen extends StatefulWidget {
-  const PairScreen({super.key, required this.link, this.onPaired, this.scan = scanQr, this.pair = _realPair});
+  const PairScreen({super.key, required this.link, this.onPaired, this.scan = scanQr, this.pair = _realPair, this.onBluetooth});
   final ConnectionController link;
   final VoidCallback? onPaired;
   final Scanner scan;
   final Pairer pair;
+
+  /// Android only: use the phone as a Bluetooth remote instead of pairing over Wi-Fi.
+  final VoidCallback? onBluetooth;
 
   @override
   State<PairScreen> createState() => _PairScreenState();
@@ -120,7 +123,14 @@ class _PairScreenState extends State<PairScreen> {
               ]),
             )
           else
-            FilledButton.icon(onPressed: _start, icon: const Icon(Icons.qr_code_scanner_rounded), label: const Text('Scan QR code')),
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              FilledButton.icon(onPressed: _start, icon: const Icon(Icons.qr_code_scanner_rounded), label: const Text('Scan QR code')),
+              if (widget.onBluetooth != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextButton.icon(onPressed: widget.onBluetooth, icon: const Icon(Icons.bluetooth_rounded), label: const Text('Use Bluetooth instead')),
+                ),
+            ]),
           if (_problem != null)
             Padding(
               padding: const EdgeInsets.only(top: 16),

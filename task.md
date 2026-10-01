@@ -95,7 +95,7 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 ### E. Flutter mobile app (iOS + Android)
 - [x] E1 `mobile/` Android + iOS projects: application id `app.phoneremote`, minSdk 28, release signing from the same env keystore as the native app, permissions (Wi-Fi/multicast/camera), iOS camera + local-network + Bonjour keys; CI builds the release APK and an unsigned iOS app (first runs pending)
 - [x] E2 Wi-Fi mode done natively (no WebView): pinned-TLS protocol client verified against the real Rust agent, mDNS, QR pairing, saved PCs, native remote + touchpad screens; 46 tests
-- [ ] E3 Android-only Bluetooth mode via platform channel (reuse HidRemote.kt)
+- [x] E3 Android-only Bluetooth mode: `HidRemote.kt`/`HidKeys.kt` reused through a platform channel (`HidBridge.kt`), Dart controller + screen + tab (hidden on iOS), usable without pairing a PC; Dart side tested with a fake platform. The Kotlin compiles only in CI and the Bluetooth link needs a real phone + PC to verify
 - [ ] E4 Files tab, Settings and themes done (widget tests); contrast audit and screen-reader pass still open
 - [ ] E5 Device identity + optional sign-in
 - [ ] E6 Parity checklist, then retire `android/`; CI builds AAB and IPA

@@ -8,6 +8,7 @@ import '../core/identity.dart';
 import '../core/protocol.dart';
 import '../core/session.dart';
 import 'discovery.dart';
+import 'input_sink.dart';
 import 'pc_store.dart';
 
 enum LinkStatus {
@@ -32,7 +33,7 @@ enum LinkStatus {
 
 /// Keeps one PC connected: logs in with the device key, follows the PC's state, reconnects with backoff, and finds
 /// the PC again if its address changed.
-class ConnectionController extends ChangeNotifier {
+class ConnectionController extends ChangeNotifier implements InputSink {
   ConnectionController({
     required this.pcStore,
     required this.identityStore,
@@ -61,7 +62,10 @@ class ConnectionController extends ChangeNotifier {
   List<PcRecord> get pcs => List.unmodifiable(_pcs);
   LinkStatus get status => _status;
   AgentState? get state => _state;
+  @override
   bool get inputAllowed => _session?.inputAllowed ?? false;
+  @override
+  bool get inputConnected => status == LinkStatus.connected;
   PcRecord? get active {
     for (final p in _pcs) {
       if (p.id == _activeId) return p;
@@ -132,10 +136,15 @@ class ConnectionController extends ChangeNotifier {
   void volumeSet(int level) => session?.volumeSet(level);
   void mute() => session?.mute();
   void selectPlayer(String id) => session?.select(id);
+  @override
   void mouseMove(int dx, int dy) => session?.mouseMove(dx, dy);
+  @override
   void mouseButton(String button, String action) => session?.mouseButton(button, action);
+  @override
   void scroll(int dx, int dy) => session?.scroll(dx, dy);
+  @override
   void typeText(String s) => session?.text(s);
+  @override
   void pressKey(String name, [List<String> mods = const []]) => session?.key(name, mods);
 
   // ---- the connection loop -----------------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -6,6 +8,7 @@ import 'app/discovery.dart';
 import 'app/pc_store.dart';
 import 'app/settings.dart';
 import 'app/theme.dart';
+import 'core/hid.dart';
 import 'core/identity.dart';
 import 'ui/home_shell.dart';
 
@@ -22,13 +25,14 @@ Future<void> main() async {
 
   settings.addListener(applyAwake);
   applyAwake();
-  runApp(PhoneRemoteApp(settings: settings, link: link));
+  runApp(PhoneRemoteApp(settings: settings, link: link, bluetooth: Platform.isAndroid ? BluetoothController(ChannelHidPlatform()) : null));
 }
 
 class PhoneRemoteApp extends StatelessWidget {
-  const PhoneRemoteApp({super.key, required this.settings, required this.link});
+  const PhoneRemoteApp({super.key, required this.settings, required this.link, this.bluetooth});
   final AppSettings settings;
   final ConnectionController link;
+  final BluetoothController? bluetooth;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +48,7 @@ class PhoneRemoteApp extends StatelessWidget {
           'light' => ThemeMode.light,
           _ => ThemeMode.system,
         },
-        home: HomeShell(link: link, settings: settings),
+        home: HomeShell(link: link, settings: settings, bluetooth: bluetooth),
       ),
     );
   }

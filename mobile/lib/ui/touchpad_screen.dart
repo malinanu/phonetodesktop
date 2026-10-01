@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../app/connection.dart';
+import '../app/input_sink.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
 import 'widgets.dart';
@@ -10,7 +10,7 @@ import 'widgets.dart';
 /// Mouse and keyboard for the PC. One finger moves, a tap clicks, two fingers scroll, a two-finger tap right-clicks.
 class TouchpadScreen extends StatefulWidget {
   const TouchpadScreen({super.key, required this.link, required this.settings});
-  final ConnectionController link;
+  final InputSink link;
   final AppSettings settings;
 
   @override
@@ -29,7 +29,7 @@ class _TouchpadScreenState extends State<TouchpadScreen> {
   final _text = TextEditingController();
   final _typed = FocusNode();
 
-  ConnectionController get link => widget.link;
+  InputSink get link => widget.link;
   AppSettings get settings => widget.settings;
 
   @override
@@ -124,7 +124,7 @@ class _TouchpadScreenState extends State<TouchpadScreen> {
       listenable: Listenable.merge([link, settings]),
       builder: (context, _) {
         final c = context.pr;
-        final online = link.status == LinkStatus.connected;
+        final online = link.inputConnected;
         if (online && !link.inputAllowed) {
           return Padding(
             padding: const EdgeInsets.all(28),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app/connection.dart';
+import '../core/hid.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
+import 'bluetooth_screen.dart';
 import 'files_screen.dart';
 import 'pair_screen.dart';
 import 'remote_screen.dart';
@@ -10,11 +12,14 @@ import 'settings_screen.dart';
 import 'touchpad_screen.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.link, required this.settings, this.scan = scanQr, this.pair});
+  const HomeShell({super.key, required this.link, required this.settings, this.scan = scanQr, this.pair, this.bluetooth});
   final ConnectionController link;
   final AppSettings settings;
   final Scanner scan;
   final Pairer? pair;
+
+  /// Present on Android only: iOS cannot act as a Bluetooth keyboard.
+  final BluetoothController? bluetooth;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -22,10 +27,19 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
+  bool _btOnly = false; // no PC paired, but the user chose Bluetooth
 
-  PairScreen _pairScreen({VoidCallback? onPaired}) => widget.pair == null
-      ? PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan)
-      : PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, pair: widget.pair!);
+  PairScreen _pairScreen({VoidCallback? onPaired, VoidCallback? onBluetooth}) => widget.pair == null
+      ? PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, onBluetooth: onBluetooth)
+      : PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, pair: widget.pair!, onBluetooth: onBluetooth);
+
+  Widget _btOnlyPage(BluetoothController bt) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Bluetooth remote', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          leading: IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: () => setState(() => _btOnly = false)),
+        ),
+        body: BluetoothScreen(controller: bt, settings: widget.settings),
+      );
 
   void _openPair() {
     late final VoidCallback close;
@@ -41,7 +55,11 @@ class _HomeShellState extends State<HomeShell> {
       listenable: widget.link,
       builder: (context, _) {
         final link = widget.link;
-        if (link.pcs.isEmpty) return _pairScreen();
+        if (link.pcs.isEmpty) {
+          final bt = widget.bluetooth;
+          if (bt != null && _btOnly) return _btOnlyPage(bt);
+          return _pairScreen(onBluetooth: bt == null ? null : () => setState(() => _btOnly = true));
+        }
         final c = context.pr;
         final pc = link.active;
         final dot = switch (link.status) {
@@ -75,16 +93,18 @@ class _HomeShellState extends State<HomeShell> {
                 RemoteScreen(link: link, settings: widget.settings),
                 TouchpadScreen(link: link, settings: widget.settings),
                 FilesScreen(settings: widget.settings, onOpenSettings: _openSettings),
+                if (widget.bluetooth != null) BluetoothScreen(controller: widget.bluetooth!, settings: widget.settings),
               ]),
             ),
           ]),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tab,
             onDestinationSelected: (i) => setState(() => _tab = i),
-            destinations: const [
+            destinations: [
               NavigationDestination(icon: Icon(Icons.play_circle_outline_rounded), selectedIcon: Icon(Icons.play_circle_rounded), label: 'Remote'),
               NavigationDestination(icon: Icon(Icons.touch_app_outlined), selectedIcon: Icon(Icons.touch_app_rounded), label: 'Touchpad'),
               NavigationDestination(icon: Icon(Icons.upload_file_outlined), selectedIcon: Icon(Icons.upload_file_rounded), label: 'Files'),
+              if (widget.bluetooth != null) NavigationDestination(icon: Icon(Icons.bluetooth_outlined), selectedIcon: Icon(Icons.bluetooth_rounded), label: 'Bluetooth'),
             ],
           ),
         );
