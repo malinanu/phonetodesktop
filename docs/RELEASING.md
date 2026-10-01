@@ -40,7 +40,7 @@ Many EV certs ship on a hardware token and can't be exported; for those use a cl
 SSL.com eSigner, etc.) and adjust the signing steps.
 
 ### 3. Website (GitHub Pages)
-Repo **Settings → Pages → Source: GitHub Actions**. `.github/workflows/pages.yml` publishes `site/` on every push to `main`.
+Repo **Settings → Pages → Source: GitHub Actions**. `.github/workflows/pages.yml` publishes `site/` on every push to `main` (or the current default branch; consider renaming it to `main` under Settings → Branches).
 The privacy policy URL for Play is `https://<owner>.github.io/<repo>/privacy.html` (or your custom domain, set under Pages).
 
 ## Google Play

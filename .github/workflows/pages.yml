@@ -3,7 +3,8 @@ name: pages
 # One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
 on:
   push:
-    branches: [main]
+    # The repo's default branch is currently claude/phone-media-remote-ddrl6t; drop it once the default is renamed to main.
+    branches: [main, claude/phone-media-remote-ddrl6t]
     paths: ["site/**", "shared/base.css", "shared/font.woff2", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
