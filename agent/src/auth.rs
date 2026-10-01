@@ -302,6 +302,7 @@ mod tests {
             port: 1,
             local_secret: String::new(),
             autostart_initialized: true,
+            files_url: String::new(),
         };
         c.devices.clear();
         Auth::in_memory(c)

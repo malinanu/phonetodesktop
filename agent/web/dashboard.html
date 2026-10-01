@@ -130,7 +130,7 @@
     <p class="lead" id="hSub"></p>
     <div class="stat"><div><b id="hPhones">0</b><span>phones connected</span></div><div><b id="hTotal">0</b><span>phones paired</span></div></div>
     <div class="now" id="hNow"></div>
-    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a></div>
+    <div class="links"><a class="btn primary" href="#phones">Add a phone</a><a class="btn" href="#players">Set up video players</a><button class="btn" id="hFiles" hidden>Send files</button></div>
   </section>
 
   <section id="phones">
@@ -209,11 +209,13 @@
     if (view === 'activity') loadLog();
   }
   addEventListener('hashchange', route);
+  $('hFiles').addEventListener('click', () => { api('/api/open-files', 'POST').catch(() => {}); });
 
   function renderHome() {
     const now = data.now, p = now && now.players.find(x => x.id === now.current);
     $('hSub').textContent = `Listening on ${data.ips[0] || '127.0.0.1'}:${data.port}.`;
     $('hPhones').textContent = data.phones_online;
+    $('hFiles').hidden = !data.files_url;
     $('hTotal').textContent = data.devices.length + (data.legacy ? '+' : '');
     const box = $('hNow'); box.textContent = '';
     box.append(el('span', 'kicker', 'Now playing on this PC'));

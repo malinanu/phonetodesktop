@@ -29,18 +29,20 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 - [ ] T3.5 Local compose smoke test (needs Docker + two browsers) — partly done: app tested without Docker (health, uuid, credentials, WebSocket register OK; no Docker daemon in this environment)
 
 ## Phase 4 — Android "Files" tab
-- [ ] T4.1 Third tab with a hardened WebView
-- [ ] T4.2 Server URL via `BuildConfig`, https-only validation + unit test
-- [ ] T4.3 File chooser and download handling
-- [ ] T4.4 "Open in browser" fallback for large receives
-- [ ] T4.5 Re-check permissions (none added)
-- [ ] T4.6 Stretch: Android share-target
+Changed approach: FileSync streams downloads through a service worker / File System Access API, which an Android WebView cannot hand to the system downloader (and I won't expose a JS bridge to a remote site). So the tab is a native panel that opens Send files in the phone's browser, where large receives work.
+- [x] T4.1 Third "Files" tab (native panel, no remote WebView, no JS bridge)
+- [x] T4.2 Server URL via `-PfilesUrl` → `BuildConfig.FILES_URL`, overridable in Settings; https-only validation (`FilesUrl.kt`) + unit tests
+- [x] T4.3 ~~File chooser / download handling in a WebView~~ not needed: the browser does both
+- [x] T4.4 Opens in the browser (that is the "large receive" path)
+- [x] T4.5 Permissions re-checked: none added (INTERNET already declared)
+- [ ] T4.6 Stretch: Android share-target (not done)
+- [ ] T4.7 Compile + run `testDebugUnitTest` (no Android SDK here; CI does it) and try the tab on a real phone
 
 ## Phase 5 — Windows agent entry points
-- [ ] T5.1 Config key `files_url`
-- [ ] T5.2 Dashboard card + tray item "Send files"
-- [ ] T5.3 Stretch: "Send to this PC" QR
-- [ ] T5.4 Rust tests
+- [x] T5.1 Config key `files_url`
+- [x] T5.2 Dashboard card + tray item "Send files"
+- [ ] T5.3 Stretch (not done): "Send to this PC" QR
+- [x] T5.4 Rust tests
 
 ## Phase 6 — Website, docs, privacy, store
 - [ ] T6.1 Landing page: "Send files" section

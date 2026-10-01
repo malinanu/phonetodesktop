@@ -25,6 +25,9 @@
   .switch i::after { content:""; position:absolute; top:4px; left:4px; width:24px; height:24px; border-radius:50%; background:var(--ink-dim); transition:transform .2s var(--ease),background .2s; }
   .switch input:checked + i { background:var(--accent); } .switch input:checked + i::after { transform:translateX(20px); background:var(--on-accent); }
   .switch input:focus-visible + i { outline:2px solid var(--accent); outline-offset:2px; }
+  input[type=url] { width:100%; margin-top:8px; font:500 16px var(--font); color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; min-height:48px; }
+  input[type=url]:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  input[type=url][aria-invalid=true] { border-color:var(--bad); }
   input[type=range] { -webkit-appearance:none; appearance:none; width:150px; height:32px; background:transparent; }
   input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:4px; background:linear-gradient(to right,var(--accent) var(--p,50%),var(--surface-2) var(--p,50%)); }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; margin-top:-9px; border-radius:50%; background:var(--accent); border:0; }
@@ -60,6 +63,10 @@
   <div class="row"><div class="grow"><b>Vibration</b><span class="hint">A small buzz when you press a button.</span></div><label class="switch"><input type="checkbox" data-key="vibrate" aria-label="Vibration"><i></i></label></div>
   <div class="row appOnly"><div class="grow"><b>Keep screen on</b><span class="hint">Stops the phone sleeping while the app is open.</span></div><label class="switch"><input type="checkbox" data-key="keepAwake" aria-label="Keep screen on"><i></i></label></div>
 
+  <h2 class="appOnly">Send files</h2>
+  <div class="row appOnly"><div class="grow"><b>File server</b><span class="hint" id="filesHint">The address of your Send files server, e.g. files.example.com. Leave empty to use the app's built-in address.</span>
+    <input type="url" id="filesUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://files.example.com" aria-label="File server address" aria-describedby="filesHint"></div></div>
+
   <button class="reset" id="reset">Reset to defaults</button>
 </div>
 <script>
@@ -75,6 +82,7 @@
       g.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(cur[k]) === b.dataset.v); });
     });
     document.querySelectorAll('input[type=checkbox][data-key]').forEach(function (c) { c.checked = !!cur[c.dataset.key]; });
+    $('filesUrl').value = cur.filesUrl || '';
     $('speed').value = cur.padSpeed; $('speed').style.setProperty('--p', ((cur.padSpeed - 0.5) / 1.5 * 100) + '%');
     $('speedVal').textContent = Number(cur.padSpeed).toFixed(1) + '×';
   }
@@ -89,6 +97,13 @@
     c.addEventListener('change', function () { var p = {}; p[c.dataset.key] = c.checked; S.set(p); S.haptic(10); paint(); });
   });
   $('speed').addEventListener('input', function () { S.set({ padSpeed: Number($('speed').value) }); paint(); });
+  // Only https addresses are kept; anything else is flagged and not saved (the app enforces the same rule).
+  $('filesUrl').addEventListener('change', function () {
+    var v = $('filesUrl').value.trim();
+    var ok = v === '' || /^(https:\/\/)?[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:\d{1,5})?([\/?#]\S*)?$/i.test(v);
+    $('filesUrl').setAttribute('aria-invalid', String(!ok));
+    if (ok) S.set({ filesUrl: v });
+  });
   $('reset').addEventListener('click', function () { S.set(S.defaults); paint(); });
   $('back').addEventListener('click', function () {
     if (window.AndroidBridge && window.AndroidBridge.closeOverlay) window.AndroidBridge.closeOverlay();

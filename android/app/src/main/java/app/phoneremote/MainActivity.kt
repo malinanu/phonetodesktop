@@ -68,6 +68,11 @@ class MainActivity : Activity() {
     private lateinit var btView: View
     private lateinit var navWifi: LinearLayout
     private lateinit var navBt: LinearLayout
+    private lateinit var navFiles: LinearLayout
+    private lateinit var filesView: View
+    private lateinit var filesBody: TextView
+    private lateinit var filesOpen: Button
+    private var filesMode = false
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
     private var loadedKey: String? = null
@@ -147,11 +152,13 @@ class MainActivity : Activity() {
         settingsPage = overlayPage()
         welcome = buildWelcome()
         btView = buildBluetoothView()
+        filesView = buildFilesView()
         content.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(welcome, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(guide, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(settingsPage, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(btView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        content.addView(filesView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content, lp(h = 0, weight = 1f))
 
         nav = LinearLayout(this).apply {
@@ -161,7 +168,9 @@ class MainActivity : Activity() {
         navWifi = navItem(R.drawable.ic_wifi, "Wi-Fi") { showMode(false) }
         navBt = navItem(R.drawable.ic_bluetooth, "Bluetooth") { showMode(true) }
         nav.addView(navWifi, lp(0, WRAP_CONTENT, 1f))
+        navFiles = navItem(R.drawable.ic_files, "Files") { showFiles() }
         nav.addView(navBt, lp(0, WRAP_CONTENT, 1f))
+        nav.addView(navFiles, lp(0, WRAP_CONTENT, 1f))
         root.addView(nav)
         // The bar is only useful when the keyboard is closed.
         root.setOnApplyWindowInsetsListener { v, insets ->
@@ -340,8 +349,68 @@ class MainActivity : Activity() {
 
     private fun showMode(bluetooth: Boolean) {
         overlay = null
+        filesMode = false
         updateVisibility(bluetooth)
         if (bluetooth) startBluetooth()
+    }
+
+    private fun showFiles() {
+        overlay = null
+        filesMode = true
+        refreshFiles()
+        updateVisibility(false)
+    }
+
+    /** The configured file-server address, or null when none is set. */
+    private fun filesUrl() = FilesUrl.resolve(store.settingsJson(), BuildConfig.FILES_URL)
+
+    /**
+     * Files tab. Sending and receiving run in the phone's browser, not in a WebView here: receiving streams to disk
+     * through a service worker or the File System Access API, which a WebView cannot hand to the system downloader.
+     */
+    private fun buildFilesView(): View {
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.BOTTOM
+            setPadding(dp(24), dp(16), dp(24), dp(20))
+        }
+        col.addView(label("FILES", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
+        col.addView(label("Send files.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
+        filesBody = label("", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) }
+        col.addView(filesBody)
+        listOf(
+            "Open it here and on the other device",
+            "Share the room link or QR code",
+            "Pick files; they go straight between devices",
+        ).forEachIndexed { i, t ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
+            row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
+            row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
+            col.addView(row)
+        }
+        filesOpen = button("Open Send files", filled = true) {
+            val url = filesUrl()
+            if (url == null) openOverlay("settings")
+            else try {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+            } catch (_: android.content.ActivityNotFoundException) {
+                Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show()
+            }
+        }
+        col.addView(filesOpen, lp().apply { topMargin = dp(20) })
+        col.addView(button("Change server address") { openOverlay("settings") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        return col
+    }
+
+    private fun refreshFiles() {
+        val url = filesUrl()
+        if (url == null) {
+            filesBody.text = "Send files of any size to any device, privately. First add your file server address in Settings."
+            filesOpen.text = "Open Settings"
+        } else {
+            filesBody.text = "Send files of any size to any device, privately. They open in your browser, which is what lets big files save straight to storage."
+            filesOpen.text = "Open Send files"
+        }
     }
 
     /** Full-screen Guide or Settings on top of the current screen. */
@@ -354,6 +423,7 @@ class MainActivity : Activity() {
 
     private fun closeOverlay() {
         overlay = null
+        if (filesMode) refreshFiles()
         updateVisibility(btView.visibility == View.VISIBLE)
     }
 
@@ -362,10 +432,12 @@ class MainActivity : Activity() {
         guide.visibility = if (overlay == "guide") View.VISIBLE else View.GONE
         settingsPage.visibility = if (overlay == "settings") View.VISIBLE else View.GONE
         btView.visibility = if (bluetooth && base) View.VISIBLE else View.GONE
-        web.visibility = if (!bluetooth && base && paired()) View.VISIBLE else View.GONE
-        welcome.visibility = if (!bluetooth && base && !paired()) View.VISIBLE else View.GONE
-        styleNav(navWifi, !bluetooth)
+        filesView.visibility = if (filesMode && base) View.VISIBLE else View.GONE
+        web.visibility = if (!bluetooth && !filesMode && base && paired()) View.VISIBLE else View.GONE
+        welcome.visibility = if (!bluetooth && !filesMode && base && !paired()) View.VISIBLE else View.GONE
+        styleNav(navWifi, !bluetooth && !filesMode)
         styleNav(navBt, bluetooth)
+        styleNav(navFiles, filesMode)
         if (bluetooth) banner.visibility = View.GONE
     }
 

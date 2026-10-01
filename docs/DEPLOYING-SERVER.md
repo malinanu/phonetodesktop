@@ -35,9 +35,10 @@ Make the package public once (GitHub → Packages → the image → Package sett
 Before the first release exists, build locally instead: `docker build -t ghcr.io/malinanu/phonetodesktop-files:latest filesync`.
 
 ## 4. Point the apps at it
-- Android: set `filesUrl` in `android/gradle.properties` (or `-PfilesUrl=https://files.example.com` in CI) before building.
-- Windows agent: `files_url` in its config (default is empty = feature hidden until set).
-- Website: `site/index.html` links to the same URL.
+- **Release builds (recommended):** set one repository variable, GitHub → Settings → Secrets and variables → Actions → *Variables* → `FILES_URL` = `https://files.example.com`. The release workflow bakes it into the Android app (`-PfilesUrl`) and the Windows agent (`PHONE_REMOTE_FILES_URL`).
+- Local Android build: `gradle -p android assembleDebug -PfilesUrl=https://files.example.com`. Users can also type their own address in the app under Settings → Send files.
+- Windows agent: users can override with `"files_url": "https://..."` in `%APPDATA%\phone-remote\config.json`. Empty and no build default = the "Send files" buttons are hidden.
+- Website: set the link in `site/index.html` (Send files section) to the same URL.
 
 ## Operating it
 - **Upgrade:** `docker compose pull && docker compose up -d`. Pin `FILES_TAG=1.2.3` to control upgrades.

@@ -52,6 +52,8 @@ pub struct App {
     pub port: u16,
     pub ips: Vec<Ipv4Addr>,
     pub vlc_password: String,
+    /// Validated address of the "Send files" server, if one is configured.
+    pub files_url: Option<String>,
     pub on_pending: Option<PendingHook>,
     tx: watch::Sender<String>,
     notify: Notify,
@@ -68,6 +70,7 @@ impl App {
             port: cfg.port,
             ips,
             vlc_password: crate::backend::vlc_password(&cfg.local_secret),
+            files_url: crate::config::files_url(cfg),
             on_pending,
             tx: watch::channel(String::new()).0,
             notify: Notify::new(),

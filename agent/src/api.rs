@@ -30,6 +30,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/players", get(players))
         .route("/api/players/setup", post(players_setup))
         .route("/api/autostart", post(set_autostart))
+        .route("/api/open-files", post(open_files))
         .route("/api/log", get(log_tail))
 }
 
@@ -71,6 +72,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "legacy": app.auth.legacy_enabled(),
         "setup_done": app.auth.setup_done(),
         "autostart": autostart_enabled(),
+        "files_url": app.files_url,
         "phones_online": app.auth.online_count(),
         "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
         "last_exit": std::env::var("PR_LAST_EXIT").unwrap_or_default(),
@@ -205,6 +207,22 @@ async fn set_autostart(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
     crate::tray::set_autostart(body["enabled"].as_bool().unwrap_or(false));
     let _ = body;
     ok()
+}
+
+/// Open the configured "Send files" page in the default browser. Takes no input: only the address
+/// from the config (validated as https) is ever opened.
+async fn open_files(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    match &app.files_url {
+        Some(url) => {
+            crate::open_url(url);
+            ok()
+        }
+        None => (StatusCode::NOT_FOUND, Json(json!({"ok": false, "error": "no file server configured"}))).into_response(),
+    }
 }
 
 async fn log_tail(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {

@@ -20,6 +20,8 @@ jobs:
           sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
       - run: cargo build --release --manifest-path agent/Cargo.toml
+        env:
+          PHONE_REMOTE_FILES_URL: ${{ vars.FILES_URL }}   # repo variable; empty hides "Send files" in the agent
       - name: Sign exe (optional)
         if: ${{ env.WIN_CERT_B64 != '' }}
         shell: pwsh
@@ -68,7 +70,7 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*}))
+          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
       - run: mv android/app/build/outputs/apk/release/app-release.apk PhoneRemote-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
         with: { name: android-apk, path: PhoneRemote-*.apk }
@@ -83,7 +85,7 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*}))
+          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
           mv android/app/build/outputs/bundle/release/app-release.aab PhoneRemote-$v.aab
       - uses: actions/upload-artifact@v4
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
