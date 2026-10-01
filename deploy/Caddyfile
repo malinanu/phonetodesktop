@@ -4,5 +4,11 @@
 {$FILES_DOMAIN} {
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	encode zstd gzip
-	reverse_proxy filesync:80
+	# Optional account service (docker compose --profile accounts up -d), reachable at https://<domain>/account/
+	handle_path /account/* {
+		reverse_proxy account:8000
+	}
+	handle {
+		reverse_proxy filesync:80
+	}
 }

@@ -85,11 +85,11 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [x] C5 (added after your choice of pinned HTTPS) TLS with a per-PC self-signed ECDSA P-256 certificate; HTTPS + HTTP on one port (first-byte sniffing, handshake in its own task so a silent client cannot block others); fingerprint in the QR; plain HTTP refused from the network when older phones are off. Verified with the real binary: QR fingerprint == openssl's SHA-256 of the served public key; `curl --pinnedpubkey` accepts the right pin and rejects a wrong one; TLS 1.3 + ALPN http/1.1; silent connection does not delay others; plain-from-network refused when v1 off; plus a test with a real pinning rustls client doing the v2 login over wss and a wrong pin refused. CI (head f696949) is green on the macOS and Windows runners too, so the `ring` C build and the TLS code pass there
 
 ### D. Account service (optional cloud)
-- [ ] D1 `account/` FastAPI + Postgres: users, devices, certificates, revocations
-- [ ] D2 Sign-in: email magic link, Google, Sign in with Apple
+- [x] D1 `account/` FastAPI + SQLAlchemy (SQLite for tests, Postgres in deploy): users, devices, signed certificates (Ed25519, key ids for rotation), signed revocation list, link codes; 52 tests (pytest) incl. authorization between accounts, tampered/expired certs, rate limits; also smoke-tested over real HTTP with uvicorn
+- [x] D2 Sign-in: emailed one-time code (changed from a link: works in the app without deep links; 5 tries, 15 min, hashed), Google and Apple ID-token verification (tested with a locally generated RSA key standing in for the provider's JWKS; NOT tested against the real providers, which needs your client IDs), rotating refresh tokens with reuse detection
 - [ ] D3 Client enrol, certificate refresh, offline verification, revocation polling
 - [ ] D4 Web "My devices" + account deletion
-- [ ] D5 Deploy (compose + Portainer), backups, SMTP
+- [x] D5 Deploy: Dockerfile, optional `--profile accounts` in both compose files (Postgres + service; reachable at /account/ through the existing Caddy), CI workflow + GHCR image on tags, docs/ACCOUNTS.md. Compose rendering verified; NOT run on a real host. Backups and a real SMTP provider are yours to set up
 - [ ] D6 Security review + threat-model note
 
 ### E. Flutter mobile app (iOS + Android)
