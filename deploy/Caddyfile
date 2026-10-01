@@ -1,0 +1,14 @@
+# TLS termination for the FileSync server. Caddy gets and renews the certificate by itself.
+# FILES_DOMAIN comes from .env (e.g. files.example.com). Caddy forwards the original Host header
+# by default, which FileSync needs: it rewrites relay ICE candidates to the address clients used.
+{$FILES_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	encode zstd gzip
+	# Optional account service (docker compose --profile accounts up -d), reachable at https://<domain>/account/
+	handle_path /account/* {
+		reverse_proxy account:8000
+	}
+	handle {
+		reverse_proxy filesync:80
+	}
+}

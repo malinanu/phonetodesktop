@@ -17,6 +17,14 @@ pub mod setup;
 pub mod vlc;
 #[cfg(windows)]
 pub mod windows;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub mod desktop;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub mod keymap;
+#[cfg(target_os = "linux")]
+pub mod mpris;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub mod sysvol;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Key {
@@ -97,6 +105,11 @@ pub fn default_backend(force_mock: bool, local_secret: &str) -> Box<dyn Backend>
     #[cfg(windows)]
     if !force_mock {
         return Box::new(windows::WindowsBackend { vlc_password: vlc_password(local_secret) });
+    }
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    if !force_mock {
+        let _ = local_secret;
+        return Box::new(desktop::DesktopBackend::new());
     }
     let _ = (force_mock, local_secret);
     Box::new(mock::MockBackend::new())

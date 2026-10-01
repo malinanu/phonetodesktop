@@ -26,10 +26,14 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/devices/{id}/input", post(set_input))
         .route("/api/setup-done", post(setup_done))
         .route("/api/legacy", post(set_legacy))
+        .route("/api/allow-v1", post(set_allow_v1))
         .route("/api/unpair-all", post(unpair_all))
         .route("/api/players", get(players))
         .route("/api/players/setup", post(players_setup))
         .route("/api/autostart", post(set_autostart))
+        .route("/api/open-files", post(open_files))
+        .route("/api/files-url", post(set_files_url))
+        .route("/api/files-enabled", post(set_files_enabled))
         .route("/api/log", get(log_tail))
 }
 
@@ -61,7 +65,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         .auth
         .devices()
         .into_iter()
-        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online, "input": d.input_allowed}))
+        .map(|(d, online)| json!({"id": d.id, "name": d.name, "created": d.created, "last_seen": d.last_seen, "online": online, "input": d.input_allowed, "platform": d.platform, "v": if d.pubkey.is_empty() { 1 } else { 2 }}))
         .collect();
     Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -69,8 +73,12 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "port": app.port,
         "ips": app.ips.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
         "legacy": app.auth.legacy_enabled(),
+        "allow_v1": app.auth.v1_allowed(),
         "setup_done": app.auth.setup_done(),
         "autostart": autostart_enabled(),
+        "files_url": app.auth.files_url(),
+        "files_local_port": app.files_port.load(std::sync::atomic::Ordering::Relaxed),
+        "files_enabled": app.files_enabled.load(std::sync::atomic::Ordering::Relaxed),
         "phones_online": app.auth.online_count(),
         "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
         "last_exit": std::env::var("PR_LAST_EXIT").unwrap_or_default(),
@@ -155,6 +163,16 @@ async fn set_legacy(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>
     ok()
 }
 
+/// Turn the older bearer-token login (protocol v1, plain HTTP) on or off. Off = only key-based phones may connect.
+async fn set_allow_v1(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    app.auth.set_v1_allowed(body["enabled"].as_bool().unwrap_or(true));
+    ok()
+}
+
 async fn unpair_all(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
     let app = match guard(&(c, h, s), &Method::POST) {
         Ok(a) => a,
@@ -201,9 +219,61 @@ async fn set_autostart(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
         Err(r) => return r,
     };
     let _ = app;
+    let on = body["enabled"].as_bool().unwrap_or(false);
     #[cfg(windows)]
-    crate::tray::set_autostart(body["enabled"].as_bool().unwrap_or(false));
-    let _ = body;
+    crate::tray::set_autostart(on);
+    #[cfg(unix)]
+    if let Err(e) = crate::platform::set_autostart(on) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok": false, "error": e.to_string()}))).into_response();
+    }
+    let _ = on;
+    ok()
+}
+
+/// Open the configured "Send files" page in the default browser. Takes no input: only the address
+/// from the config is ever opened, and `config::clean_files_url` has already limited it to https plus
+/// characters that are inert for `cmd /c start`.
+async fn open_files(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    // Your own server if you set one up, otherwise the built-in page on this computer.
+    if let Some(url) = app.auth.files_url() {
+        crate::open_url(&url);
+        return ok();
+    }
+    let port = app.files_port.load(std::sync::atomic::Ordering::Relaxed);
+    if port != 0 && app.files_enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        crate::open_url(&format!("http://localhost:{port}/"));
+        ok()
+    } else {
+        (StatusCode::NOT_FOUND, Json(json!({"ok": false, "error": "Send files is switched off"}))).into_response()
+    }
+}
+
+/// Set the "Send files" server address from the dashboard (https only; empty clears it).
+async fn set_files_url(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    if app.auth.set_files_url(body["url"].as_str().unwrap_or("")) {
+        ok()
+    } else {
+        (StatusCode::BAD_REQUEST, Json(json!({"ok": false, "error": "Use an https:// address, for example files.example.com"}))).into_response()
+    }
+}
+
+/// Switch the built-in Send files page on or off (takes effect at once).
+async fn set_files_enabled(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    let on = body["enabled"].as_bool().unwrap_or(true);
+    app.files_enabled.store(on, std::sync::atomic::Ordering::Relaxed);
+    app.auth.set_files_enabled(on);
     ok()
 }
 
@@ -219,6 +289,8 @@ async fn log_tail(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
 fn autostart_enabled() -> bool {
     #[cfg(windows)]
     return crate::tray::autostart_enabled();
-    #[cfg(not(windows))]
+    #[cfg(unix)]
+    return crate::platform::autostart_enabled();
+    #[cfg(not(any(windows, unix)))]
     false
 }

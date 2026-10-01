@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Phone Remote</title>
+<meta name="description" content="Phone Remote collects no personal data. Remote control stays on your network; Send files uses a small relay server that never stores files.">
+<link rel="stylesheet" href="base.css">
+<style>
+  main { max-width: 700px; margin: 0 auto; padding: 48px 20px; }
+  h1 { font-size: 36px; margin: 8px 0 6px; } h2 { font-size: 21px; margin: 32px 0 8px; }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <a href="./">← Phone Remote</a>
+  <h1>Privacy Policy</h1>
+  <p class="dim">Last updated: 1 October 2026 (added Send files)</p>
+
+  <p>Phone Remote has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> works on your own Wi-Fi: the Phone Remote program on your computer serves the page and introduces the two devices, and files go straight between them, so no server of ours is involved. Only if you choose to use a Send files server (your own, for sending over the internet) does a small server introduce devices and, when a direct connection is impossible, relay encrypted data. <b>The developer does not collect personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
+
+  <h2>What stays on your devices</h2>
+  <ul>
+    <li><b>Pairing data.</b> The PC keeps a list of phones you have approved (a name and a public key that you can revoke). The phone keeps the key for each PC it is paired with, plus your settings (theme, step sizes and similar). This is stored only on those devices. <code>phone-remote rotate</code> on the PC revokes every phone.</li>
+    <li><b>Media commands.</b> Play, pause, seek, volume and similar commands travel directly between your phone and your PC over your local network, or over Bluetooth. The PC agent also reads the title and playback position of the current media session so the phone can show what's playing. That information is shown on your phone and is not sent anywhere else.</li>
+    <li><b>Logs.</b> The desktop agent (Windows, macOS or Linux) writes a local activity log on the computer (viewable in its dashboard). It is never uploaded.</li>
+    <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
+  </ul>
+
+  <h2>Send files: what the server sees (only if you use one)</h2>
+  <p>By default Send files runs on your computer and only on your home network; the points below apply to a Send files server you set up yourself for sending over the internet.</p>
+  <ul>
+    <li><b>File contents.</b> Files travel directly between devices, encrypted (WebRTC/DTLS). They never pass through the server unencrypted and are never stored. When a direct route is impossible the relay forwards the same encrypted traffic without being able to read it.</li>
+    <li><b>Connection setup.</b> To connect two devices, the server forwards short setup messages between them (random device ids and network-address details needed to connect). These are held in memory only while connected and are not written to disk.</li>
+    <li><b>IP addresses.</b> As with any internet service, your IP address is visible to the server and the relay while you are connected. The relay may write connection details (IP addresses and times) to operational logs. Those logs rotate automatically by size and are kept only for a short time (typically days), used only to keep the service running and to deal with abuse.</li>
+    <li><b>Sharing.</b> People you give a room link or code to can see the file names you send them and your device's network address, as with any peer-to-peer transfer. Only share a room with people you trust, and use a room password for sensitive files.</li>
+    <li><b>Who runs the server.</b> The address of the Send files server is set by whoever built or configured your copy of the app (you can change it under Settings → Send files). If you run your own server, only you see this data.</li>
+  </ul>
+
+  <h2>Permissions the Android app asks for</h2>
+  <ul>
+    <li><b>Network and Wi-Fi state, multicast.</b> To find your PC on the local network and talk to it. The Files tab opens Send files in your browser, so file transfer itself needs no extra permission.</li>
+    <li><b>Bluetooth (connect, advertise).</b> For Bluetooth mode, where the phone acts as a keyboard / media-key device. Android groups these under "Nearby devices".</li>
+  </ul>
+  <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
+
+  <h2>Network traffic</h2>
+  <p>Send files transfers are always encrypted end to end (WebRTC), and a Send files server you set up yourself should use HTTPS. Remote control between your phone and your computer uses an encrypted HTTPS connection that the phone pins to your computer's own key, so other people on the same Wi-Fi cannot read or change it. Phones with an older version of the app use plain HTTP until you switch that off in the computer's dashboard. The computer only accepts connections from private (LAN) addresses and requires a paired device.</p>
+
+  <h2>Children</h2>
+  <p>The app is not directed at children and collects no data from anyone.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new date. Questions: open an issue at <a href="https://github.com/malinanu/phonetodesktop/issues">github.com/malinanu/phonetodesktop/issues</a>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Remote — control your computer's media from your phone</title>
+<meta name="description" content="Control your Windows, Mac or Linux computer's media from your phone over your own Wi-Fi, and send files of any size between devices. No account required, no tracking.">
+<link rel="stylesheet" href="base.css">
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 40px; }
+  h1 { font-size: clamp(34px, 7vw, 54px); margin: 10px 0 16px; }
+  .lede { font-size: 19px; color: var(--ink-dim); max-width: 34em; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+  section { margin-top: 56px; }
+  h2 { font-size: 26px; margin-bottom: 14px; }
+  ol, ul { padding-left: 1.2em; } li { margin: 8px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .grid h3 { font-size: 18px; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 20px; font-size: 14px; }
+  footer a { margin-right: 16px; }
+  /* downloads */
+  .dl-list { display: grid; gap: 10px; margin-top: 12px; }
+  .dl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+  .dl-row .what { flex: 1 1 220px; min-width: 0; }
+  .dl-row b { display: block; }
+  .dl-row .meta { font-size: 13px; color: var(--ink-dim); overflow-wrap: anywhere; }
+  .dl-row .btn { padding: 9px 16px; font-size: 15px; }
+  .dl-row[data-mine] { border-color: var(--accent); }
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
+  .note summary { cursor: pointer; font-weight: 650; padding: 6px 0; }
+  .note p { margin: 4px 0 10px; color: var(--ink-dim); }
+  code { font-size: .92em; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+  .sums { font-size: 13px; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Phone Remote</div>
+  <h1>Your phone is the remote for your computer.</h1>
+  <p class="lede">Play, pause, skip, seek and change volume on your Windows, Mac or Linux computer from your phone, over your own Wi-Fi. Send files of any size between any devices, privately. No ads, no tracking.</p>
+  <div class="cta">
+    <a class="btn primary" id="dl-main" href="#downloads">Download</a>
+    <a class="btn" href="#downloads">All downloads</a>
+  </div>
+  <p class="dim" id="dl-sub">Free and open source. Windows 10/11 · macOS 11+ · Linux · Android 9+</p>
+
+  <section>
+    <h2>Get connected in 60 seconds</h2>
+    <ol>
+      <li>Install <b>Phone Remote</b> on your computer and open it. A dashboard shows a QR code.</li>
+      <li>Install the phone app, then scan the QR code with it.</li>
+      <li>Approve the phone on your computer. Done — it stays paired until you remove it.</li>
+    </ol>
+    <p class="dim">Both devices must be on the same Wi-Fi. On Android, Bluetooth mode needs no computer software at all: the phone acts as a Bluetooth keyboard with media keys.</p>
+  </section>
+
+  <section id="downloads">
+    <h2>Downloads</h2>
+    <h3 style="font-size:18px;margin:0 0 4px">Computer</h3>
+    <div class="dl-list" id="dl-desktop"><p class="dim" id="dl-loading">Loading the latest version…</p></div>
+    <h3 style="font-size:18px;margin:22px 0 4px">Phone</h3>
+    <div class="badges">
+      <a class="btn" id="get-appstore" href="__APP_STORE_URL__" hidden>Download on the App Store</a>
+      <a class="btn" id="get-play" href="__PLAY_STORE_URL__" hidden>Get it on Google Play</a>
+    </div>
+    <div class="dl-list" id="dl-phone"></div>
+    <p class="sums" id="dl-foot"></p>
+
+    <h3 style="font-size:18px;margin:22px 0 4px">First-run notes</h3>
+    <details class="note"><summary>Windows: "Windows protected your PC"</summary><p>The installer is not yet signed by a known publisher, so SmartScreen warns. Choose <b>More info → Run anyway</b>. When it asks, allow access on <b>Private networks</b> so your phone can reach the PC.</p></details>
+    <details class="note"><summary>macOS: "can't be opened" and permissions</summary><p>Open the <code>.dmg</code> and drag Phone Remote to Applications. If macOS says it cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings → Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song title and progress are not available on macOS; play, pause, skip and volume work.</p></details>
+    <details class="note"><summary>Linux: install and requirements</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Then open <b>Phone Remote</b> from your applications menu, or run <code>phone-remote open</code>. Players that support MPRIS (Spotify, VLC, Firefox, Chromium, Rhythmbox, mpv with the MPRIS script) show title and progress. Mouse and keyboard control needs an X11 session (XWayland also works); a Wayland-only desktop may block it. Volume uses PipeWire (<code>wpctl</code>) or PulseAudio (<code>pactl</code>).</p></details>
+    <details class="note"><summary>Verify a download</summary><p>Every release lists SHA-256 checksums (<code>SHA256SUMS</code>). Compare with <code>sha256sum file</code> (Linux), <code>shasum -a 256 file</code> (macOS) or <code>certutil -hashfile file SHA256</code> (Windows).</p></details>
+  </section>
+
+  <section id="files">
+    <h2>Send files, too</h2>
+    <p class="lede" style="font-size:17px">Click Send files on your computer, scan its code with your phone, and pick files. They go straight from device to device over your Wi-Fi, encrypted, with no size limit, nothing to set up and nothing uploaded anywhere.</p>
+    <div class="cta"><a class="btn primary" id="open-files" href="__FILES_URL__" hidden>Open Send files</a></div>
+    <p class="dim">Built on <a href="https://github.com/polius/filesync">FileSync</a> (MIT). It is built into the Phone Remote program on your computer. For sending between different networks you can run your own server.</p>
+  </section>
+
+  <section>
+    <h2>Private by design</h2>
+    <div class="grid">
+      <div class="card"><h3>Stays on your network</h3><p class="dim">Remote-control commands go straight from phone to computer. There is no server in the middle.</p></div>
+      <div class="card"><h3>You approve every phone</h3><p class="dim">Pairing needs your OK on the computer, and any phone can be revoked at any time.</p></div>
+      <div class="card"><h3>No tracking</h3><p class="dim">No ads or analytics. Files are never stored. <a href="privacy.html">Read the privacy policy</a>.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Good to know</h2>
+    <ul>
+      <li>Phone-to-computer traffic is encrypted and pinned to your computer's own key, and only private (home-network) addresses are accepted. Phones on older app versions use plain HTTP until you switch that off in the computer's dashboard.</li>
+      <li>Bluetooth mode (Android only) can't show what's playing, and seeks with the arrow keys.</li>
+      <li>iPhones cannot act as a Bluetooth keyboard, so the iPhone app works over Wi-Fi only.</li>
+    </ul>
+  </section>
+
+  <footer class="dim">
+    <a href="https://github.com/malinanu/phonetodesktop">Source code</a>
+    <a href="https://github.com/malinanu/phonetodesktop/issues">Report a problem</a>
+    <a href="privacy.html">Privacy</a>
+  </footer>
+</main>
+<script>
+(function () {
+  "use strict";
+  var RELEASES = "https://github.com/malinanu/phonetodesktop/releases/latest";
+
+  // ---- store buttons: the links are filled in when the site is built; show only real https links ----
+  ["open-files", "get-appstore", "get-play"].forEach(function (id) {
+    var a = document.getElementById(id);
+    if (a && /^https:\/\//.test(a.getAttribute("href"))) a.hidden = false;
+  });
+
+  // ---- which computer / phone is this? ----
+  function detect() {
+    var ua = navigator.userAgent || "";
+    var uaPlatform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    var os = "other";
+    if (/android/i.test(ua)) os = "android";
+    else if (/iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(uaPlatform) && navigator.maxTouchPoints > 1)) os = "ios";
+    else if (/Win/i.test(uaPlatform) || /Windows/i.test(ua)) os = "windows";
+    else if (/Mac/i.test(uaPlatform) || /Macintosh/i.test(ua)) os = "macos";
+    else if (/Linux|X11|CrOS/i.test(uaPlatform + ua)) os = "linux";
+    var arm = /aarch64|arm64|armv8/i.test(ua + uaPlatform);
+    return { os: os, arch: arm ? "aarch64" : "x86_64" };
+  }
+  var me = detect();
+
+  function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+
+  function row(title, sub, a, mine) {
+    var d = document.createElement("div"); d.className = "dl-row"; if (mine) d.setAttribute("data-mine", "");
+    var w = document.createElement("div"); w.className = "what";
+    var b = document.createElement("b"); b.textContent = title;
+    var m = document.createElement("span"); m.className = "meta";
+    m.textContent = sub + " · " + size(a.size) + " · SHA-256 " + a.sha256.slice(0, 12) + "…";
+    w.appendChild(b); w.appendChild(m);
+    var l = document.createElement("a"); l.className = "btn" + (mine ? " primary" : ""); l.textContent = "Download"; l.href = a.url;
+    l.setAttribute("download", "");
+    d.appendChild(w); d.appendChild(l);
+    return d;
+  }
+
+  var LABEL = {
+    "windows/installer": ["Windows", "Installer for Windows 10 and 11 (.exe)"],
+    "macos/installer": ["macOS", "Disk image for Apple silicon and Intel (.dmg)"],
+    "linux/deb": ["Linux · Debian / Ubuntu", "Package (.deb)"],
+    "linux/tarball": ["Linux · other distributions", "Archive with an install script (.tar.gz)"],
+    "android/apk": ["Android", "Direct download (.apk); use Google Play when available"]
+  };
+
+  function render(m) {
+    var desk = document.getElementById("dl-desktop"), phone = document.getElementById("dl-phone");
+    desk.textContent = ""; phone.textContent = "";
+    var assets = ((m && m.assets) || []).slice().sort(function (a, b) { return (a.arch === "aarch64") - (b.arch === "aarch64"); });
+    var order = ["windows/installer", "macos/installer", "linux/deb", "linux/tarball"];
+    var best = null;
+    order.forEach(function (key) {
+      assets.filter(function (a) { return a.platform + "/" + a.kind === key; }).forEach(function (a) {
+        var mine = a.platform === me.os && (a.arch === "universal" || a.arch === me.arch) && (a.platform !== "linux" || a.kind === "deb");
+        var lab = LABEL[key]; var arch = a.arch === "universal" || a.platform !== "linux" ? "" : " · " + (a.arch === "aarch64" ? "ARM64" : "x86-64");
+        if (mine && !best) best = a;
+        desk.appendChild(row(lab[0] + arch, lab[1], a, mine));
+      });
+    });
+    assets.filter(function (a) { return a.platform === "android"; }).forEach(function (a) {
+      phone.appendChild(row(LABEL["android/apk"][0], LABEL["android/apk"][1], a, me.os === "android"));
+    });
+    if (!desk.children.length) {
+      var p = document.createElement("p"); p.className = "dim";
+      p.innerHTML = 'Downloads are on the <a href="' + RELEASES + '">releases page</a>.';
+      desk.appendChild(p);
+    }
+    var main = document.getElementById("dl-main"), sub = document.getElementById("dl-sub");
+    if (best) {
+      var names = { windows: "Windows", macos: "macOS", linux: "Linux" };
+      main.textContent = "Download for " + names[best.platform]; main.href = best.url;
+      sub.textContent = "Version " + m.version + " · " + size(best.size) + " · free and open source";
+    } else if (me.os === "android" || me.os === "ios") {
+      main.textContent = "Get the phone app"; main.href = "#downloads";
+      sub.textContent = "Install Phone Remote on your computer too. This page lists every download.";
+    }
+    if (m && m.version) document.getElementById("dl-foot").textContent = "Latest version " + m.version + ". Checksums: SHA256SUMS on the release page.";
+  }
+
+  fetch("latest.json", { cache: "no-cache" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (m) { render(m && m.assets ? m : null); })
+    .catch(function () { render(null); });
+})();
+</script>
+</body>
+</html>

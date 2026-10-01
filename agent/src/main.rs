@@ -2,17 +2,21 @@
 // CLI subcommands re-attach to the parent terminal so their output still shows.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod account;
 mod api;
 mod auth;
 mod backend;
 mod config;
 mod controller;
 mod discovery;
+mod files;
 mod guardian;
 mod log;
 mod net;
+mod platform;
 mod protocol;
 mod server;
+mod tls;
 #[cfg(windows)]
 mod tray;
 
@@ -25,6 +29,8 @@ fn usage() -> &'static str {
      phone-remote rotate    unpair every phone\n\
      phone-remote setup-players   switch on VLC / mpv / MPC-HC remote interfaces (progress + seek)
      phone-remote install   (Windows) allow private-network firewall access (run as Administrator)\n\
+     phone-remote open      (macOS/Linux) start the agent if needed and show the dashboard\n\
+     phone-remote autostart on|off|status   (macOS/Linux) start at login\n\
      \n\
      Windows: without --console the agent runs in the system tray."
 }
@@ -124,6 +130,8 @@ fn real_main() -> Result<()> {
         }
         "pair" => say(&format!("Open http://127.0.0.1:{}/pair on this PC (the agent must be running) and scan the code.", cfg.port)),
         "install" => install(&cfg)?,
+        "open" => open_cmd(cfg.port)?,
+        "autostart" => autostart_cmd(args.get(1).map(String::as_str))?,
         "setup-players" => backend::setup::apply(&backend::vlc_password(&cfg.local_secret)).iter().for_each(|l| say(l)),
         _ => {
             log::install_hooks();
@@ -234,7 +242,15 @@ async fn serve(
     let host = net::hostname();
     let backend: Arc<dyn backend::Backend> = Arc::from(backend::default_backend(mock, &cfg.local_secret));
     let controller = Arc::new(controller::Controller::new(backend.clone(), host.clone()));
-    let app = server::App::new(controller, &cfg, host.clone(), ips.clone(), server::pending_hook());
+    // This computer's TLS identity (made once). If it cannot be made, fall back to plain HTTP so the agent still runs.
+    let identity = match config::dir().and_then(|d| tls::load_or_create(&d, &host)) {
+        Ok(i) => Some(i),
+        Err(e) => {
+            log::log(&format!("TLS identity unavailable ({e:#}); serving plain HTTP only"));
+            None
+        }
+    };
+    let app = server::App::new(controller, &cfg, host.clone(), ips.clone(), server::pending_hook(), identity.as_ref().map(|i| i.fingerprint.clone()));
     let urls = app.pair_urls();
 
     let _mdns = if no_mdns {
@@ -256,6 +272,9 @@ async fn serve(
         if urls.len() > 1 {
             say(&format!("(other addresses: {})", ips[1..].iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", ")));
         }
+        if let Some(i) = &identity {
+            say(&format!("Secure connection: phones pin this key fingerprint: {}", i.fingerprint));
+        }
         say(&format!("Dashboard (approve phones, settings): http://127.0.0.1:{}/dashboard\n", cfg.port));
     }
 
@@ -269,32 +288,53 @@ async fn serve(
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     });
-    let svc = server::router(app).into_make_service_with_connect_info::<SocketAddr>();
-    axum::serve(listener, svc)
-        .with_graceful_shutdown(async move {
-            if console {
-                let _ = tokio::signal::ctrl_c().await;
-            } else {
-                // Background mode: no signal, no window, no browser can stop the server.
-                std::future::pending::<()>().await;
+    // Send files: the same page FileSync serves, built in, on the next port up. Failure to bind is not fatal.
+    if let Some(port) = cfg.port.checked_add(1) {
+        match tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port))).await {
+            Ok(l) => {
+                app.files_port.store(port, std::sync::atomic::Ordering::Relaxed);
+                let svc = files::router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
+                log::log(&format!("Send files on port {port}"));
+                tokio::spawn(async move {
+                    if let Err(e) = axum::serve(l, svc).await {
+                        log::log(&format!("Send files stopped: {e}"));
+                    }
+                });
             }
-        })
-        .await?;
+            Err(e) => log::log(&format!("Send files unavailable (port {port}): {e}")),
+        }
+    }
+    let svc = server::router(app.clone()).into_make_service_with_connect_info::<SocketAddr>();
+    match identity.as_ref().map(tls::acceptor) {
+        Some(Ok(acceptor)) => {
+            let app = app.clone();
+            // `tap_io` (a no-op here) is what lets axum hand handlers the peer address for a custom listener.
+            use axum::serve::ListenerExt;
+            let listener = tls::SniffListener::new(listener, acceptor, Arc::new(move || app.auth.v1_allowed()))?.tap_io(|_| {});
+            axum::serve(listener, svc).with_graceful_shutdown(wait_for_shutdown(console)).await?;
+        }
+        other => {
+            if let Some(Err(e)) = other {
+                log::log(&format!("TLS unavailable ({e:#}); serving plain HTTP only"));
+            }
+            axum::serve(listener, svc).with_graceful_shutdown(wait_for_shutdown(console)).await?;
+        }
+    }
     Ok(())
+}
+
+async fn wait_for_shutdown(console: bool) {
+    if console {
+        let _ = tokio::signal::ctrl_c().await;
+    } else {
+        // Background mode: no signal, no window, no browser can stop the server.
+        std::future::pending::<()>().await;
+    }
 }
 
 /// Open a URL in the default browser without flashing a console window.
 pub fn open_url(url: &str) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
-            .spawn();
-    }
-    #[cfg(not(windows))]
-    let _ = url;
+    platform::open_url(url);
 }
 
 #[cfg(windows)]
@@ -303,7 +343,7 @@ fn install(cfg: &config::Config) -> Result<()> {
     let ok = std::process::Command::new("netsh")
         .args([
             "advfirewall", "firewall", "add", "rule", "name=Phone Remote", "dir=in", "action=allow",
-            "protocol=TCP", &format!("localport={}", cfg.port), "profile=private",
+            "protocol=TCP", &format!("localport={},{}", cfg.port, cfg.port.saturating_add(1)), "profile=private",
             &format!("program={}", exe.display()),
         ])
         .status()
@@ -314,6 +354,36 @@ fn install(cfg: &config::Config) -> Result<()> {
         if ok { "OK  " } else { "FAIL" },
         if ok { "" } else { " - re-run from an Administrator prompt" }
     ));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn open_cmd(port: u16) -> Result<()> {
+    platform::open_dashboard(port)
+}
+
+#[cfg(not(unix))]
+fn open_cmd(port: u16) -> Result<()> {
+    // Windows: the tray app is the launcher; just show the dashboard if it is running.
+    open_url(&format!("http://127.0.0.1:{port}/dashboard"));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn autostart_cmd(what: Option<&str>) -> Result<()> {
+    match what {
+        Some("on") => platform::set_autostart(true)?,
+        Some("off") => platform::set_autostart(false)?,
+        Some("status") | None => {}
+        Some(other) => anyhow::bail!("unknown option {other:?}; use on, off or status"),
+    }
+    say(if platform::autostart_enabled() { "Start at login: on" } else { "Start at login: off" });
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn autostart_cmd(_: Option<&str>) -> Result<()> {
+    say("On Windows, use the tray menu: Start with Windows.");
     Ok(())
 }
 

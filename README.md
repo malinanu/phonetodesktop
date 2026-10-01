@@ -1,18 +1,29 @@
 # Phone Remote
 
-Control media on a Windows PC from an Android phone, over the local network (Wi-Fi) or Bluetooth.
+Control media on a Windows, macOS or Linux computer from a phone, over the local network (Wi-Fi), or from an Android phone over Bluetooth.
 
 ```
 agent/     Rust desktop agent (Windows GSMTC backend, tray app), serves the phone UI + WebSocket
 shared/    Design system (base.css, font) and the in-app Guide page, used by both the PC agent and the Android app
 android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
+filesync/  Send files: peer-to-peer WebRTC file transfer (FastAPI signaling + coturn + web UI), imported from github.com/polius/FileSync (MIT)
+deploy/    Production compose + Caddyfile for the FileSync server (see docs/DEPLOYING-SERVER.md)
 ```
+
+## Download and releasing
+Downloads, privacy policy and the landing page live in `site/` (published with GitHub Pages). Releases are cut by tagging; see [docs/RELEASING.md](docs/RELEASING.md) for signing, Play Store and website setup. Licensed under [MIT](LICENSE).
+
+## Send files
+Phone Remote also sends files between devices, in the browser, with no size limit. **It is built in:** the PC program serves the FileSync page and its small signaling relay on the home network (port + 1, `agent/src/files.rs`), so nothing needs hosting and nothing needs configuring. Click *Send files* on the PC, scan the code with the phone, pick files; they go directly between the devices over encrypted WebRTC. A phone receiving over plain Wi-Fi buffers the file in memory (browsers only stream to disk on HTTPS or localhost), so keep files sent *to a phone* to a few hundred MB; the computer side streams to disk with no limit. Only for sending between different networks (over the internet) do you run your own server (`filesync/`, [docs/DEPLOYING-SERVER.md](docs/DEPLOYING-SERVER.md)) and enter its address. FileSync is by [polius](https://github.com/polius/FileSync) and MIT licensed (see `filesync/LICENSE`).
 
 ## Settings and themes
 The remote's **⋮ menu → Settings** (and the same page from the Bluetooth tab): theme (System / Dark / Light), skip step, volume step, touchpad speed, scroll direction, tap-to-click, vibration and keep-screen-on. In the Android app the values live in the app and are shared by every page; in a plain browser they live in `localStorage`. Colours are defined once in `shared/base.css` (and mirrored in `Theme.kt`) and checked for 4.5:1 text contrast in both themes.
 
 ## Guide pages
 `shared/guide.html` holds two pages, *Get connected in 60 seconds* and *What happens when you tap play*. The PC serves it at `/guide` (tray menu → Guide) and the Android app bundles it (top bar → Guide).
+
+## Desktop agent (Windows, macOS, Linux)
+The same Rust agent runs on all three. Downloads: the website, or the GitHub release (Windows `.exe`, macOS `.dmg`, Linux `.deb` / `.tar.gz`). On macOS and Linux open it with `phone-remote open` (or from the applications menu); `phone-remote autostart on` starts it at login. Linux players are read over MPRIS (title, progress, seek); on macOS the media keys, volume, mouse and keyboard work but song title and progress are not available. See [docs/DESKTOP-TESTING.md](docs/DESKTOP-TESTING.md).
 
 ## Windows agent
 Download `phone-remote.exe` from the CI artifacts (or `cargo build --release` in `agent/`), then:
@@ -39,7 +50,7 @@ No agent needed, but there is no now-playing display, and seek is arrow keys to 
 Unsigned downloads show "Windows protected your PC / Unknown publisher". Click **More info → Run anyway** (or right-click the file → Properties → Unblock). The release workflow signs the agent exe and the installer automatically when the `WIN_CERT_B64` and `WIN_CERT_PASSWORD` secrets are set; a signed build removes the warning.
 
 ## Security
-The QR carries a 15-minute pairing code that only lets a phone *ask* to join; the PC owner approves it, and the phone then receives its own revocable key. Constant-time compares, 5-failures/min lockout, WebSocket Origin check, LAN-only source addresses. The dashboard and its API are loopback-only with Host-header and custom-header checks (DNS-rebinding/CSRF). Traffic is plain HTTP on the LAN.
+The QR carries a 15-minute pairing code that only lets a phone *ask* to join, and the key fingerprint of this PC; the PC owner approves, and the phone is then known by its **device key** (the PC stores only the public key, no secret). Each login signs a fresh per-connection challenge, so nothing can be replayed. Phone traffic runs over **HTTPS with a certificate the phone pins** (per-PC self-signed key, fingerprint in the QR), so nobody on the same Wi-Fi can read or alter it. Phones from before this change still work over plain HTTP until you switch them off in the dashboard (Settings → *Allow older phone apps*). Also: 5-failures/min lockout, WebSocket Origin check, LAN-only source addresses, and a loopback-only dashboard with Host-header and custom-header checks (DNS-rebinding/CSRF). Details: [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 ## Dashboard
 Double-click the tray icon: Home, Phones (approve/remove, QR), Video players (one-click setup), Settings, Activity, Help. It opens as an app-style Edge window.

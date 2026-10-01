@@ -20,6 +20,8 @@ jobs:
           sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
       - run: cargo build --release --manifest-path agent/Cargo.toml
+        env:
+          PHONE_REMOTE_FILES_URL: ${{ vars.FILES_URL }}   # repo variable; empty hides "Send files" in the agent
       - name: Sign exe (optional)
         if: ${{ env.WIN_CERT_B64 != '' }}
         shell: pwsh
@@ -43,7 +45,7 @@ jobs:
             & $st verify /pa $_.FullName
           }
       - uses: actions/upload-artifact@v4
-        with: { name: windows-installer, path: dist/PhoneRemote-Setup-*.exe }
+        with: { name: release-windows, path: dist/PhoneRemote-Setup-*.exe }
   android:
     runs-on: ubuntu-latest
     steps:
@@ -68,17 +70,166 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*}))
+          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
       - run: mv android/app/build/outputs/apk/release/app-release.apk PhoneRemote-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
-        with: { name: android-apk, path: PhoneRemote-*.apk }
+        with: { name: release-android, path: PhoneRemote-*.apk }
+      # Play Store bundle. Only built with a real keystore (Play rejects debug-signed bundles).
+      # Kept as a workflow artifact, not attached to the public release; upload it in Play Console.
+      - name: Build release AAB (Play Store)
+        if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          IFS=. read -r a b c <<< "$v"
+          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
+          mv android/app/build/outputs/bundle/release/app-release.aab PhoneRemote-$v.aab
+      - uses: actions/upload-artifact@v4
+        if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
+        with: { name: android-aab, path: PhoneRemote-*.aab }
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-22.04, arch: x86_64 }
+          - { runner: ubuntu-22.04-arm, arch: aarch64 }
+    # Built on 22.04 (glibc 2.35) so the binary and the .deb also run on Debian 12 and Ubuntu 22.04+.
+    # The arm64 leg may be unavailable (private repos); it must not block the release.
+    continue-on-error: ${{ matrix.arch == 'aarch64' }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version from tag
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
+      - run: cargo test --manifest-path agent/Cargo.toml
+      - run: cargo build --release --manifest-path agent/Cargo.toml
+        env:
+          PHONE_REMOTE_FILES_URL: ${{ vars.FILES_URL }}
+      - uses: taiki-e/install-action@v2
+        with: { tool: cargo-deb }
+      - name: Package (.deb and tarball)
+        run: |
+          mkdir -p dist
+          (cd agent && cargo deb --no-build)
+          cp agent/target/debian/*.deb dist/
+          installer/linux/make-tarball.sh "$VERSION" "${{ matrix.arch }}" agent/target/release/phone-remote dist
+      - uses: actions/upload-artifact@v4
+        with: { name: "release-linux-${{ matrix.arch }}", path: dist/* }
+  macos:
+    runs-on: macos-14
+    env:
+      MACOS_CERT_B64: ${{ secrets.MACOS_CERT_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version from tag
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          sed -i '' "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
+      - run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - run: cargo test --manifest-path agent/Cargo.toml
+      - name: Build universal binary
+        env:
+          PHONE_REMOTE_FILES_URL: ${{ vars.FILES_URL }}
+        run: |
+          cargo build --release --manifest-path agent/Cargo.toml --target aarch64-apple-darwin
+          cargo build --release --manifest-path agent/Cargo.toml --target x86_64-apple-darwin
+          lipo -create -output phone-remote-universal \
+            agent/target/aarch64-apple-darwin/release/phone-remote \
+            agent/target/x86_64-apple-darwin/release/phone-remote
+          lipo -info phone-remote-universal
+      - name: Import Developer ID certificate (optional)
+        if: ${{ env.MACOS_CERT_B64 != '' }}
+        env:
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"; PW=$(uuidgen)
+          security create-keychain -p "$PW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$PW" "$KC"
+          echo "$MACOS_CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$PW" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain
+          ID=$(security find-identity -v -p codesigning "$KC" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.+)".*/\1/')
+          echo "MACOS_SIGN_IDENTITY=$ID" >> "$GITHUB_ENV"
+      - name: Build .app and .dmg (signed and notarized when the secrets exist)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: installer/macos/make-dmg.sh "$VERSION" phone-remote-universal dist
+      - uses: actions/upload-artifact@v4
+        with: { name: release-macos, path: dist/*.dmg }
   publish:
-    needs: [windows, android]
+    needs: [windows, android, linux, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: { path: out, merge-multiple: true }
+        with: { pattern: "release-*", path: out, merge-multiple: true }
+      - name: latest.json and SHA256SUMS (the website reads latest.json)
+        run: python3 installer/make_latest.py out "${GITHUB_REF_NAME#v}" "${{ github.repository }}" --tag "$GITHUB_REF_NAME"
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*
           generate_release_notes: true
+  # FileSync server image for the VPS (see docs/DEPLOYING-SERVER.md). Pushed to GHCR with the
+  # built-in token, so no extra secrets are needed. Image names must be lowercase.
+  files-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3   # needed to build the arm64 image on an amd64 runner
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: filesync
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/malinanu/phonetodesktop-files:latest
+            ghcr.io/malinanu/phonetodesktop-files:${{ steps.tag.outputs.version }}
+  # Account service image (optional; see docs/ACCOUNTS.md).
+  account-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: account
+          push: true
+          tags: |
+            ghcr.io/malinanu/phonetodesktop-account:latest
+            ghcr.io/malinanu/phonetodesktop-account:${{ steps.tag.outputs.version }}
+

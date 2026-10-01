@@ -21,6 +21,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -68,6 +69,17 @@ class MainActivity : Activity() {
     private lateinit var btView: View
     private lateinit var navWifi: LinearLayout
     private lateinit var navBt: LinearLayout
+    private lateinit var navFiles: LinearLayout
+    private lateinit var filesView: View
+    private lateinit var filesBody: TextView
+    private lateinit var filesOpen: Button
+    private lateinit var filesSetup: LinearLayout
+    private lateinit var filesInput: EditText
+    private lateinit var filesError: TextView
+    private lateinit var filesChange: Button
+    private lateinit var filesScan: Button
+    private lateinit var filesSteps: LinearLayout
+    private var filesMode = false
     private lateinit var discovery: Discovery
     private var hid: HidRemote? = null
     private var loadedKey: String? = null
@@ -147,21 +159,25 @@ class MainActivity : Activity() {
         settingsPage = overlayPage()
         welcome = buildWelcome()
         btView = buildBluetoothView()
+        filesView = buildFilesView()
         content.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(welcome, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(guide, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(settingsPage, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         content.addView(btView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        content.addView(filesView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content, lp(h = 0, weight = 1f))
 
         nav = LinearLayout(this).apply {
             setBackgroundColor(C.CARD)
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
-        navWifi = navItem(R.drawable.ic_wifi, "Wi-Fi") { showMode(false) }
+        navWifi = navItem(R.drawable.ic_wifi, "Remote") { showMode(false) }
         navBt = navItem(R.drawable.ic_bluetooth, "Bluetooth") { showMode(true) }
         nav.addView(navWifi, lp(0, WRAP_CONTENT, 1f))
+        navFiles = navItem(R.drawable.ic_files, "Files") { showFiles() }
         nav.addView(navBt, lp(0, WRAP_CONTENT, 1f))
+        nav.addView(navFiles, lp(0, WRAP_CONTENT, 1f))
         root.addView(nav)
         // The bar is only useful when the keyboard is closed.
         root.setOnApplyWindowInsetsListener { v, insets ->
@@ -176,6 +192,13 @@ class MainActivity : Activity() {
         showMode(false)
         // Load the last known address right away, then let mDNS correct it if the IP changed.
         openActive()
+        // A recreate (theme change, rotation) must not throw the user off the Files tab.
+        if (savedInstanceState?.getBoolean("filesMode") == true) showFiles()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("filesMode", filesMode)
     }
 
     override fun onStart() { super.onStart(); if (paired()) discovery.start() }
@@ -197,21 +220,22 @@ class MainActivity : Activity() {
             gravity = Gravity.BOTTOM
             setPadding(dp(24), dp(16), dp(24), dp(20))
         }
-        col.addView(label("SETUP", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
-        col.addView(label("Take the remote.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
-        col.addView(label("Pause, skip and seek your PC's media from the couch. Pair once; it reconnects by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
+        col.addView(label("CONNECT", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
+        col.addView(label("Control your computer from your phone.", 34f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
+        col.addView(label("Pause, skip and change the volume of videos and music from the couch. You connect once, then it works by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
         listOf(
-            "Open Phone Remote on your PC",
-            "Double-click its tray icon and open Phones",
-            "Scan the code, then tap Allow on the PC",
+            "On your computer, open Phone Remote. The window shows a square code.",
+            "Tap the big button below and point the camera at that code.",
+            "On the computer, click Allow. That is all.",
         ).forEachIndexed { i, t ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
             row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
             row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
             col.addView(row)
         }
-        col.addView(button("Scan QR code", filled = true) { scanQr() }, lp().apply { topMargin = dp(20) })
-        col.addView(button("How it works and troubleshooting") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("Scan the code on my computer", filled = true) { scanQr() }.apply { minHeight = dp(60); textSize = 17f }, lp().apply { topMargin = dp(20) })
+        col.addView(button("No Phone Remote on the computer? Use Bluetooth") { showMode(true) }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("Help") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
     }
 
@@ -340,8 +364,163 @@ class MainActivity : Activity() {
 
     private fun showMode(bluetooth: Boolean) {
         overlay = null
+        filesMode = false
         updateVisibility(bluetooth)
         if (bluetooth) startBluetooth()
+    }
+
+    private fun showFiles() {
+        overlay = null
+        filesMode = true
+        refreshFiles()
+        updateVisibility(false)
+    }
+
+    /** The configured file-server address, or null when none is set. */
+    private fun filesUrl() = FilesUrl.resolve(store.settingsJson(), BuildConfig.FILES_URL)
+
+    /**
+     * Files tab. Sending and receiving run in the phone's browser, not in a WebView here: receiving streams to disk
+     * through a service worker or the File System Access API, which a WebView cannot hand to the system downloader.
+     */
+    private fun buildFilesView(): View {
+        val scroll = android.widget.ScrollView(this).apply { isFillViewport = true }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.BOTTOM
+            setPadding(dp(24), dp(16), dp(24), dp(20))
+        }
+        col.addView(label("FILES", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
+        col.addView(label("Send files.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
+        filesBody = label("", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) }
+        col.addView(filesBody)
+        filesSteps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        listOf(
+            "On your computer, click Send files.",
+            "Here, tap the big button and point the camera at the code on the computer screen.",
+            "Pick files. They go straight between the two devices.",
+        ).forEachIndexed { i, t ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
+            row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
+            row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
+            filesSteps.addView(row)
+        }
+        col.addView(filesSteps)
+        filesScan = button("Scan the code on the computer", filled = true) { scanFilesCode() }.apply { minHeight = dp(60); textSize = 17f }
+        col.addView(filesScan, lp().apply { topMargin = dp(20) })
+        filesOpen = button("Open Send files") {
+            val url = filesUrl() ?: localFilesUrl()
+            if (url == null) showMode(false)
+            else openInBrowser(url)
+        }
+        col.addView(filesOpen, lp().apply { topMargin = dp(8) })
+        // Where the address is entered: right here, because without it nothing on this tab can work.
+        filesSetup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, 0) }
+        filesSetup.addView(label("Server address", 13f, C.DIM, bold = true))
+        filesInput = EditText(this).apply {
+            hint = "files.yourdomain.com"
+            setHintTextColor(C.DIM)
+            setTextColor(C.FG)
+            textSize = 17f
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine()
+            background = bg(C.CARD)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        filesSetup.addView(filesInput, lp().apply { topMargin = dp(6) })
+        filesError = label("", 14f, C.BAD).apply { visibility = View.GONE; setPadding(0, dp(6), 0, 0) }
+        filesSetup.addView(filesError)
+        filesSetup.addView(button("Save address", filled = true) { saveFilesAddress() }, lp().apply { topMargin = dp(10) })
+        filesSetup.addView(label("Only needed to send files between different networks, over the internet. It is the address of the server you set up (see the guide, “Set up Send files”), such as files.example.com. Leave it empty for normal use.", 14f, C.DIM).apply { setPadding(0, dp(12), 0, 0) })
+        col.addView(filesSetup, lp().apply { topMargin = dp(12) })
+        filesChange = button("Use my own Send files server instead") { showFilesSetup(true) }.apply { background = null; setTextColor(C.DIM) }
+        col.addView(filesChange, lp().apply { topMargin = dp(4) })
+        scroll.addView(col)
+        return scroll
+    }
+
+    /** The built-in Send files page of the PC this phone is connected to, or null if no PC is saved. */
+    private fun localFilesUrl(): String? = store.active()?.let { FilesUrl.local(it.host, it.port) }
+
+    private fun openInBrowser(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Scan the room code the computer's Send files page shows, then continue in the browser. */
+    private fun scanFilesCode() {
+        val pc = store.active()
+        if (pc == null && filesUrl() == null) { showMode(false); return }
+        val opts = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        GmsBarcodeScanning.getClient(this, opts).startScan()
+            .addOnSuccessListener { code ->
+                val raw = code.rawValue
+                val own = filesUrl()?.trimEnd('/')
+                val ownLink = own != null && FilesUrl.clean(raw) != null && raw?.trim()?.startsWith(own) == true
+                if ((pc != null && FilesUrl.isLocalLink(raw, pc.host, pc.port)) || ownLink) {
+                    openInBrowser(raw!!.trim())
+                } else {
+                    Toast.makeText(this, "That is not the Send files code. On the computer, click Send files and scan the code it shows.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .addOnFailureListener { Toast.makeText(this, "Scan failed: ${it.message}", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun refreshFiles() {
+        val custom = filesUrl()
+        val local = localFilesUrl()
+        when {
+            custom != null -> {
+                filesBody.text = "You are using your own Send files server. Open it on both devices, then share the room link or QR code."
+                filesSteps.visibility = View.GONE
+                filesScan.visibility = View.VISIBLE
+                filesOpen.visibility = View.VISIBLE
+                filesChange.text = "Change or remove my own server"
+                filesChange.visibility = View.VISIBLE
+            }
+            local != null -> {
+                filesBody.text = "Send files of any size between this phone and your computer. Nothing is uploaded to the internet."
+                filesSteps.visibility = View.VISIBLE
+                filesScan.visibility = View.VISIBLE
+                filesOpen.visibility = View.VISIBLE
+                filesChange.text = "Use my own Send files server instead"
+                filesChange.visibility = View.VISIBLE
+            }
+            else -> {
+                filesBody.text = "First connect this phone to your computer on the Remote tab. Then you can send files between them."
+                filesSteps.visibility = View.GONE
+                filesScan.visibility = View.GONE
+                filesOpen.visibility = View.VISIBLE
+                filesOpen.text = "Go to Remote"
+                filesChange.text = "Use my own Send files server instead"
+                filesChange.visibility = View.VISIBLE
+            }
+        }
+        if (custom != null || local != null) filesOpen.text = "Open Send files on this phone"
+        showFilesSetup(false)
+    }
+
+    private fun showFilesSetup(show: Boolean) {
+        filesSetup.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            filesInput.setText(FilesUrl.overrideOf(store.settingsJson()))
+            filesError.visibility = View.GONE
+        }
+    }
+
+    private fun saveFilesAddress() {
+        val raw = filesInput.text.toString().trim()
+        val clean = FilesUrl.clean(raw)
+        if (raw.isNotEmpty() && clean == null) {
+            filesError.text = "That doesn’t look right. Use an https address such as files.example.com."
+            filesError.visibility = View.VISIBLE
+            return
+        }
+        store.saveSettings(FilesUrl.withOverride(store.settingsJson(), clean ?: ""))
+        refreshFiles()
     }
 
     /** Full-screen Guide or Settings on top of the current screen. */
@@ -354,6 +533,7 @@ class MainActivity : Activity() {
 
     private fun closeOverlay() {
         overlay = null
+        if (filesMode) refreshFiles()
         updateVisibility(btView.visibility == View.VISIBLE)
     }
 
@@ -362,10 +542,12 @@ class MainActivity : Activity() {
         guide.visibility = if (overlay == "guide") View.VISIBLE else View.GONE
         settingsPage.visibility = if (overlay == "settings") View.VISIBLE else View.GONE
         btView.visibility = if (bluetooth && base) View.VISIBLE else View.GONE
-        web.visibility = if (!bluetooth && base && paired()) View.VISIBLE else View.GONE
-        welcome.visibility = if (!bluetooth && base && !paired()) View.VISIBLE else View.GONE
-        styleNav(navWifi, !bluetooth)
+        filesView.visibility = if (filesMode && base) View.VISIBLE else View.GONE
+        web.visibility = if (!bluetooth && !filesMode && base && paired()) View.VISIBLE else View.GONE
+        welcome.visibility = if (!bluetooth && !filesMode && base && !paired()) View.VISIBLE else View.GONE
+        styleNav(navWifi, !bluetooth && !filesMode)
         styleNav(navBt, bluetooth)
+        styleNav(navFiles, filesMode)
         if (bluetooth) banner.visibility = View.GONE
     }
 
@@ -398,7 +580,7 @@ class MainActivity : Activity() {
         contentDescription = text
         setOnClickListener { click() }
         addView(android.widget.ImageView(this@MainActivity).apply { setImageResource(icon) }, LinearLayout.LayoutParams(dp(24), dp(24)))
-        addView(label(text, 12f, bold = true).apply { setPadding(0, dp(2), 0, 0) })
+        addView(label(text, 12f, bold = true).apply { setPadding(0, dp(2), 0, 0); gravity = Gravity.CENTER })
     }
 
     private fun styleNav(item: LinearLayout, selected: Boolean) {

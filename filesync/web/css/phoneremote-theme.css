@@ -1,0 +1,43 @@
+/* Phone Remote look for the imported FileSync UI: same tokens as shared/base.css (warm neutrals,
+   one amber accent, Bricolage Grotesque). Loaded after style.css so only values are overridden;
+   the Bootstrap markup is untouched. Keep colours in sync with shared/base.css. */
+@font-face { font-family:"Bricolage Grotesque"; src:url(../assets/fonts/bricolage.woff2) format("woff2"); font-weight:400 800; font-display:swap; }
+
+:root, :root.dark {
+  --pr-font: "Bricolage Grotesque", ui-rounded, "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+  --pr-accent: #ff9a3c; --pr-on-accent: #1b1006; --pr-accent-hover: #ffad5e;
+  --color-body-bg: #15110e;  --color-surface: #1f1a16;
+  --color-header: #b3a594;   --color-h1: #f5ebdd;  --color-h2: #b3a594;  --color-p: #b3a594;
+  --color-input: #f5ebdd;    --color-input-bg: #15110e;
+  --color-box: #f5ebdd;      --color-box-bg: #1f1a16;
+  --color-url: #ff9a3c;      --color-icon: #86d9a6;
+  --color-button-border: #372e26; --color-border: #372e26; --color-muted: #b3a594;
+  --color-card-header-bg: #2a231d;
+}
+:root.light {
+  --pr-accent: #e8710a; --pr-on-accent: #1b1006; --pr-accent-hover: #cf6406;
+  --color-body-bg: #f7f1e8;  --color-surface: #fffaf2;
+  --color-header: #6c6050;   --color-h1: #241c14;  --color-h2: #6c6050;  --color-p: #6c6050;
+  --color-input: #241c14;    --color-input-bg: #fffaf2;
+  --color-box: #241c14;      --color-box-bg: #fffaf2;
+  --color-url: #a04a00;      --color-icon: #17703f;
+  --color-button-border: #e0d3c0; --color-border: #e0d3c0; --color-muted: #6c6050;
+  --color-card-header-bg: #efe6d8;
+}
+
+body, .btn, .app-version, .form-control, .form-select { font-family: var(--pr-font) !important; }
+/* Headings carry an inline font-family: Acme; replace it with the shared typeface. */
+[style*="Acme"] { font-family: var(--pr-font) !important; }
+[style*="rgb(252, 145, 45)"] { color: var(--pr-accent) !important; }
+
+a { color: var(--color-url); }
+.btn-primary, .btn-success { background-color: var(--pr-accent); border-color: var(--pr-accent); color: var(--pr-on-accent); }
+.btn-primary:hover, .btn-primary:focus, .btn-success:hover, .btn-success:focus {
+  background-color: var(--pr-accent-hover); border-color: var(--pr-accent-hover); color: var(--pr-on-accent);
+  box-shadow: 0 4px 12px rgba(255, 154, 60, .25);
+}
+.form-control:focus, .form-select:focus { border-color: var(--pr-accent); box-shadow: 0 0 0 .2rem rgba(255, 154, 60, .25); }
+
+.pr-back { color: var(--color-h2); text-decoration: none; }
+.pr-back:hover { color: var(--pr-accent); }
+.pr-credit { font-size: .85rem; color: var(--color-muted); }

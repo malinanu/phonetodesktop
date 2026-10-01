@@ -13,7 +13,10 @@ android {
         // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=10203
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (findProperty("versionName") as String?) ?: "0.1.0"
+        // Address of the "Send files" server (docs/DEPLOYING-SERVER.md). Empty = the Files tab asks the user to enter one.
+        buildConfigField("String", "FILES_URL", "\"${(findProperty("filesUrl") as String?) ?: ""}\"")
     }
+    buildFeatures { buildConfig = true }
     signingConfigs {
         // Release keystore comes from the environment (CI secrets); never commit it.
         val path = System.getenv("ANDROID_KEYSTORE_PATH")

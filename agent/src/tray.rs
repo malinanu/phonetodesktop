@@ -165,9 +165,16 @@ pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {
     let logm = MenuItem::new("Open log folder", true, None);
     let auto = CheckMenuItem::new("Start with Windows", true, autostart_enabled(), None);
     let quit = MenuItem::new("Quit Phone Remote", true, None);
-    menu.append_items(&[&open, &add, &logm, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
+    // "Send files" only appears when a file server is configured (config `files_url` or the build default).
+    let files = config::files_url(&cfg).map(|url| (MenuItem::new("Send files", true, None), url));
+    menu.append_items(&[&open, &add])?;
+    if let Some((item, _)) = &files {
+        menu.append(item)?;
+    }
+    menu.append_items(&[&logm, &PredefinedMenuItem::separator(), &auto, &PredefinedMenuItem::separator(), &quit])?;
     let (open_id, add_id, log_id, auto_id, quit_id) = (open.id().clone(), add.id().clone(), logm.id().clone(), auto.id().clone(), quit.id().clone());
-    let _keep = (&open, &add, &logm, &auto, &quit); // menu items must outlive the tray on this thread
+    let files_target = files.as_ref().map(|(item, url)| (item.id().clone(), url.clone()));
+    let _keep = (&open, &add, &logm, &auto, &quit, &files); // menu items must outlive the tray on this thread
 
     let (d1, d2, d3) = (dashboard.clone(), dashboard.clone(), dashboard.clone());
     // These closures run inside the tray window's procedure: a panic must never unwind out of it.
@@ -177,6 +184,10 @@ pub fn run(mut cfg: Config, dashboard: String) -> Result<()> {
                 open_dashboard(&d1);
             } else if e.id == add_id {
                 open_dashboard(&format!("{d2}#add"));
+            } else if files_target.as_ref().is_some_and(|(id, _)| e.id == *id) {
+                if let Some((_, url)) = &files_target {
+                    crate::open_url(url);
+                }
             } else if e.id == log_id {
                 crate::open_url(&crate::log::dir().display().to_string());
             } else if e.id == auto_id {
