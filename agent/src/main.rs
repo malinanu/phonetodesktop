@@ -343,7 +343,7 @@ fn install(cfg: &config::Config) -> Result<()> {
     let ok = std::process::Command::new("netsh")
         .args([
             "advfirewall", "firewall", "add", "rule", "name=Phone Remote", "dir=in", "action=allow",
-            "protocol=TCP", &format!("localport={}", cfg.port), "profile=private",
+            "protocol=TCP", &format!("localport={},{}", cfg.port, cfg.port.saturating_add(1)), "profile=private",
             &format!("program={}", exe.display()),
         ])
         .status()
