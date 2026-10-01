@@ -93,10 +93,10 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [ ] D6 Security review + threat-model note
 
 ### E. Flutter mobile app (iOS + Android)
-- [ ] E1 `mobile/` project, same application id and signing key
-- [ ] E2 Wi-Fi mode: mDNS, QR, saved PCs, controller (shared web UI first)
+- [ ] E1 `mobile/` project (Dart; platform folders, application id and signing key still to add)
+- [x] E2 Wi-Fi mode done natively (no WebView): pinned-TLS protocol client verified against the real Rust agent, mDNS, QR pairing, saved PCs, native remote + touchpad screens; 46 tests
 - [ ] E3 Android-only Bluetooth mode via platform channel (reuse HidRemote.kt)
-- [ ] E4 Files tab, Settings, themes, accessibility
+- [ ] E4 Files tab, Settings and themes done (widget tests); contrast audit and screen-reader pass still open
 - [ ] E5 Device identity + optional sign-in
 - [ ] E6 Parity checklist, then retire `android/`; CI builds AAB and IPA
 
