@@ -5,7 +5,7 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 
 ## Phase 0 — Setup
 - [x] T0.1 Create this `task.md`
-- [ ] T0.2 Work on the existing branch; update PR #1 description (one branch, one PR)
+- [x] T0.2 Work on the existing branch; update PR #1 description (one branch, one PR)
 - [ ] T0.3 Confirm ownership / licence of FileSync with the owner (MIT — attribution kept either way)
 
 ## Phase 1 — Import and CI
@@ -54,7 +54,7 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 ## Phase 7 — Verify and ship
 - [x] T7.1 FileSync browser e2e: smoke cell (Chromium / service-worker sink / 20 MiB, SHA-256 verified) passes against the app run without Docker (stand-in for nginx). Not run: full matrix, interruption harness and TURN cells (need Docker + coturn)
 - [ ] T7.2 Real-device matrix incl. cross-network (TURN relay)
-- [ ] T7.3 `/security-review` of the new surface
+- [x] T7.3 `/security-review` of the new surface (no high-confidence findings)
 - [ ] T7.4 CI green, PR ready, tag `v1.1.0` only after T3.5 and T7.2
 
 ## Needs a human (cannot be done from this environment)
