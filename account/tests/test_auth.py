@@ -150,9 +150,10 @@ def test_bad_provider_tokens_are_refused(world, why, overrides):
 
 
 def test_a_token_signed_by_another_key_is_refused(world):
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    import jwt
     import time
+
+    import jwt
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
     other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     now = int(time.time())
@@ -169,7 +170,6 @@ def test_nonce_must_match_when_given(world):
 def test_provider_sign_in_is_off_when_not_configured(world):
     from app.oidc import OidcVerifier
 
-    world.app.router  # keep the app alive
     v = OidcVerifier([], [])
     assert not v.enabled("google") and not v.enabled("apple") and not v.enabled("nope")
 

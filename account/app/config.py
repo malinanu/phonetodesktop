@@ -39,7 +39,7 @@ class Settings:
     trust_proxy: bool = False
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         env = os.environ.get
         keys: dict[str, bytes] = {}
         raw = env("ACCOUNT_SIGNING_KEYS", "")

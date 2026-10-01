@@ -23,9 +23,9 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(320), unique=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=now)
-    devices: Mapped[list["Device"]] = relationship(cascade="all, delete-orphan", back_populates="user")
-    sessions: Mapped[list["Session"]] = relationship(cascade="all, delete-orphan")
-    identities: Mapped[list["Identity"]] = relationship(cascade="all, delete-orphan")
+    devices: Mapped[list[Device]] = relationship(cascade="all, delete-orphan", back_populates="user")
+    sessions: Mapped[list[Session]] = relationship(cascade="all, delete-orphan")
+    identities: Mapped[list[Identity]] = relationship(cascade="all, delete-orphan")
 
 
 class Identity(Base):

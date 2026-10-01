@@ -1,7 +1,7 @@
 """Verifying Google and Apple ID tokens (Sign in with Apple is required on iOS when other social sign-in is offered)."""
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import jwt
 
