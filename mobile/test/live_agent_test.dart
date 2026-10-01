@@ -8,7 +8,7 @@ import 'package:phoneremote/core/protocol.dart';
 import 'package:phoneremote/core/session.dart';
 import 'package:phoneremote/core/spki.dart';
 
-import 'support/agent_under_test.dart';
+import 'support/agent_harness.dart';
 
 void main() {
   late AgentUnderTest agent;

@@ -122,6 +122,22 @@ class ConnectionController extends ChangeNotifier {
     return p.durMs > 0 && pos > p.durMs ? p.durMs : pos;
   }
 
+  // Commands. Ignored while the PC is not connected, so the screens never have to check.
+  void playPause() => session?.playPause();
+  void next() => session?.next();
+  void prev() => session?.prev();
+  void seekRel(int seconds) => session?.seekRel(seconds);
+  void seekAbs(int posMs) => session?.seekAbs(posMs);
+  void volume(int steps) => session?.volume(steps);
+  void volumeSet(int level) => session?.volumeSet(level);
+  void mute() => session?.mute();
+  void selectPlayer(String id) => session?.select(id);
+  void mouseMove(int dx, int dy) => session?.mouseMove(dx, dy);
+  void mouseButton(String button, String action) => session?.mouseButton(button, action);
+  void scroll(int dx, int dy) => session?.scroll(dx, dy);
+  void typeText(String s) => session?.text(s);
+  void pressKey(String name, [List<String> mods = const []]) => session?.key(name, mods);
+
   // ---- the connection loop -----------------------------------------------------------------------------------
 
   void _start() {

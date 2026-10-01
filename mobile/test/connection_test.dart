@@ -11,7 +11,7 @@ import 'package:phoneremote/core/identity.dart';
 import 'package:phoneremote/core/session.dart';
 import 'package:phoneremote/core/spki.dart';
 
-import 'support/agent_under_test.dart';
+import 'support/agent_harness.dart';
 
 class FakeDiscovery implements Discovery {
   FakeDiscovery(this.sightings);
