@@ -72,12 +72,30 @@ jobs:
       - run: mv android/app/build/outputs/apk/release/app-release.apk PhoneRemote-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
         with: { name: android-apk, path: PhoneRemote-*.apk }
+      # Play Store bundle. Only built with a real keystore (Play rejects debug-signed bundles).
+      # Kept as a workflow artifact, not attached to the public release; upload it in Play Console.
+      - name: Build release AAB (Play Store)
+        if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          IFS=. read -r a b c <<< "$v"
+          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*}))
+          mv android/app/build/outputs/bundle/release/app-release.aab PhoneRemote-$v.aab
+      - uses: actions/upload-artifact@v4
+        if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
+        with: { name: android-aab, path: PhoneRemote-*.aab }
   publish:
     needs: [windows, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with: { path: out, merge-multiple: true }
+        with: { name: windows-installer, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: android-apk, path: out }
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*

@@ -8,6 +8,9 @@ shared/    Design system (base.css, font) and the in-app Guide page, used by bot
 android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
 ```
 
+## Download and releasing
+Downloads, privacy policy and the landing page live in `site/` (published with GitHub Pages). Releases are cut by tagging; see [docs/RELEASING.md](docs/RELEASING.md) for signing, Play Store and website setup. Licensed under [MIT](LICENSE).
+
 ## Settings and themes
 The remote's **⋮ menu → Settings** (and the same page from the Bluetooth tab): theme (System / Dark / Light), skip step, volume step, touchpad speed, scroll direction, tap-to-click, vibration and keep-screen-on. In the Android app the values live in the app and are shared by every page; in a plain browser they live in `localStorage`. Colours are defined once in `shared/base.css` (and mirrored in `Theme.kt`) and checked for 4.5:1 text contrast in both themes.
 

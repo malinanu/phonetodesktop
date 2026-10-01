@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Phone Remote</title>
+<meta name="description" content="Phone Remote collects no personal data and has no servers.">
+<link rel="stylesheet" href="base.css">
+<style>
+  main { max-width: 700px; margin: 0 auto; padding: 48px 20px; }
+  h1 { font-size: 36px; margin: 8px 0 6px; } h2 { font-size: 21px; margin: 32px 0 8px; }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <a href="./">← Phone Remote</a>
+  <h1>Privacy Policy</h1>
+  <p class="dim">Last updated: 1 October 2026</p>
+
+  <p>Phone Remote lets you control media on your Windows PC from your Android phone. <b>It does not collect, store on our side, or share any personal data.</b> The developer operates no servers for the app, and the app contains no analytics, advertising or tracking.</p>
+
+  <h2>What stays on your devices</h2>
+  <ul>
+    <li><b>Pairing data.</b> The PC keeps a list of phones you have approved (a name and a revocable key). The phone keeps the key for each PC it is paired with, plus your settings (theme, step sizes and similar). This is stored only on those devices. <code>phone-remote rotate</code> on the PC revokes every phone.</li>
+    <li><b>Media commands.</b> Play, pause, seek, volume and similar commands travel directly between your phone and your PC over your local network, or over Bluetooth. The PC agent also reads the title and playback position of the current media session so the phone can show what's playing. That information is shown on your phone and is not sent anywhere else.</li>
+    <li><b>Logs.</b> The PC agent writes a local activity log on the PC (viewable in its dashboard). It is never uploaded.</li>
+    <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
+  </ul>
+
+  <h2>Permissions the Android app asks for</h2>
+  <ul>
+    <li><b>Network and Wi-Fi state, multicast.</b> To find your PC on the local network and talk to it.</li>
+    <li><b>Bluetooth (connect, advertise).</b> For Bluetooth mode, where the phone acts as a keyboard / media-key device. Android groups these under "Nearby devices".</li>
+  </ul>
+  <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
+
+  <h2>Network traffic</h2>
+  <p>Wi-Fi mode uses plain HTTP and WebSocket between devices on the same private network; the PC agent only accepts connections from private (LAN) addresses and requires a paired key. Use it on networks you trust.</p>
+
+  <h2>Children</h2>
+  <p>The app is not directed at children and collects no data from anyone.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new date. Questions: open an issue at <a href="https://github.com/malinanu/phonetodesktop/issues">github.com/malinanu/phonetodesktop/issues</a>.</p>
+</main>
+</body>
+</html>

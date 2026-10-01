@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Remote — control your PC's media from your phone</title>
+<meta name="description" content="Play, pause, skip, seek and change volume on your Windows PC from your Android phone, over your own Wi-Fi or Bluetooth. No account, no cloud.">
+<link rel="stylesheet" href="base.css">
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 40px; }
+  h1 { font-size: clamp(34px, 7vw, 54px); margin: 10px 0 16px; }
+  .lede { font-size: 19px; color: var(--ink-dim); max-width: 34em; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
+  section { margin-top: 56px; }
+  h2 { font-size: 26px; margin-bottom: 14px; }
+  ol, ul { padding-left: 1.2em; } li { margin: 8px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .grid h3 { font-size: 18px; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 20px; font-size: 14px; }
+  footer a { margin-right: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Phone Remote</div>
+  <h1>Your phone is the remote for your PC.</h1>
+  <p class="lede">Play, pause, skip, seek and change volume on your Windows PC from your Android phone, over your own Wi-Fi or Bluetooth. No account, no cloud, nothing leaves your network.</p>
+  <div class="cta">
+    <a class="btn primary" id="dl-win" href="https://github.com/malinanu/phonetodesktop/releases/latest">Download for Windows</a>
+    <a class="btn" id="dl-apk" href="https://github.com/malinanu/phonetodesktop/releases/latest">Download Android app (APK)</a>
+  </div>
+  <p class="dim" id="ver">Free and open source. Windows 10/11 · Android 9+</p>
+
+  <section>
+    <h2>Get connected in 60 seconds</h2>
+    <ol>
+      <li>Install <b>Phone Remote</b> on your PC and run it. It sits in the tray and shows a QR code.</li>
+      <li>Scan the QR code with your phone camera or the Android app.</li>
+      <li>Approve the phone on your PC. Done — it stays paired until you remove it.</li>
+    </ol>
+    <p class="dim">No Wi-Fi? Use Bluetooth mode: the phone acts as a Bluetooth keyboard and media-key device, with no PC software needed.</p>
+  </section>
+
+  <section>
+    <h2>Private by design</h2>
+    <div class="grid">
+      <div class="card"><h3>Stays on your network</h3><p class="dim">Commands go straight from phone to PC. There is no server in the middle.</p></div>
+      <div class="card"><h3>You approve every phone</h3><p class="dim">Pairing needs your OK on the PC, and any phone can be revoked at any time.</p></div>
+      <div class="card"><h3>No tracking</h3><p class="dim">No accounts, analytics or ads. <a href="privacy.html">Read the privacy policy</a>.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Good to know</h2>
+    <ul>
+      <li>Until the Windows installer carries a paid code-signing certificate, Windows may show "Windows protected your PC". Choose <b>More info → Run anyway</b>.</li>
+      <li>Wi-Fi traffic is plain HTTP on your home network, limited to private addresses. Don't use it on networks you don't trust.</li>
+      <li>Bluetooth mode can't show what's playing, and seeks with the arrow keys.</li>
+    </ul>
+  </section>
+
+  <footer class="dim">
+    <a href="https://github.com/malinanu/phonetodesktop">Source code</a>
+    <a href="https://github.com/malinanu/phonetodesktop/issues">Report a problem</a>
+    <a href="privacy.html">Privacy</a>
+  </footer>
+</main>
+<script>
+// Point the buttons at the newest release's files; the plain links above still work without this.
+fetch("https://api.github.com/repos/malinanu/phonetodesktop/releases/latest")
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (rel) {
+    if (!rel) return;
+    (rel.assets || []).forEach(function (a) {
+      if (/\.exe$/i.test(a.name)) document.getElementById("dl-win").href = a.browser_download_url;
+      if (/\.apk$/i.test(a.name)) document.getElementById("dl-apk").href = a.browser_download_url;
+    });
+    if (rel.tag_name) document.getElementById("ver").textContent += " · Latest: " + rel.tag_name;
+  })
+  .catch(function () {});
+</script>
+</body>
+</html>
