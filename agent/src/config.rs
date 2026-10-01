@@ -145,6 +145,11 @@ pub fn clean_files_url(raw: &str) -> Option<String> {
     if !host.split('.').all(label_ok) {
         return None;
     }
+    // The address is later handed to `cmd /c start`, so the path/query may not carry shell metacharacters
+    // (& | ^ % " < > ' and friends). A server base URL needs none of them.
+    if !tail.bytes().all(|b| b.is_ascii_alphanumeric() || b"._~/?#=+,:;@!*-".contains(&b)) {
+        return None;
+    }
     Some(format!("https://{}{}", authority.to_ascii_lowercase(), tail))
 }
 
@@ -171,6 +176,8 @@ mod tests {
             "https://a b.com", "https://", "https://:443", "https://files.example.com:0", "https://files.example.com:99999",
             "https://files.example.com:x", "https://files.example.com:+80", "https://-bad.example.com", "https://exa_mple.com",
             "https://files.example.com\\evil", "https://[::1]/", "https://a..b.com",
+            "https://files.example.com/?a=1&calc.exe", "https://files.example.com/%PATH%", "https://files.example.com/a|b",
+            "https://files.example.com/a^b", "https://files.example.com/a\"b", "https://files.example.com/a'b", "https://files.example.com/<x>",
         ] {
             assert_eq!(clean_files_url(bad), None, "should reject: {bad}");
         }

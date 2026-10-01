@@ -210,7 +210,8 @@ async fn set_autostart(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
 }
 
 /// Open the configured "Send files" page in the default browser. Takes no input: only the address
-/// from the config (validated as https) is ever opened.
+/// from the config is ever opened, and `config::clean_files_url` has already limited it to https plus
+/// characters that are inert for `cmd /c start`.
 async fn open_files(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
     let app = match guard(&(c, h, s), &Method::POST) {
         Ok(a) => a,

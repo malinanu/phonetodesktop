@@ -97,12 +97,29 @@
     c.addEventListener('change', function () { var p = {}; p[c.dataset.key] = c.checked; S.set(p); S.haptic(10); paint(); });
   });
   $('speed').addEventListener('input', function () { S.set({ padSpeed: Number($('speed').value) }); paint(); });
-  // Only https addresses are kept; anything else is flagged and not saved (the app enforces the same rule).
+  // Same rules as FilesUrl.kt (Android) and clean_files_url (PC agent): https only, a strict host and port,
+  // no credentials, and only inert characters in the path/query. Returns the normalised address or null.
+  function cleanFilesUrl(raw) {
+    var s = String(raw || '').trim();
+    if (!s || /\s|\\/.test(s)) return null;
+    if (s.indexOf('://') < 0) s = 'https://' + s;
+    var m = /^https:\/\/([^\/?#]*)([\/?#][\s\S]*)?$/i.exec(s);
+    if (!m) return null;
+    var auth = m[1], tail = m[2] || '';
+    if (!auth || auth.indexOf('@') >= 0) return null;
+    var c = auth.indexOf(':'), host = c < 0 ? auth : auth.slice(0, c), port = c < 0 ? null : auth.slice(c + 1);
+    if (port !== null && !(/^[0-9]{1,5}$/.test(port) && +port >= 1 && +port <= 65535)) return null;
+    if (!host.split('.').every(function (l) { return /^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$/.test(l); })) return null;
+    if (!/^[A-Za-z0-9._~\/?#=+,:;@!*-]*$/.test(tail)) return null;
+    return 'https://' + auth.toLowerCase() + tail;
+  }
+  window.cleanFilesUrl = cleanFilesUrl;
+  // Only a valid address is saved; anything else is flagged and left as it was.
   $('filesUrl').addEventListener('change', function () {
     var v = $('filesUrl').value.trim();
-    var ok = v === '' || /^(https:\/\/)?[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:\d{1,5})?([\/?#]\S*)?$/i.test(v);
-    $('filesUrl').setAttribute('aria-invalid', String(!ok));
-    if (ok) S.set({ filesUrl: v });
+    var c = v === '' ? '' : cleanFilesUrl(v);
+    $('filesUrl').setAttribute('aria-invalid', String(c === null));
+    if (c !== null) { S.set({ filesUrl: c }); $('filesUrl').value = c; }
   });
   $('reset').addEventListener('click', function () { S.set(S.defaults); paint(); });
   $('back').addEventListener('click', function () {

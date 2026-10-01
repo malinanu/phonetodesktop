@@ -15,7 +15,10 @@ class FilesUrlTest {
         for (bad in listOf("", "   ", null, "http://files.example.com", "ftp://x.com", "javascript:alert(1)",
             "https://user:pw@files.example.com", "https://a b.com", "https://", "https://:443",
             "https://files.example.com:0", "https://files.example.com:99999", "https://files.example.com:x",
-            "https://-bad.example.com", "https://exa_mple.com", "https://files.example.com\\evil")) {
+            "https://-bad.example.com", "https://exa_mple.com", "https://files.example.com\\evil",
+            "https://files.example.com:+443", "https://files.example.com:\u0664\u0664\u0663",
+            "https://files.example.com/?a=1&calc.exe", "https://files.example.com/%PATH%", "https://files.example.com/a|b",
+            "https://files.example.com/a^b", "https://files.example.com/a\"b", "https://files.example.com/a'b", "https://files.example.com/<x>")) {
             assertNull("should reject: $bad", FilesUrl.clean(bad))
         }
     }

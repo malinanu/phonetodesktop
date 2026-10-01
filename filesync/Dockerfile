@@ -59,4 +59,5 @@ EXPOSE 80
 # --ws-max-size caps WebSocket frames at the transport (uvicorn's default is 16 MiB,
 # which would be fully buffered before the app's own 32 KiB payload check runs);
 # 64 KiB leaves headroom over the signaling _MAX_PAYLOAD_BYTES limit.
-CMD ["bash", "-c", "python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]
+# Phone Remote: --no-access-log keeps per-request client addresses out of the container logs.
+CMD ["bash", "-c", "python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 --no-access-log & nginx -g 'daemon off;' & wait -n"]

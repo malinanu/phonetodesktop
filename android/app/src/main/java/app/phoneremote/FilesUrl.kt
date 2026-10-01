@@ -7,6 +7,8 @@ package app.phoneremote
 object FilesUrl {
     // The Settings page stores {"filesUrl":"https://..."}; JSON.stringify adds no escapes for URLs.
     private val overrideRe = Regex("\"filesUrl\"\\s*:\\s*\"([^\"\\\\]*)\"")
+    // Path/query characters allowed after the host. Same set as the PC agent (it hands the address to cmd.exe).
+    private val tailRe = Regex("^[A-Za-z0-9._~/?#=+,:;@!*-]*$")
     private val hostRe = Regex("^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$")
 
     /**
@@ -27,9 +29,11 @@ object FilesUrl {
         val port = authority.substringAfter(':', "")
         if (!hostRe.matches(host)) return null
         if (':' in authority) {
-            val n = port.toIntOrNull()
+            // toIntOrNull alone would accept "+443" and non-ASCII digits.
+            val n = if (port.all { it in '0'..'9' }) port.toIntOrNull() else null
             if (n == null || n !in 1..65535) return null
         }
+        if (!tailRe.matches(tail)) return null
         return "https://" + authority.lowercase() + tail
     }
 

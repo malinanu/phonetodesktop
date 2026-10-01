@@ -185,6 +185,13 @@ class MainActivity : Activity() {
         showMode(false)
         // Load the last known address right away, then let mDNS correct it if the IP changed.
         openActive()
+        // A recreate (theme change, rotation) must not throw the user off the Files tab.
+        if (savedInstanceState?.getBoolean("filesMode") == true) showFiles()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("filesMode", filesMode)
     }
 
     override fun onStart() { super.onStart(); if (paired()) discovery.start() }

@@ -60,3 +60,7 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 
 ## Needs a human (cannot be done from this environment)
 T0.3, T3.5, T7.1 (if no Docker), T7.2, VPS provisioning and DNS, Play Console.
+
+## Bug review (code-review, high)
+Fixed: cmd.exe metacharacters accepted in `files_url` (agent, Android and Settings validators now identical, with tests); arm64 image build lacked QEMU; Kotlin port check accepted `+443`; Settings page validated more loosely than the app; HSTS typo; uvicorn access log contradicted the privacy wording; Files tab lost on activity recreate.
+Not changed (upstream FileSync behaviour, worth an upstream issue): `signaling.py` does a blocking DNS lookup on the event loop and caches failures forever; the credentials rate limit is global behind a proxy (documented in DEPLOYING-SERVER.md).
