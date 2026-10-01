@@ -24,6 +24,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Add the shared design system
         run: cp shared/base.css shared/font.woff2 site/
+      - name: Fill in the Send files address (repo variable FILES_URL; the button stays hidden if unset)
+        env:
+          FILES_URL: ${{ vars.FILES_URL }}
+        run: |
+          # Only a plain https origin is accepted (letters, digits, dots, dashes, optional port).
+          if [[ "$FILES_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$ ]]; then
+            sed -i "s|__FILES_URL__|${FILES_URL}|g" site/index.html
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }

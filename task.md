@@ -45,11 +45,11 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 - [x] T5.4 Rust tests
 
 ## Phase 6 — Website, docs, privacy, store
-- [ ] T6.1 Landing page: "Send files" section
-- [ ] T6.2 Rewrite privacy policy (a server now sees IPs/peer ids transiently)
-- [ ] T6.3 Update Play Data safety answers in `docs/RELEASING.md`
-- [ ] T6.4 Update RELEASING.md + guide page
-- [ ] T6.5 Release checklist: server up and healthy before tagging
+- [x] T6.1 Landing page: "Send files" section
+- [x] T6.2 Rewrite privacy policy (a server now sees IPs/peer ids transiently)
+- [x] T6.3 Update Play Data safety answers in `docs/RELEASING.md`
+- [x] T6.4 Update RELEASING.md + guide page
+- [x] T6.5 Release checklist: server up and healthy before tagging
 
 ## Phase 7 — Verify and ship
 - [ ] T7.1 FileSync e2e against local compose (needs Docker + Chromium)

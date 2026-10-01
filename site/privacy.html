@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy — Phone Remote</title>
-<meta name="description" content="Phone Remote collects no personal data and has no servers.">
+<meta name="description" content="Phone Remote collects no personal data. Remote control stays on your network; Send files uses a small relay server that never stores files.">
 <link rel="stylesheet" href="base.css">
 <style>
   main { max-width: 700px; margin: 0 auto; padding: 48px 20px; }
@@ -16,9 +16,9 @@
 <main>
   <a href="./">← Phone Remote</a>
   <h1>Privacy Policy</h1>
-  <p class="dim">Last updated: 1 October 2026</p>
+  <p class="dim">Last updated: 1 October 2026 (added Send files)</p>
 
-  <p>Phone Remote lets you control media on your Windows PC from your Android phone. <b>It does not collect, store on our side, or share any personal data.</b> The developer operates no servers for the app, and the app contains no analytics, advertising or tracking.</p>
+  <p>Phone Remote has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> uses a small server that introduces devices to each other and, when a direct connection is impossible, relays encrypted data. <b>The developer does not collect personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
 
   <h2>What stays on your devices</h2>
   <ul>
@@ -28,15 +28,24 @@
     <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
   </ul>
 
+  <h2>Send files: what the server sees</h2>
+  <ul>
+    <li><b>File contents.</b> Files travel directly between devices, encrypted (WebRTC/DTLS). They never pass through the server unencrypted and are never stored. When a direct route is impossible the relay forwards the same encrypted traffic without being able to read it.</li>
+    <li><b>Connection setup.</b> To connect two devices, the server forwards short setup messages between them (random device ids and network-address details needed to connect). These are held in memory only while connected and are not written to disk.</li>
+    <li><b>IP addresses.</b> As with any internet service, your IP address is visible to the server and the relay while you are connected. The relay may write connection details (IP addresses and times) to operational logs. Those logs rotate automatically by size and are kept only for a short time (typically days), used only to keep the service running and to deal with abuse.</li>
+    <li><b>Sharing.</b> People you give a room link or code to can see the file names you send them and your device's network address, as with any peer-to-peer transfer. Only share a room with people you trust, and use a room password for sensitive files.</li>
+    <li><b>Who runs the server.</b> The address of the Send files server is set by whoever built or configured your copy of the app (you can change it under Settings → Send files). If you run your own server, only you see this data.</li>
+  </ul>
+
   <h2>Permissions the Android app asks for</h2>
   <ul>
-    <li><b>Network and Wi-Fi state, multicast.</b> To find your PC on the local network and talk to it.</li>
+    <li><b>Network and Wi-Fi state, multicast.</b> To find your PC on the local network and talk to it. The Files tab opens Send files in your browser, so file transfer itself needs no extra permission.</li>
     <li><b>Bluetooth (connect, advertise).</b> For Bluetooth mode, where the phone acts as a keyboard / media-key device. Android groups these under "Nearby devices".</li>
   </ul>
   <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
 
   <h2>Network traffic</h2>
-  <p>Wi-Fi mode uses plain HTTP and WebSocket between devices on the same private network; the PC agent only accepts connections from private (LAN) addresses and requires a paired key. Use it on networks you trust.</p>
+  <p>Send files uses HTTPS. Wi-Fi remote-control mode uses plain HTTP and WebSocket between devices on the same private network; the PC agent only accepts connections from private (LAN) addresses and requires a paired key. Use it on networks you trust.</p>
 
   <h2>Children</h2>
   <p>The app is not directed at children and collects no data from anyone.</p>

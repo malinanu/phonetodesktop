@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Phone Remote — control your PC's media from your phone</title>
-<meta name="description" content="Play, pause, skip, seek and change volume on your Windows PC from your Android phone, over your own Wi-Fi or Bluetooth. No account, no cloud.">
+<meta name="description" content="Control your Windows PC's media from your Android phone over Wi-Fi or Bluetooth, and send files of any size between devices. No account, no tracking.">
 <link rel="stylesheet" href="base.css">
 <style>
   main { max-width: 760px; margin: 0 auto; padding: 56px 20px 40px; }
@@ -25,7 +25,7 @@
 <main>
   <div class="kicker">Phone Remote</div>
   <h1>Your phone is the remote for your PC.</h1>
-  <p class="lede">Play, pause, skip, seek and change volume on your Windows PC from your Android phone, over your own Wi-Fi or Bluetooth. No account, no cloud, nothing leaves your network.</p>
+  <p class="lede">Play, pause, skip, seek and change volume on your Windows PC from your Android phone, over your own Wi-Fi or Bluetooth. Send files of any size between any devices, privately. No account, no ads, no tracking.</p>
   <div class="cta">
     <a class="btn primary" id="dl-win" href="https://github.com/malinanu/phonetodesktop/releases/latest">Download for Windows</a>
     <a class="btn" id="dl-apk" href="https://github.com/malinanu/phonetodesktop/releases/latest">Download Android app (APK)</a>
@@ -42,12 +42,19 @@
     <p class="dim">No Wi-Fi? Use Bluetooth mode: the phone acts as a Bluetooth keyboard and media-key device, with no PC software needed.</p>
   </section>
 
+  <section id="files">
+    <h2>Send files, too</h2>
+    <p class="lede" style="font-size:17px">Open one page on both devices, share the link or QR code, and pick files. They go straight from device to device, encrypted, with no size limit and nothing to install for the person receiving.</p>
+    <div class="cta"><a class="btn primary" id="open-files" href="__FILES_URL__" hidden>Open Send files</a></div>
+    <p class="dim">Built on <a href="https://github.com/polius/filesync">FileSync</a> (MIT). A small server only introduces the devices and relays encrypted data when a direct connection isn't possible; it never stores files.</p>
+  </section>
+
   <section>
     <h2>Private by design</h2>
     <div class="grid">
-      <div class="card"><h3>Stays on your network</h3><p class="dim">Commands go straight from phone to PC. There is no server in the middle.</p></div>
+      <div class="card"><h3>Stays on your network</h3><p class="dim">Remote-control commands go straight from phone to PC. There is no server in the middle.</p></div>
       <div class="card"><h3>You approve every phone</h3><p class="dim">Pairing needs your OK on the PC, and any phone can be revoked at any time.</p></div>
-      <div class="card"><h3>No tracking</h3><p class="dim">No accounts, analytics or ads. <a href="privacy.html">Read the privacy policy</a>.</p></div>
+      <div class="card"><h3>No tracking</h3><p class="dim">No accounts, analytics or ads. Files are never stored. <a href="privacy.html">Read the privacy policy</a>.</p></div>
     </div>
   </section>
 
@@ -67,6 +74,11 @@
   </footer>
 </main>
 <script>
+// "Send files" button: the link is filled in when the site is built; show it only if it was.
+(function () {
+  var a = document.getElementById("open-files");
+  if (a && /^https:\/\//.test(a.getAttribute("href"))) a.hidden = false;
+})();
 // Point the buttons at the newest release's files; the plain links above still work without this.
 fetch("https://api.github.com/repos/malinanu/phonetodesktop/releases/latest")
   .then(function (r) { return r.ok ? r.json() : null; })

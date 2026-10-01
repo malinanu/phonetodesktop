@@ -6,6 +6,7 @@ Everything ships from one command: `git tag v1.0.0 && git push --tags`.
 - `PhoneRemote-Setup-<version>.exe` — Windows installer
 - `PhoneRemote-<version>.apk` — Android APK (direct download)
 - `PhoneRemote-<version>.aab` — Play Store bundle (workflow artifact only; needs the keystore secrets)
+- `ghcr.io/malinanu/phonetodesktop-files:<version>` and `:latest` — the Send files server image (see [DEPLOYING-SERVER.md](DEPLOYING-SERVER.md))
 
 Version numbers come from the tag (`v1.2.3` → versionName `1.2.3`, versionCode `10203`). Never reuse a tag.
 
@@ -39,7 +40,12 @@ Add secrets `WIN_CERT_B64` (that output) and `WIN_CERT_PASSWORD`. The workflow s
 Many EV certs ship on a hardware token and can't be exported; for those use a cloud signing service (Azure Trusted Signing,
 SSL.com eSigner, etc.) and adjust the signing steps.
 
-### 3. Website (GitHub Pages)
+### 3. Send files server and `FILES_URL`
+Deploy the server first ([DEPLOYING-SERVER.md](DEPLOYING-SERVER.md)), then add the repository **variable** (not secret) `FILES_URL` = `https://files.example.com`
+under Settings → Secrets and variables → Actions → Variables. Releases bake it into the Android app and the Windows agent, and the Pages workflow uses it for the website button.
+Without it the Files tab asks for an address and the "Send files" buttons stay hidden.
+
+### 4. Website (GitHub Pages)
 Repo **Settings → Pages → Source: GitHub Actions**. `.github/workflows/pages.yml` publishes `site/` on every push to `main` (or the current default branch; consider renaming it to `main` under Settings → Branches).
 The privacy policy URL for Play is `https://<owner>.github.io/<repo>/privacy.html` (or your custom domain, set under Pages).
 
@@ -47,14 +53,18 @@ The privacy policy URL for Play is `https://<owner>.github.io/<repo>/privacy.htm
 1. Create a developer account at play.google.com/console ($25 one-time; new personal accounts must run a closed test with
    12+ testers for 14 days before production access).
 2. Create the app, then fill in: privacy policy URL, **Data safety** form, content rating, target audience, app category (Tools).
-   Data safety answers: *no data collected, no data shared* (see `site/privacy.html`; the app has no analytics and no external servers).
+   Data safety answers: *no data collected, no data shared*. This holds because the app itself contacts no server of yours: remote control is phone-to-PC on the LAN,
+   and the Files tab only launches the phone's browser for Send files. The privacy policy still describes the file service (see `site/privacy.html`).
+   **Re-answer the form if you ever load the Send files page inside the app (WebView), add analytics or crash upload, or send anything else off the device.**
 3. Enrol in **Play App Signing** when uploading the first bundle, and upload `PhoneRemote-<version>.aab` from the release workflow run
    (Actions → run → Artifacts → `android-aab`).
 4. Permissions Play may ask you to justify: Bluetooth connect/advertise (Bluetooth HID remote mode) and local network discovery (finding the PC).
 5. Roll out: internal test → closed test → production. Every upload needs a higher versionCode, which a new tag gives you.
 
 ## Release checklist
-- [ ] CI green on `main` (`build` workflow)
+- [ ] CI green on `main` (`build` and `filesync-checks` workflows)
+- [ ] Send files server deployed, `https://<files-domain>/api/health` returns 200, and `FILES_URL` is set
+- [ ] A file sent between two devices on different networks (forces the TURN relay) arrives intact
 - [ ] Installed the APK on a real phone; Wi-Fi pairing and Bluetooth mode both work
 - [ ] Ran the Windows installer on a real PC; tested with VLC, a browser and Spotify
 - [ ] Tag pushed, release published, download links on the site work

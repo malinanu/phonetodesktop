@@ -1,10 +1,16 @@
 # Production stack for the Phone Remote "Send files" server (FileSync).
 #   cp .env.example .env && $EDITOR .env && docker compose up -d
 # Adapted from filesync/deploy/docker-compose-ssl.yml. See docs/DEPLOYING-SERVER.md.
+x-logging: &logging
+  # Operational logs rotate by size, so nothing is kept for long (see the privacy policy).
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
 services:
   caddy:
     image: caddy:2
     container_name: files-caddy
+    logging: *logging
     ports:
       - "80:80"      # needed for the certificate challenge and the redirect to https
       - "443:443"
@@ -21,6 +27,7 @@ services:
   filesync:
     image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
     container_name: files-app
+    logging: *logging
     environment:
       - SECRET_FILE=/keys/secret
     volumes:
@@ -35,6 +42,7 @@ services:
   coturn:
     image: coturn/coturn:alpine
     container_name: files-coturn
+    logging: *logging
     entrypoint: ["/bin/sh", "-c"]
     # Private ranges are denied as relay targets so the relay can't be used to reach this host's
     # internal network. The quotas cap how many relay sessions one user / the whole server can hold;
@@ -77,6 +85,7 @@ services:
   init:
     image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
     container_name: files-init
+    logging: *logging
     command: python3 api/init_secret.py
     volumes:
       - keys:/keys
