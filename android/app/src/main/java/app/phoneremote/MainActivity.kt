@@ -170,7 +170,7 @@ class MainActivity : Activity() {
             setBackgroundColor(C.CARD)
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
-        navWifi = navItem(R.drawable.ic_wifi, "Wi-Fi") { showMode(false) }
+        navWifi = navItem(R.drawable.ic_wifi, "Remote") { showMode(false) }
         navBt = navItem(R.drawable.ic_bluetooth, "Bluetooth") { showMode(true) }
         nav.addView(navWifi, lp(0, WRAP_CONTENT, 1f))
         navFiles = navItem(R.drawable.ic_files, "Files") { showFiles() }
@@ -218,21 +218,22 @@ class MainActivity : Activity() {
             gravity = Gravity.BOTTOM
             setPadding(dp(24), dp(16), dp(24), dp(20))
         }
-        col.addView(label("SETUP", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
-        col.addView(label("Take the remote.", 38f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
-        col.addView(label("Pause, skip and seek your PC's media from the couch. Pair once; it reconnects by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
+        col.addView(label("CONNECT", 12f, C.DIM, bold = true).apply { letterSpacing = 0.12f })
+        col.addView(label("Control your computer from your phone.", 34f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
+        col.addView(label("Pause, skip and change the volume of videos and music from the couch. You connect once, then it works by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
         listOf(
-            "Open Phone Remote on your PC",
-            "Double-click its tray icon and open Phones",
-            "Scan the code, then tap Allow on the PC",
+            "On your computer, open Phone Remote. The window shows a square code.",
+            "Tap the big button below and point the camera at that code.",
+            "On the computer, click Allow. That is all.",
         ).forEachIndexed { i, t ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, dp(12)) }
             row.addView(label("${i + 1}", 26f, C.ACC_TEXT, bold = true), lp(dp(36), WRAP_CONTENT))
             row.addView(label(t, 16f), lp(0, WRAP_CONTENT, 1f))
             col.addView(row)
         }
-        col.addView(button("Scan QR code", filled = true) { scanQr() }, lp().apply { topMargin = dp(20) })
-        col.addView(button("How it works and troubleshooting") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("Scan the code on my computer", filled = true) { scanQr() }.apply { minHeight = dp(60); textSize = 17f }, lp().apply { topMargin = dp(20) })
+        col.addView(button("No Phone Remote on the computer? Use Bluetooth") { showMode(true) }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("Help") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
     }
 
