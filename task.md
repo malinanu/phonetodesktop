@@ -9,7 +9,7 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 - [ ] T0.3 Confirm ownership / licence of FileSync with the owner (MIT — attribution kept either way)
 
 ## Phase 1 — Import and CI
-- [x] T1.1 Import FileSync into `filesync/` with `git subtree` (history squashed, LICENSE kept)
+- [x] T1.1 Import FileSync into `filesync/` as a plain copy of upstream @ 5283525 (LICENSE kept; no subtree merge commits)
 - [x] T1.2 Move FileSync workflows to root `.github/`, scoped to `filesync/**`
 - [x] T1.3 Run `ruff`, `pytest`, `npm run lint`, `npm test` locally — all green
 - [x] T1.4 Root README: add `filesync/` and a "Send files" section
