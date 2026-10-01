@@ -387,14 +387,18 @@ async fn challenge_login(sock: &mut WebSocket, app: &Arc<App>, device: String) -
     rand::rng().fill_bytes(&mut nonce);
     let _ = sock.send(text(serde_json::json!({"t":"challenge","nonce":URL_SAFE_NO_PAD.encode(nonce)}).to_string())).await;
     let reply = tokio::time::timeout(Duration::from_secs(5), sock.recv()).await;
-    let sig = match reply {
+    let (sig, cert) = match reply {
         Ok(Some(Ok(Message::Text(t)))) => match serde_json::from_str::<ClientMsg>(t.as_str()) {
-            Ok(ClientMsg::AuthSig { device: d, sig }) if d == device => sig,
+            Ok(ClientMsg::AuthSig { device: d, sig, cert }) if d == device => (sig, cert),
             _ => return None,
         },
         _ => return None,
     };
-    match app.auth.verify_signature(&device, &nonce, &sig) {
+    let result = match &cert {
+        Some(cert) => app.auth.verify_account_login(&device, cert, &nonce, &sig),
+        None => app.auth.verify_signature(&device, &nonce, &sig),
+    };
+    match result {
         Ok(name) => Some(Login { device: Some(device), name }),
         Err(AuthErr::Revoked) => fail(sock, serde_json::json!({"t":"auth","ok":false,"err":"revoked"})).await,
         Err(_) => {
@@ -534,6 +538,7 @@ mod tests {
             autostart_initialized: true,
             files_url: String::new(),
             allow_v1: true,
+            account: None,
         }
     }
 

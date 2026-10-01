@@ -87,7 +87,7 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 ### D. Account service (optional cloud)
 - [x] D1 `account/` FastAPI + SQLAlchemy (SQLite for tests, Postgres in deploy): users, devices, signed certificates (Ed25519, key ids for rotation), signed revocation list, link codes; 52 tests (pytest) incl. authorization between accounts, tampered/expired certs, rate limits; also smoke-tested over real HTTP with uvicorn
 - [x] D2 Sign-in: emailed one-time code (changed from a link: works in the app without deep links; 5 tries, 15 min, hashed), Google and Apple ID-token verification (tested with a locally generated RSA key standing in for the provider's JWKS; NOT tested against the real providers, which needs your client IDs), rotating refresh tokens with reuse detection
-- [ ] D3 Client enrol, certificate refresh, offline verification, revocation polling
+- [ ] D3 Client enrol, certificate refresh, offline verification, revocation polling. Done: the PC verifies certificates and signed revocation lists offline (`agent/src/account.rs`, checked against certificates made by the real Python service) and accepts account phones at login (`auth_sig` + `cert`), 7 new tests. Open: joining an account from the PC (link code), revocation polling, dashboard account section, Dart-side enrol and certificate renewal
 - [ ] D4 Web "My devices" + account deletion
 - [x] D5 Deploy: Dockerfile, optional `--profile accounts` in both compose files (Postgres + service; reachable at /account/ through the existing Caddy), CI workflow + GHCR image on tags, docs/ACCOUNTS.md. Compose rendering verified; NOT run on a real host. Backups and a real SMTP provider are yours to set up
 - [ ] D6 Security review + threat-model note

@@ -41,6 +41,12 @@ The phone signs these exact bytes (`auth_message` in `agent/src/auth.rs`):
 ```
 - The **nonce** is fresh for each connection, so a recorded login cannot be replayed.
 - The **pc id** (from the QR / mDNS) binds the signature to this computer, so it is useless against another one.
+- **Account phones** (optional, see [ACCOUNTS.md](ACCOUNTS.md)) add their device certificate:
+  `{"t":"auth_sig","device":"<id>","sig":"...","cert":"<certificate>"}`. A computer that joined the same account
+  accepts it with no QR pairing, by checking the certificate's signature offline, then the `sig` against the
+  certificate's `pk`. The certificate alone is worthless without the private key. If the certificate does not work
+  but the phone is also paired locally, the local key is used. `"revoked"` is also returned when the owner removed
+  the device from the account (as far as this computer has learned).
 - Errors: `"revoked"` (the computer no longer knows this device: forget it and pair again), `"bad token"` (signature
   did not verify; counts towards a lockout of 5 failures per minute), `"locked"`, `"v2_required"` (this computer
   refuses v1 phones).

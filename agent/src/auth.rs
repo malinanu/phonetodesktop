@@ -1,6 +1,7 @@
 //! Who may control this PC: approved phones with their own tokens, plus the legacy shared secret.
 //! Pure logic (no sockets), so the pairing state machine is unit-tested.
 
+use crate::account::{AccountTrust, CertError};
 use crate::config::{self, Config, Device};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -58,6 +59,8 @@ struct Inner {
     pending: Vec<PendingEntry>,
     decisions: HashMap<String, Decision>,
     online: HashMap<String, usize>,
+    /// Devices that logged in with an account certificate (not stored in the trust list), id -> name.
+    account_devices: HashMap<String, String>,
 }
 
 pub struct Auth {
@@ -117,6 +120,7 @@ impl Auth {
                 pending: vec![],
                 decisions: HashMap::new(),
                 online: HashMap::new(),
+                account_devices: HashMap::new(),
             }),
             persist,
         }
@@ -181,6 +185,69 @@ impl Auth {
         }
         d.last_seen = now_s();
         Ok(d.name.clone())
+    }
+
+    /// Protocol v2 login by an account phone: it presents a device certificate signed by the account this PC
+    /// joined, and signs the challenge with the key named in that certificate. Works offline.
+    /// A phone that is also paired locally falls back to its local key if the certificate does not work.
+    pub fn verify_account_login(&self, device: &str, cert: &str, nonce: &[u8], sig_b64: &str) -> Result<String, AuthErr> {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        let outcome = {
+            let mut i = self.inner.lock().unwrap();
+            let pc_id = i.cfg.pc_id.clone();
+            match i.cfg.account.as_ref().map(|a| a.verify_cert(cert, now_s())) {
+                None => Err(None),
+                Some(Err(e)) => Err(Some(e)),
+                Some(Ok(c)) if c.dev != device || c.kind != "phone" => Err(Some(CertError::Malformed)),
+                Some(Ok(c)) => {
+                    let sig = URL_SAFE_NO_PAD.decode(sig_b64).ok().and_then(|b| ed25519_dalek::Signature::from_slice(&b).ok());
+                    match sig {
+                        Some(sig) if c.pk.verify_strict(&auth_message(&pc_id, device, nonce), &sig).is_ok() => {
+                            let name = if c.name.is_empty() { "Account phone".to_string() } else { c.name };
+                            i.account_devices.insert(device.to_string(), name.clone());
+                            Ok(name)
+                        }
+                        _ => Err(Some(CertError::BadSignature)),
+                    }
+                }
+            }
+        };
+        match outcome {
+            Ok(name) => Ok(name),
+            Err(why) => match self.verify_signature(device, nonce, sig_b64) {
+                Ok(name) => Ok(name),
+                // Not paired here either: tell the phone why. Only "removed from the account" means forget this PC.
+                Err(_) if why == Some(CertError::Revoked) => Err(AuthErr::Revoked),
+                Err(_) => Err(AuthErr::BadToken),
+            },
+        }
+    }
+
+    /// The account this PC has joined, if any.
+    pub fn account(&self) -> Option<AccountTrust> {
+        self.inner.lock().unwrap().cfg.account.clone()
+    }
+
+    pub fn set_account(&self, account: Option<AccountTrust>) {
+        let mut i = self.inner.lock().unwrap();
+        if account.is_none() {
+            i.account_devices.clear();
+        }
+        i.cfg.account = account;
+        self.save(&i);
+    }
+
+    /// Store a freshly fetched signed revocation list. False if it did not verify.
+    pub fn apply_revocations(&self, envelope: &str) -> bool {
+        let mut i = self.inner.lock().unwrap();
+        let Some(a) = i.cfg.account.as_mut() else { return false };
+        let ok = a.apply_revocations(envelope, now_s());
+        if ok {
+            let gone: Vec<String> = a.revoked.iter().map(|r| r.dev.clone()).collect();
+            i.account_devices.retain(|d, _| !gone.contains(d));
+            self.save(&i);
+        }
+        ok
     }
 
     /// Does this device log in with a key (v2)?
@@ -331,7 +398,11 @@ impl Auth {
     /// Live check (so the dashboard switch takes effect at once). Shared-secret phones cannot be
     /// identified, so they never get mouse and keyboard.
     pub fn input_allowed(&self, device: &str) -> bool {
-        self.inner.lock().unwrap().cfg.devices.iter().find(|d| d.id == device).is_some_and(|d| d.input_allowed)
+        let i = self.inner.lock().unwrap();
+        match i.cfg.devices.iter().find(|d| d.id == device) {
+            Some(d) => d.input_allowed,
+            None => i.account_devices.contains_key(device) && i.cfg.account.as_ref().is_some_and(|a| a.input_allowed),
+        }
     }
 
     pub fn set_input_allowed(&self, device: &str, on: bool) -> bool {
@@ -406,6 +477,7 @@ mod tests {
             autostart_initialized: true,
             files_url: String::new(),
             allow_v1: true,
+            account: None,
         };
         c.devices.clear();
         Auth::in_memory(c)
@@ -612,6 +684,140 @@ mod tests {
         let (a, _) = with_v2_phone();
         let code = a.code();
         assert_eq!(a.request_pairing(&code, "ph", "Old app", "ip"), Ok(None), "needs the owner's approval, no silent token");
+    }
+
+    // ---- account certificates ----
+
+    mod account {
+        use super::*;
+        use crate::account::{AccountTrust, Revoked};
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        use std::collections::BTreeMap;
+
+        const ACCT: &str = "abababababababababababababababab";
+
+        fn service() -> SigningKey {
+            SigningKey::from_bytes(&[5u8; 32])
+        }
+
+        fn joined() -> Auth {
+            let a = auth(false);
+            a.set_account(Some(AccountTrust {
+                url: "https://x.test/account".into(),
+                acct: ACCT.into(),
+                keys: BTreeMap::from([("k1".to_string(), URL_SAFE_NO_PAD.encode(service().verifying_key().to_bytes()))]),
+                grace_days: 14,
+                input_allowed: true,
+                revoked: vec![],
+                revoked_checked: 0,
+            }));
+            a
+        }
+
+        fn cert(device: &str, kind: &str, phone_pk: &str, iat: u64, exp: u64) -> String {
+            let body = serde_json::to_vec(&serde_json::json!({"v":1,"kid":"k1","acct":ACCT,"dev":device,"kind":kind,"name":"Pixel","pk":phone_pk,"iat":iat,"exp":exp})).unwrap();
+            let mut msg = b"PRv2-cert\0".to_vec();
+            msg.extend_from_slice(&body);
+            format!("{}.{}", URL_SAFE_NO_PAD.encode(&body), URL_SAFE_NO_PAD.encode(service().sign(&msg).to_bytes()))
+        }
+
+        fn fresh(device: &str, pk: &str) -> String {
+            let n = now_s();
+            cert(device, "phone", pk, n - 60, n + 86_400)
+        }
+
+        #[test]
+        fn an_account_phone_logs_in_with_its_certificate_and_no_pairing() {
+            let a = joined();
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            assert_eq!(a.verify_account_login("phone-9", &fresh("phone-9", &pk), &nonce, &sig), Ok("Pixel".into()));
+            assert!(a.input_allowed("phone-9"), "the owner's own phones may use the mouse and keyboard");
+            assert!(a.devices().is_empty(), "nothing is added to the local trust list");
+        }
+
+        #[test]
+        fn the_certificate_alone_is_not_enough() {
+            let a = joined();
+            let (_, pk) = keypair(3);
+            let (thief, _) = keypair(4);
+            let nonce = [1u8; 32];
+            let c = fresh("phone-9", &pk);
+            // someone who copied the certificate but not the key
+            let sig = sign(&thief, &a.pc_id(), "phone-9", &nonce);
+            assert_eq!(a.verify_account_login("phone-9", &c, &nonce, &sig), Err(AuthErr::BadToken));
+            // a signature for another nonce or another PC
+            let (sk, _) = keypair(3);
+            assert_eq!(a.verify_account_login("phone-9", &c, &nonce, &sign(&sk, &a.pc_id(), "phone-9", &[2u8; 32])), Err(AuthErr::BadToken));
+            assert_eq!(a.verify_account_login("phone-9", &c, &nonce, &sign(&sk, "other-pc", "phone-9", &nonce)), Err(AuthErr::BadToken));
+            assert!(!a.input_allowed("phone-9"));
+        }
+
+        #[test]
+        fn the_certificate_must_be_for_this_device_and_a_phone() {
+            let a = joined();
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            let n = now_s();
+            assert_eq!(a.verify_account_login("phone-9", &fresh("phone-1", &pk), &nonce, &sig), Err(AuthErr::BadToken));
+            assert_eq!(a.verify_account_login("phone-9", &cert("phone-9", "pc", &pk, n - 60, n + 1000), &nonce, &sig), Err(AuthErr::BadToken));
+        }
+
+        #[test]
+        fn expired_beyond_the_grace_period_is_refused_but_a_short_absence_is_fine() {
+            let a = joined();
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            let n = now_s();
+            assert!(a.verify_account_login("phone-9", &cert("phone-9", "phone", &pk, n - 40 * 86_400, n - 5 * 86_400), &nonce, &sig).is_ok());
+            assert_eq!(a.verify_account_login("phone-9", &cert("phone-9", "phone", &pk, n - 90 * 86_400, n - 40 * 86_400), &nonce, &sig), Err(AuthErr::BadToken));
+        }
+
+        #[test]
+        fn a_removed_device_is_told_to_forget_this_pc_and_cannot_log_in() {
+            let a = joined();
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            let c = fresh("phone-9", &pk);
+            assert!(a.verify_account_login("phone-9", &c, &nonce, &sig).is_ok());
+            // the owner removes it; the PC next fetches the list
+            let mut t = a.account().unwrap();
+            t.revoked.push(Revoked { dev: "phone-9".into(), at: now_s() });
+            a.set_account(Some(t));
+            assert_eq!(a.verify_account_login("phone-9", &c, &nonce, &sig), Err(AuthErr::Revoked));
+        }
+
+        #[test]
+        fn without_an_account_or_with_a_bad_certificate_a_locally_paired_phone_still_works() {
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            // not joined to any account: a certificate is ignored, a stranger is refused
+            let a = auth(false);
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            assert_eq!(a.verify_account_login("phone-9", &fresh("phone-9", &pk), &nonce, &sig), Err(AuthErr::BadToken));
+            // paired locally as well: local key wins even when the certificate is junk
+            let a = joined();
+            let code = a.code();
+            a.request_pairing_v2(&code, "phone-9", "Pixel", "ip", &pk, "android").unwrap();
+            a.decide("phone-9", true);
+            assert_eq!(a.verify_account_login("phone-9", "junk", &nonce, &sig), Ok("Pixel".into()));
+        }
+
+        #[test]
+        fn leaving_the_account_forgets_account_phones() {
+            let a = joined();
+            let (sk, pk) = keypair(3);
+            let nonce = [1u8; 32];
+            let sig = sign(&sk, &a.pc_id(), "phone-9", &nonce);
+            a.verify_account_login("phone-9", &fresh("phone-9", &pk), &nonce, &sig).unwrap();
+            assert!(a.input_allowed("phone-9"));
+            a.set_account(None);
+            assert!(!a.input_allowed("phone-9"));
+        }
     }
 }
 

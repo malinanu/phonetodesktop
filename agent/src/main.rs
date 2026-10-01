@@ -2,6 +2,7 @@
 // CLI subcommands re-attach to the parent terminal so their output still shows.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod account;
 mod api;
 mod auth;
 mod backend;

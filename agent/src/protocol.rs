@@ -45,7 +45,8 @@ pub enum ClientMsg {
     /// Protocol v2 login, step 1: the PC answers with `{"t":"challenge","nonce":...}`.
     Challenge { device: String },
     /// Protocol v2 login, step 2: base64url Ed25519 signature over `auth::auth_message(pc_id, device, nonce)`.
-    AuthSig { device: String, sig: String },
+    /// An account phone adds its device certificate (docs/ACCOUNTS.md) so it needs no QR pairing.
+    AuthSig { device: String, sig: String, #[serde(default)] cert: Option<String> },
     Cmd(Command),
     Ping,
 }
