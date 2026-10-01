@@ -52,7 +52,7 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 - [x] T6.5 Release checklist: server up and healthy before tagging
 
 ## Phase 7 — Verify and ship
-- [ ] T7.1 FileSync e2e against local compose (needs Docker + Chromium)
+- [x] T7.1 FileSync browser e2e: smoke cell (Chromium / service-worker sink / 20 MiB, SHA-256 verified) passes against the app run without Docker (stand-in for nginx). Not run: full matrix, interruption harness and TURN cells (need Docker + coturn)
 - [ ] T7.2 Real-device matrix incl. cross-network (TURN relay)
 - [ ] T7.3 `/security-review` of the new surface
 - [ ] T7.4 CI green, PR ready, tag `v1.1.0` only after T3.5 and T7.2
