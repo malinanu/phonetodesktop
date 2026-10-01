@@ -26,7 +26,7 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 - [x] T3.2 Release workflow builds and pushes the image to GHCR on `v*` tags
 - [x] T3.3 `docs/DEPLOYING-SERVER.md` runbook
 - [x] T3.4 Hardening notes (real client IP, TURN limits, exposed paths)
-- [ ] T3.5 Local compose smoke test (needs Docker + two browsers) — partly done: app tested without Docker (health, uuid, credentials, WebSocket register OK; no Docker daemon in this environment)
+- [ ] T3.5 Local compose smoke test (needs Docker + two browsers) — partly done: CI's `docker` build and `e2e-smoke` (the real FileSync container stack: nginx + FastAPI + coturn, 100-MB-class transfer in Chromium) are green; app also tested here without Docker. Not yet run: `deploy/docker-compose.yml` itself (Caddy + GHCR image) on a real server
 
 ## Phase 4 — Android "Files" tab
 Changed approach: FileSync streams downloads through a service worker / File System Access API, which an Android WebView cannot hand to the system downloader (and I won't expose a JS bridge to a remote site). So the tab is a native panel that opens Send files in the phone's browser, where large receives work.
@@ -36,7 +36,8 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 - [x] T4.4 Opens in the browser (that is the "large receive" path)
 - [x] T4.5 Permissions re-checked: none added (INTERNET already declared)
 - [ ] T4.6 Stretch: Android share-target (not done)
-- [ ] T4.7 Compile + run `testDebugUnitTest` (no Android SDK here; CI does it) and try the tab on a real phone
+- [x] T4.7a CI compiled the app and ran `testDebugUnitTest` (incl. `FilesUrlTest`): green
+- [ ] T4.7b Try the Files tab on a real phone
 
 ## Phase 5 — Windows agent entry points
 - [x] T5.1 Config key `files_url`
