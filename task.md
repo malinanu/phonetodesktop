@@ -67,7 +67,7 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 ### A. Cross-platform desktop agent
 - [x] A1 Linux `Backend`: MPRIS (zbus), volume via wpctl/pactl, input via enigo (X11/XTest). Verified live here: MPRIS roundtrip against a fake player on a private D-Bus, and X11 mouse/scroll/text/Ctrl+key/media-key events seen by a probe window under Xvfb. Not done: uinput for Wayland-only desktops (documented limit)
 - [ ] A2 macOS `Backend` (enigo media keys + input, volume via osascript; no now-playing): implemented and `cargo check --target aarch64-apple-darwin` is clean, but NOT run on a real Mac (needs the G1 manual check)
-- [ ] A3 Tray / autostart / log folder / open-url cross-platform (no more `cmd /c start` on mac/Linux)
+- [ ] A3 Tray / autostart / log folder / open-url cross-platform: DONE for open-url (open / xdg-open), start-at-login (macOS LaunchAgent with KeepAlive, Linux XDG autostart; `phone-remote autostart on|off|status`; dashboard toggle), log folder (already per-OS), and the `phone-remote open` launcher (starts the agent detached, shows the dashboard); verified live on Linux. NOT done: a tray icon on macOS/Linux (the dashboard in the browser is the UI there for now); macOS parts compile-checked only
 - [ ] A4 Packaging + CI matrix: Windows installer, macOS .dmg (signed/notarized), Linux AppImage + .deb; `cargo test` + `clippy` on all three
 - [ ] A5 mDNS + firewall notes per OS
 

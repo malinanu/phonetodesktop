@@ -203,9 +203,14 @@ async fn set_autostart(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
         Err(r) => return r,
     };
     let _ = app;
+    let on = body["enabled"].as_bool().unwrap_or(false);
     #[cfg(windows)]
-    crate::tray::set_autostart(body["enabled"].as_bool().unwrap_or(false));
-    let _ = body;
+    crate::tray::set_autostart(on);
+    #[cfg(unix)]
+    if let Err(e) = crate::platform::set_autostart(on) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok": false, "error": e.to_string()}))).into_response();
+    }
+    let _ = on;
     ok()
 }
 
@@ -238,6 +243,8 @@ async fn log_tail(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
 fn autostart_enabled() -> bool {
     #[cfg(windows)]
     return crate::tray::autostart_enabled();
-    #[cfg(not(windows))]
+    #[cfg(unix)]
+    return crate::platform::autostart_enabled();
+    #[cfg(not(any(windows, unix)))]
     false
 }

@@ -11,6 +11,7 @@ mod discovery;
 mod guardian;
 mod log;
 mod net;
+mod platform;
 mod protocol;
 mod server;
 #[cfg(windows)]
@@ -25,6 +26,8 @@ fn usage() -> &'static str {
      phone-remote rotate    unpair every phone\n\
      phone-remote setup-players   switch on VLC / mpv / MPC-HC remote interfaces (progress + seek)
      phone-remote install   (Windows) allow private-network firewall access (run as Administrator)\n\
+     phone-remote open      (macOS/Linux) start the agent if needed and show the dashboard\n\
+     phone-remote autostart on|off|status   (macOS/Linux) start at login\n\
      \n\
      Windows: without --console the agent runs in the system tray."
 }
@@ -124,6 +127,8 @@ fn real_main() -> Result<()> {
         }
         "pair" => say(&format!("Open http://127.0.0.1:{}/pair on this PC (the agent must be running) and scan the code.", cfg.port)),
         "install" => install(&cfg)?,
+        "open" => open_cmd(cfg.port)?,
+        "autostart" => autostart_cmd(args.get(1).map(String::as_str))?,
         "setup-players" => backend::setup::apply(&backend::vlc_password(&cfg.local_secret)).iter().for_each(|l| say(l)),
         _ => {
             log::install_hooks();
@@ -285,16 +290,7 @@ async fn serve(
 
 /// Open a URL in the default browser without flashing a console window.
 pub fn open_url(url: &str) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
-            .spawn();
-    }
-    #[cfg(not(windows))]
-    let _ = url;
+    platform::open_url(url);
 }
 
 #[cfg(windows)]
@@ -314,6 +310,36 @@ fn install(cfg: &config::Config) -> Result<()> {
         if ok { "OK  " } else { "FAIL" },
         if ok { "" } else { " - re-run from an Administrator prompt" }
     ));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn open_cmd(port: u16) -> Result<()> {
+    platform::open_dashboard(port)
+}
+
+#[cfg(not(unix))]
+fn open_cmd(port: u16) -> Result<()> {
+    // Windows: the tray app is the launcher; just show the dashboard if it is running.
+    open_url(&format!("http://127.0.0.1:{port}/dashboard"));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn autostart_cmd(what: Option<&str>) -> Result<()> {
+    match what {
+        Some("on") => platform::set_autostart(true)?,
+        Some("off") => platform::set_autostart(false)?,
+        Some("status") | None => {}
+        Some(other) => anyhow::bail!("unknown option {other:?}; use on, off or status"),
+    }
+    say(if platform::autostart_enabled() { "Start at login: on" } else { "Start at login: off" });
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn autostart_cmd(_: Option<&str>) -> Result<()> {
+    say("On Windows, use the tray menu: Start with Windows.");
     Ok(())
 }
 

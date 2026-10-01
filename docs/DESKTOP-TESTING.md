@@ -18,6 +18,8 @@ dbus-run-session -- sh -c 'python3 tests-support/fake_mpris.py /tmp/fake.log & s
 cat /tmp/fake.log     # PlayPause / Next / Previous / SetPosition as received by the fake player
 ```
 
+**Launcher, autostart and the whole agent** (no extra tools): `cargo build`, then with a throwaway `HOME`: `phone-remote autostart on` writes `~/.config/autostart/phone-remote.desktop`; `phone-remote open --port 18765` starts the agent detached and shows the dashboard (the subcommand must come first). Under `dbus-run-session` with the fake player running, `curl localhost:18765/debug` lists it.
+
 **Mouse, keyboard, scroll, media keys (X11)** needs `Xvfb` and `pip install python-xlib`:
 ```
 cd agent
