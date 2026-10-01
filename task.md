@@ -93,7 +93,7 @@ Order: A+B first (ship as a release), then C, then E and D in parallel, then F, 
 - [ ] D6 Security review + threat-model note
 
 ### E. Flutter mobile app (iOS + Android)
-- [ ] E1 `mobile/` project (Dart; platform folders, application id and signing key still to add)
+- [x] E1 `mobile/` Android + iOS projects: application id `app.phoneremote`, minSdk 28, release signing from the same env keystore as the native app, permissions (Wi-Fi/multicast/camera), iOS camera + local-network + Bonjour keys; CI builds the release APK and an unsigned iOS app (first runs pending)
 - [x] E2 Wi-Fi mode done natively (no WebView): pinned-TLS protocol client verified against the real Rust agent, mDNS, QR pairing, saved PCs, native remote + touchpad screens; 46 tests
 - [ ] E3 Android-only Bluetooth mode via platform channel (reuse HidRemote.kt)
 - [ ] E4 Files tab, Settings and themes done (widget tests); contrast audit and screen-reader pass still open

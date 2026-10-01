@@ -95,4 +95,20 @@ jobs:
         working-directory: mobile
       - run: flutter test
         working-directory: mobile
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: The Android app builds (debug-signed unless the release keystore secrets are set)
+        run: flutter build apk --release
+        working-directory: mobile
+  mobile-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter pub get
+        working-directory: mobile
+      - name: The iOS app builds (unsigned; signing and upload are done at release time)
+        run: flutter build ios --release --no-codesign
+        working-directory: mobile
 

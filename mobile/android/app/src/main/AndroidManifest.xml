@@ -1,6 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Finding PCs on the Wi-Fi (mDNS) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <!-- Scanning the pairing QR code -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Keeping the screen on while the remote is open -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
-        android:label="phoneremote"
+        android:label="Phone Remote"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
