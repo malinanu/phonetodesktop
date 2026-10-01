@@ -1,9 +1,14 @@
-name: checks
+name: filesync-checks
 
 on:
   push:
-    branches: [main]
+    paths: ["filesync/**", ".github/workflows/filesync-checks.yml"]
   pull_request:
+    paths: ["filesync/**", ".github/workflows/filesync-checks.yml"]
+
+defaults:
+  run:
+    working-directory: filesync
 
 jobs:
   # Builds the multi-stage image. This is the highest-value gate: it exercises the
@@ -46,6 +51,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: filesync/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -67,7 +73,7 @@ jobs:
         with:
           node-version: 22
       - name: Run smoke cell (chromium / sw sink / auto ICE)
-        working-directory: e2e
+        working-directory: filesync/e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium

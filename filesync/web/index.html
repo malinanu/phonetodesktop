@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>FileSync.app | Send files securely in real-time.</title>
+    <title>Send files | Phone Remote</title>
     <meta name="description" content="Send files securely from one device to many in real-time.">
     <meta charset="UTF-8">
     <link rel="icon" type="image/png" href="assets/icon.png">
@@ -9,10 +9,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <link href="css/phoneremote-theme.css" rel="stylesheet">
     <script src="js/theme.js"></script>
   </head>
   <body>
     <div class="header">
+      <a class="pr-back" href="https://malinanu.github.io/phonetodesktop/">Phone Remote</a>
+      <span style="padding-left: 5px; padding-right: 5px;">|</span>
       <span id="theme-text" style="cursor:pointer">Dark</span>
       <span style="padding-left: 5px; padding-right: 5px;">|</span>
       <span id="about-text" style="cursor:pointer">About</span>
@@ -31,7 +34,7 @@
             </div>
           </div>
           <div class="col col-auto">
-            <h1 class="fw-semibold" style="font-family: Acme; font-size: 2.8rem; margin-bottom:0; display: inline-flex; align-items: baseline; gap: 12px;">FileSync<span class="app-version" id="appVersion"></span></h1>
+            <h1 class="fw-semibold" style="font-family: Acme; font-size: 2.8rem; margin-bottom:0; display: inline-flex; align-items: baseline; gap: 12px;">Send files<span class="app-version" id="appVersion"></span></h1>
           </div>
         </div>
         <h2 class="fw-normal" style="margin:0; font-size: calc(1.05rem + 0.3vw); letter-spacing: -0.01em">Send files from one device to many in real-time.</h2>
@@ -41,7 +44,7 @@
           <p style="font-size: 2rem; margin:0; font-family: Acme;">About</p>
           <p style="font-size: 1rem; margin-top:10px; margin-bottom: 1.5rem;">Designed to work on any device, anywhere!</p>
           <hr>
-          <p style="text-align: justify; text-justify: inter-word;"><span style="font-family: Acme; font-size: 1rem; color:rgb(252, 145, 45);">FileSync.app</span> is a file sharing web application that allows users to transfer files between multiple devices with end-to-end encryption.</p>
+          <p style="text-align: justify; text-justify: inter-word;"><span style="font-family: Acme; font-size: 1rem; color:rgb(252, 145, 45);">Phone Remote</span> includes a file sharing web application, built on <a href="https://github.com/polius/filesync" target="_blank" style="text-decoration:none;">FileSync</a>, that allows users to transfer files between multiple devices with end-to-end encryption.</p>
           <p style="text-align: justify; text-justify: inter-word;">No account creation or signups are required. It enables both one-to-one and many-to-many file transfers, works across various networks and devices, and requires no app installation.</p>
           <p style="font-size: 1.2rem; margin:0; margin-top:35px; margin-bottom:20px; font-family: Acme; font-size: 1.3rem; text-align:left; font-weight: 600;">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#198754" class="bi bi-layers" viewBox="0 0 16 16" style="margin-bottom: 5px; margin-right: 6px;">
@@ -52,7 +55,8 @@
           <p style="text-align: justify; text-justify: inter-word;">FileSync uses <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API" target="_blank" style="text-decoration: none;">WebRTC</a> to transfer files between multiple devices. Files shared are peer-to-peer, which means there is a direct file transfer between the sender and receiver without any intermediate server. Your files remain private and secure throughout the entire transfer process.</p>
           <p style="text-align: justify; text-justify: inter-word; margin-bottom: 20px">Do note that a lightweight signaling server is used to assist in the initial connection setup, ensuring all users can establish peer-to-peer connections effectively. Once the connections are established, the server steps back, allowing the direct transfer of files between the sender and the receiver. At no point during this process does the server have access to the file contents. It solely facilitates the connection between users without compromising the privacy or security of the files being shared.</p>
           <img id="comic-img" src="assets/comic.png" title="File Transfer - https://xkcd.com/949" alt="File Transfer - https://xkcd.com/949" style="width:100%; max-width: 456px">
-          <p style="text-align:left; text-align: justify; text-justify: inter-word; margin-top:30px; margin-bottom:10px">Released under the MIT License.</p>
+          <p class="pr-credit" style="margin-top:6px">Comic: <a href="https://xkcd.com/949" target="_blank" rel="noopener">xkcd #949 &ldquo;File Transfer&rdquo;</a> by Randall Munroe, <a href="https://creativecommons.org/licenses/by-nc/2.5/" target="_blank" rel="noopener">CC BY-NC 2.5</a> (non-commercial use only).</p>
+          <p style="text-align:left; text-align: justify; text-justify: inter-word; margin-top:20px; margin-bottom:10px">Released under the MIT License. FileSync &copy; polius.</p>
           <p style="text-align:left; text-align: justify; text-justify: inter-word; margin:0"><a href="https://github.com/polius/filesync" target="_blank" style="text-decoration:none;">https://github.com/polius/filesync</a></p>
         </div>
 

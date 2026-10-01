@@ -6,10 +6,15 @@ Control media on a Windows PC from an Android phone, over the local network (Wi-
 agent/     Rust desktop agent (Windows GSMTC backend, tray app), serves the phone UI + WebSocket
 shared/    Design system (base.css, font) and the in-app Guide page, used by both the PC agent and the Android app
 android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
+filesync/  Send files: peer-to-peer WebRTC file transfer (FastAPI signaling + coturn + web UI), imported from github.com/polius/FileSync (MIT)
+deploy/    Production compose + Caddyfile for the FileSync server (see docs/DEPLOYING-SERVER.md)
 ```
 
 ## Download and releasing
 Downloads, privacy policy and the landing page live in `site/` (published with GitHub Pages). Releases are cut by tagging; see [docs/RELEASING.md](docs/RELEASING.md) for signing, Play Store and website setup. Licensed under [MIT](LICENSE).
+
+## Send files
+Phone Remote also sends files between any devices, in the browser, with no size limit and no install for the receiver. Files go directly between devices over encrypted WebRTC; a small server (`filesync/`) only helps them find each other and relays traffic when a direct connection is impossible. Run your own with [docs/DEPLOYING-SERVER.md](docs/DEPLOYING-SERVER.md). FileSync is by [polius](https://github.com/polius/FileSync) and MIT licensed (see `filesync/LICENSE`).
 
 ## Settings and themes
 The remote's **⋮ menu → Settings** (and the same page from the Bluetooth tab): theme (System / Dark / Light), skip step, volume step, touchpad speed, scroll direction, tap-to-click, vibration and keep-screen-on. In the Android app the values live in the app and are shared by every page; in a plain browser they live in `localStorage`. Colours are defined once in `shared/base.css` (and mirrored in `Theme.kt`) and checked for 4.5:1 text contrast in both themes.

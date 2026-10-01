@@ -9,17 +9,17 @@ Source: https://github.com/polius/FileSync (MIT). Tick each box when the task is
 - [ ] T0.3 Confirm ownership / licence of FileSync with the owner (MIT — attribution kept either way)
 
 ## Phase 1 — Import and CI
-- [ ] T1.1 Import FileSync into `filesync/` with `git subtree` (history squashed, LICENSE kept)
-- [ ] T1.2 Move FileSync workflows to root `.github/`, scoped to `filesync/**`
-- [ ] T1.3 Run `ruff`, `pytest`, `npm run lint`, `npm test` locally — all green
-- [ ] T1.4 Root README: add `filesync/` and a "Send files" section
-- [ ] T1.5 Handle the CC BY-NC xkcd comic (remove or keep attribution)
+- [x] T1.1 Import FileSync into `filesync/` with `git subtree` (history squashed, LICENSE kept)
+- [x] T1.2 Move FileSync workflows to root `.github/`, scoped to `filesync/**`
+- [x] T1.3 Run `ruff`, `pytest`, `npm run lint`, `npm test` locally — all green
+- [x] T1.4 Root README: add `filesync/` and a "Send files" section
+- [x] T1.5 Handle the CC BY-NC xkcd comic (remove or keep attribution)
 
 ## Phase 2 — One look and feel
-- [ ] T2.1 `phoneremote-theme.css` maps FileSync colours onto `shared/base.css` tokens
-- [ ] T2.2 Ship the shared font in FileSync (CSP `font-src 'self'`)
-- [ ] T2.3 User-facing strings: "Phone Remote · Send files", back link, FileSync credit
-- [ ] T2.4 Contrast ≥ 4.5:1 in both themes
+- [x] T2.1 `phoneremote-theme.css` maps FileSync colours onto `shared/base.css` tokens
+- [x] T2.2 Ship the shared font in FileSync (CSP `font-src 'self'`)
+- [x] T2.3 User-facing strings: "Phone Remote · Send files", back link, FileSync credit
+- [x] T2.4 Contrast ≥ 4.5:1 in both themes
 
 ## Phase 3 — Server, deploy, release (VPS)
 - [ ] T3.1 `deploy/docker-compose.yml` + `deploy/Caddyfile` (HTTPS, coturn, secret init)
