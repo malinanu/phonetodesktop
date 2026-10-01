@@ -1,0 +1,77 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Builds the multi-stage image. This is the highest-value gate: it exercises the
+  # Dockerfile base-image bump and proves api/requirements.txt installs cleanly inside
+  # the image (the builder stage runs `pip install -r requirements.txt`).
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t filesync:ci .
+
+  # Installs the backend deps, imports the app modules, and runs the backend unit
+  # tests. The import check catches dependency bumps that break imports (a plain
+  # syntax check would miss runtime import errors); main.py refuses to import without
+  # SECRET_KEY, so pass a throwaway value.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install -r api/requirements.txt pytest
+      - env:
+          SECRET_KEY: ci-not-a-real-secret
+        run: python -c "import api.main, api.signaling; print('import OK')"
+      - run: python -m pytest tests -q
+
+  # Static analysis for both sides of the app, plus the JS unit tests (node:test).
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install ruff
+      - run: ruff check api tests
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
+  # container (nginx + FastAPI signaling), verified by SHA-256. Uses the exact compose
+  # topology users deploy with, only swapping in a locally built image.
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image and start stack
+        run: |
+          # Tag :latest so `docker compose up` below uses this build instead of
+          # pulling the released image from Docker Hub. Never pushed.
+          docker build -t poliuscorp/filesync:latest .
+          docker compose -f deploy/docker-compose.yml up -d --wait
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Run smoke cell (chromium / sw sink / auto ICE)
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node run.mjs --smoke --base-url=http://localhost --size=20M
+      - name: Teardown
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v
