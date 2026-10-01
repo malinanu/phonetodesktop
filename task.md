@@ -61,8 +61,56 @@ Changed approach: FileSync streams downloads through a service worker / File Sys
 ## Portainer
 - [x] Portainer-ready stack `deploy/docker-compose.portainer.yml` (inline Caddy config, optional `TURN_EXTERNAL_IP`) + runbook section. Rendered and checked with `docker compose config`; not run on a real Portainer/Docker host
 
+## Phase 8 — Cross-platform product (plan: optional cloud account, Flutter mobile)
+Order: A+B first (ship as a release), then C, then E and D in parallel, then F, then G.
+
+### A. Cross-platform desktop agent
+- [x] A1 Linux `Backend`: MPRIS (zbus), volume via wpctl/pactl, input via enigo (X11/XTest). Verified live here: MPRIS roundtrip against a fake player on a private D-Bus, and X11 mouse/scroll/text/Ctrl+key/media-key events seen by a probe window under Xvfb. Not done: uinput for Wayland-only desktops (documented limit)
+- [ ] A2 macOS `Backend` (enigo media keys + input, volume via osascript; no now-playing): implemented and `cargo check --target aarch64-apple-darwin` is clean, but NOT run on a real Mac (needs the G1 manual check)
+- [ ] A3 Tray / autostart / log folder / open-url cross-platform (no more `cmd /c start` on mac/Linux)
+- [ ] A4 Packaging + CI matrix: Windows installer, macOS .dmg (signed/notarized), Linux AppImage + .deb; `cargo test` + `clippy` on all three
+- [ ] A5 mDNS + firewall notes per OS
+
+### B. Website downloads
+- [ ] B1 OS detection and per-platform downloads + checksums + store badges (hidden until URLs exist)
+- [ ] B2 Release workflow publishes `latest.json`; site reads it
+- [ ] B3 Privacy policy / guide / SmartScreen + Gatekeeper notes per platform
+
+### C. Local device identity (auth v2)
+- [ ] C1 Protocol v2: device public key at pairing, challenge-response, replay protection, v1 behind a flag
+- [ ] C2 Trust list with platform / pubkey / last seen; dashboard Devices page
+- [ ] C3 Optional PC PIN / approve every new device
+- [ ] C4 Tests incl. migration from v1 configs
+
+### D. Account service (optional cloud)
+- [ ] D1 `account/` FastAPI + Postgres: users, devices, certificates, revocations
+- [ ] D2 Sign-in: email magic link, Google, Sign in with Apple
+- [ ] D3 Client enrol, certificate refresh, offline verification, revocation polling
+- [ ] D4 Web "My devices" + account deletion
+- [ ] D5 Deploy (compose + Portainer), backups, SMTP
+- [ ] D6 Security review + threat-model note
+
+### E. Flutter mobile app (iOS + Android)
+- [ ] E1 `mobile/` project, same application id and signing key
+- [ ] E2 Wi-Fi mode: mDNS, QR, saved PCs, controller (shared web UI first)
+- [ ] E3 Android-only Bluetooth mode via platform channel (reuse HidRemote.kt)
+- [ ] E4 Files tab, Settings, themes, accessibility
+- [ ] E5 Device identity + optional sign-in
+- [ ] E6 Parity checklist, then retire `android/`; CI builds AAB and IPA
+
+### F. Stores
+- [ ] F1 Apple: developer account, App Store Connect, TestFlight, local-network strings, privacy labels
+- [ ] F2 Google Play: Data safety + privacy policy updated for accounts
+- [ ] F3 Release automation and listings
+
+### G. Verify and ship
+- [ ] G1 Agent CI green on 3 OSes + manual smoke on real Linux / Mac / Windows
+- [ ] G2 Phone x PC matrix, offline and signed in; revoke test
+- [ ] G3 Failure modes (expired cert, account service down, clock skew, lost phone)
+- [ ] G4 Final security + code review
+
 ## Needs a human (cannot be done from this environment)
-T0.3, T3.5, T7.1 (if no Docker), T7.2, VPS provisioning and DNS, Play Console.
+T0.3, T3.5, T7.1 (if no Docker), T7.2, VPS provisioning and DNS, Play Console. Phase 8: Apple Developer Program + Developer ID/notarization, Windows signing cert, OAuth client IDs (Google/Apple), SMTP, real Mac / Linux desktop / iPhone testing, store accounts.
 
 ## Bug review (code-review, high)
 Fixed: cmd.exe metacharacters accepted in `files_url` (agent, Android and Settings validators now identical, with tests); arm64 image build lacked QEMU; Kotlin port check accepted `+443`; Settings page validated more loosely than the app; HSTS typo; uvicorn access log contradicted the privacy wording; Files tab lost on activity recreate.
