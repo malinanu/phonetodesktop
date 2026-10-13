@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: 8.10.2 }
@@ -101,7 +101,7 @@ jobs:
         working-directory: mobile
       - run: flutter test
         working-directory: mobile
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: 17 }
       - name: The Android app builds (debug-signed unless the release keystore secrets are set)
         run: flutter build apk --release
