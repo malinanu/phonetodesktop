@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#15110e">
-<title>Phone Remote</title>
+<title>Lanyard</title>
 <link rel="stylesheet" href="/base.css">
 <link rel="stylesheet" href="/pad.css">
 <script src="/settings.js"></script>
@@ -231,7 +231,7 @@
     try { legacy = localStorage.getItem('pr.legacy') || localStorage.getItem('pr.token'); } catch (e) {}
   }
   if (!token && !pairCode && !legacy) {
-    showGate('Not paired', 'Pair with your PC', 'On the PC, open Phone Remote from the tray icon, choose Add a phone, then scan the QR code with this phone.',
+    showGate('Not paired', 'Pair with your PC', 'On the PC, open Lanyard from the tray icon, choose Add a phone, then scan the QR code with this phone.',
       { action: 'Show me how', onAction: () => openGuide('connect') });
     return;
   }
@@ -281,7 +281,7 @@
       lastMsg = performance.now();
       const m = JSON.parse(e.data);
       if (m.t === 'pair') {
-        if (m.status === 'pending') showGate('Waiting for approval', 'Check your PC', `Allow “${deviceName}” in the Phone Remote window on your PC. This page continues by itself.`, { busy: true, cancel: true, onCancel: cancelPair });
+        if (m.status === 'pending') showGate('Waiting for approval', 'Check your PC', `Allow “${deviceName}” in the Lanyard window on your PC. This page continues by itself.`, { busy: true, cancel: true, onCancel: cancelPair });
         else if (m.status === 'approved') {
           token = m.device_token; pairCode = null;
           try { localStorage.setItem('pr.tok', token); } catch (e) {}
@@ -290,7 +290,7 @@
           showGate('Paired', 'You’re in', 'This phone can now control the PC.');
           setTimeout(hideGate, 1100);
         } else if (m.status === 'denied') { rejected = true; showGate('Declined', 'Not allowed', 'The PC owner declined this phone.', { action: 'Try again', onAction: retryPair }); }
-        else if (m.status === 'expired') { rejected = true; showGate('Code expired', 'Get a fresh code', 'Open Phone Remote on the PC, choose Add a phone, and scan the new QR code.', scanAgain); }
+        else if (m.status === 'expired') { rejected = true; showGate('Code expired', 'Get a fresh code', 'Open Lanyard on the PC, choose Add a phone, and scan the new QR code.', scanAgain); }
         else if (m.status === 'bad_code') {
           // Phones paired before per-phone keys hold the old shared key; try it once.
           if (!triedLegacy && pairCode) { triedLegacy = true; legacy = pairCode; pairCode = null; retryNow = true; }

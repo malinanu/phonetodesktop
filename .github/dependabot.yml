@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly" }
+  # FileSync (imported under filesync/)
+  - package-ecosystem: "pip"
+    directory: "/filesync/api"
+    schedule: { interval: "weekly" }
+    groups:
+      pip-minor-and-patch: { update-types: ["minor", "patch"] }
+  - package-ecosystem: "docker"
+    directory: "/filesync"
+    schedule: { interval: "weekly" }
+  - package-ecosystem: "npm"
+    directory: "/filesync/e2e"
+    schedule: { interval: "weekly" }
+  # Phone Remote
+  - package-ecosystem: "cargo"
+    directory: "/agent"
+    schedule: { interval: "weekly" }
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule: { interval: "weekly" }

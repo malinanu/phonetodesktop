@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My devices — Lanyard</title>
+<meta name="description" content="See the phones and computers on your optional Lanyard account, rename or remove them, and add a computer.">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://lanyard.3logiq.com/devices.html">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="top" style="position:absolute"><a class="brand" href="./"><img src="assets/favicon.svg" width="40" height="40" alt="">Lanyard</a><nav aria-label="Main"><a class="keep" href="./#download">Download</a></nav></header>
+<main class="doc" id="main">
+  <h1>My devices</h1>
+  <p class="dim">An account is optional. Lanyard works on your Wi-Fi without one. With an account, your phones and computers find each other without scanning a code, and you can remove a lost phone from here.</p>
+  <noscript><p>This page needs JavaScript.</p></noscript>
+
+  <section id="signin" aria-labelledby="signin-h" hidden>
+    <h2 id="signin-h">Sign in</h2>
+    <form id="emailForm" class="acct-form">
+      <label for="email">Email address</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <button class="btn primary" type="submit">Email me a code</button>
+    </form>
+    <form id="codeForm" class="acct-form" hidden>
+      <p id="sentTo"></p>
+      <label for="code">Code from the email</label>
+      <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+      <button class="btn primary" type="submit">Sign in</button>
+      <button class="btn line" type="button" id="backBtn">Use a different email</button>
+    </form>
+  </section>
+
+  <section id="devices" aria-labelledby="devices-h" hidden>
+    <h2 id="devices-h">Signed in as <span id="who"></span></h2>
+    <ul id="list" class="acct-list"></ul>
+    <p id="empty" class="dim" hidden>No devices yet. Sign in on the phone app (Settings, Account), or add a computer below.</p>
+    <h2>Add a computer</h2>
+    <p class="dim">Get a code, then type it into Lanyard on the computer (Settings, Account). It works once and expires in 10 minutes.</p>
+    <p><button class="btn primary" id="linkBtn" type="button">Get a code</button></p>
+    <p id="linkOut" class="acct-code" hidden></p>
+    <h2>Your account</h2>
+    <p><button class="btn line" id="outBtn" type="button">Sign out</button> <button class="btn line" id="delBtn" type="button">Delete my account</button></p>
+  </section>
+
+  <p id="msg" class="acct-msg" role="status" aria-live="polite" hidden></p>
+</main>
+<footer><div class="foot-note"><span>© Lanyard. Free and open source.</span><a href="privacy.html">Privacy</a><a href="./">Back to the home page</a></div></footer>
+<script src="devices.js"></script>
+</body>
+</html>

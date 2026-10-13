@@ -1,0 +1,34 @@
+name: pages
+# Optional alternative to deploy-site.yml: publishes site/ to GitHub Pages when you run it by hand.
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions". The real website is deployed by deploy-site.yml.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Latest release manifest (the page lists the downloads from it)
+        run: |
+          if curl -fsSL "https://github.com/${{ github.repository }}/releases/latest/download/latest.json" -o site/latest.json \
+             && python3 -c "import json,sys; d=json.load(open('site/latest.json')); assert isinstance(d.get('assets'), list)"; then
+            echo "latest.json: $(python3 -c "import json; print(json.load(open('site/latest.json'))['version'])")"
+          else
+            rm -f site/latest.json
+            echo "No release manifest yet; the page falls back to the releases link."
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deploy
+        uses: actions/deploy-pages@v4

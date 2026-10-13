@@ -3,7 +3,7 @@
    Load this in <head> so the theme is applied before the first paint. */
 (function () {
   'use strict';
-  var DEFAULTS = { theme: 'system', skip: 10, volStep: 2, padSpeed: 1, scroll: 'natural', tapToClick: true, vibrate: true, keepAwake: false };
+  var DEFAULTS = { theme: 'system', skip: 10, volStep: 2, padSpeed: 1, scroll: 'natural', tapToClick: true, vibrate: true, keepAwake: false, filesUrl: '' };
   var app = window.AndroidBridge && window.AndroidBridge.getSettings ? window.AndroidBridge : null;
   var listeners = [];
 

@@ -30,6 +30,20 @@ pub struct Config {
     /// Windows: start-at-login was switched on once by default; afterwards the tray checkbox rules.
     #[serde(default)]
     pub autostart_initialized: bool,
+    /// Address of the "Send files" server (docs/DEPLOYING-SERVER.md). Empty = the address baked in at build
+    /// time (`PHONE_REMOTE_FILES_URL`), if any. When neither is set the feature is hidden.
+    #[serde(default)]
+    pub files_url: String,
+    /// Still accept phones that log in with the older bearer token over plain HTTP (protocol v1).
+    /// Switch off once every phone has been updated to the key-based protocol.
+    #[serde(default = "yes")]
+    pub allow_v1: bool,
+    /// The account this PC has joined (optional). Phones of that account then log in with a certificate.
+    #[serde(default)]
+    pub account: Option<crate::account::AccountTrust>,
+    /// Serve the built-in "Send files" page to the home network (on the agent's port + 1).
+    #[serde(default = "yes")]
+    pub files_enabled: bool,
 }
 
 fn yes() -> bool {
@@ -48,12 +62,24 @@ pub struct Device {
     /// May this phone move the mouse and type? Switchable per phone in the dashboard.
     #[serde(default = "yes")]
     pub input_allowed: bool,
+    /// Protocol v2: the phone's Ed25519 public key (base64url, 32 bytes). The PC stores only this, never a secret.
+    /// Empty for phones paired with the older bearer token (`token`).
+    #[serde(default)]
+    pub pubkey: String,
+    /// What kind of device it is ("android", "ios", "web", ...), shown in the dashboard.
+    #[serde(default)]
+    pub platform: String,
+}
+
+/// The agent's private folder (config, TLS key). Created on first use.
+pub fn dir() -> Result<PathBuf> {
+    let dir = dirs::config_dir().context("no config dir")?.join("phone-remote");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
 }
 
 fn path() -> Result<PathBuf> {
-    let dir = dirs::config_dir().context("no config dir")?.join("phone-remote");
-    std::fs::create_dir_all(&dir)?;
-    Ok(dir.join("config.json"))
+    Ok(dir()?.join("config.json"))
 }
 
 pub fn new_token() -> String {
@@ -94,7 +120,7 @@ pub fn load_or_create() -> Result<Config> {
             }
         }
     }
-    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token() };
+    let c = Config { pc_id: new_id(), token: new_token(), devices: vec![], legacy_shared_auth: false, setup_done: false, port: DEFAULT_PORT, autostart_initialized: false, local_secret: new_token(), files_url: String::new(), allow_v1: true, account: None, files_enabled: true };
     save(&c)?;
     Ok(c)
 }
@@ -107,3 +133,103 @@ pub fn save(c: &Config) -> Result<()> {
     std::fs::rename(&tmp, &p)?;
     Ok(())
 }
+
+/// Normalise a file-server address: https only (a bare host gets `https://`), no credentials, spaces or
+/// other schemes. Mirrors `FilesUrl.kt` in the Android app.
+pub fn clean_files_url(raw: &str) -> Option<String> {
+    let s = raw.trim();
+    if s.is_empty() || s.chars().any(|c| c.is_whitespace() || c == '\\') {
+        return None;
+    }
+    let s = if s.contains("://") { s.to_string() } else { format!("https://{s}") };
+    let rest = match s.get(..8) {
+        Some(p) if p.eq_ignore_ascii_case("https://") => &s[8..],
+        _ => return None,
+    };
+    let cut = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(cut);
+    if authority.is_empty() || authority.contains('@') {
+        return None;
+    }
+    let (host, port) = match authority.split_once(':') {
+        Some((h, p)) => (h, Some(p)),
+        None => (authority, None),
+    };
+    if let Some(p) = port {
+        if p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()) || !matches!(p.parse::<u16>(), Ok(n) if n >= 1) {
+            return None;
+        }
+    }
+    let label_ok = |l: &str| {
+        let b = l.as_bytes();
+        !b.is_empty() && b[0].is_ascii_alphanumeric() && b[b.len() - 1].is_ascii_alphanumeric() && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'-')
+    };
+    if !host.split('.').all(label_ok) {
+        return None;
+    }
+    // The address is later handed to `cmd /c start`, so the path/query may not carry shell metacharacters
+    // (& | ^ % " < > ' and friends). A server base URL needs none of them.
+    if !tail.bytes().all(|b| b.is_ascii_alphanumeric() || b"._~/?#=+,:;@!*-".contains(&b)) {
+        return None;
+    }
+    Some(format!("https://{}{}", authority.to_ascii_lowercase(), tail))
+}
+
+/// The "Send files" address: the config value if valid, else the one baked in at build time.
+pub fn files_url(cfg: &Config) -> Option<String> {
+    clean_files_url(&cfg.files_url).or_else(|| option_env!("PHONE_REMOTE_FILES_URL").and_then(clean_files_url))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_https_and_normalises() {
+        assert_eq!(clean_files_url("https://files.example.com").as_deref(), Some("https://files.example.com"));
+        assert_eq!(clean_files_url("  FILES.example.com ").as_deref(), Some("https://files.example.com"));
+        assert_eq!(clean_files_url("https://Files.Example.com:8443/app?x=1").as_deref(), Some("https://files.example.com:8443/app?x=1"));
+    }
+
+    #[test]
+    fn rejects_anything_unsafe_or_empty() {
+        for bad in [
+            "", "   ", "http://files.example.com", "ftp://x.com", "javascript:alert(1)", "https://user:pw@files.example.com",
+            "https://a b.com", "https://", "https://:443", "https://files.example.com:0", "https://files.example.com:99999",
+            "https://files.example.com:x", "https://files.example.com:+80", "https://-bad.example.com", "https://exa_mple.com",
+            "https://files.example.com\\evil", "https://[::1]/", "https://a..b.com",
+            "https://files.example.com/?a=1&calc.exe", "https://files.example.com/%PATH%", "https://files.example.com/a|b",
+            "https://files.example.com/a^b", "https://files.example.com/a\"b", "https://files.example.com/a'b", "https://files.example.com/<x>",
+        ] {
+            assert_eq!(clean_files_url(bad), None, "should reject: {bad}");
+        }
+    }
+
+    #[test]
+    fn config_value_is_used_when_valid() {
+        let mut c = Config { pc_id: String::new(), token: String::new(), devices: vec![], legacy_shared_auth: false, port: 1, local_secret: String::new(), setup_done: true, autostart_initialized: true, files_url: "files.example.com".into(), allow_v1: true, account: None, files_enabled: true };
+        assert_eq!(files_url(&c).as_deref(), Some("https://files.example.com"));
+        c.files_url = "http://insecure.example.com".into();
+        assert_eq!(files_url(&c), option_env!("PHONE_REMOTE_FILES_URL").and_then(clean_files_url));
+    }
+
+    #[test]
+    fn old_config_files_without_the_key_still_load() {
+        let c: Config = serde_json::from_str(r#"{"token":"t","port":8765}"#).unwrap();
+        assert_eq!(c.files_url, "");
+    }
+
+    #[test]
+    fn phones_paired_before_device_keys_still_load() {
+        // A config written by the previous version: devices have a token and no pubkey/platform.
+        let json = r#"{"token":"t","port":8765,"devices":[{"id":"p1","name":"Pixel","token":"abc","created":1,"last_seen":2,"input_allowed":true}]}"#;
+        let c: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(c.devices.len(), 1);
+        assert_eq!((c.devices[0].pubkey.as_str(), c.devices[0].platform.as_str()), ("", ""));
+        assert!(c.allow_v1, "older phones keep working until the owner switches them off");
+        // And it round-trips with the new fields.
+        let again: Config = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
+        assert_eq!(again.devices, c.devices);
+    }
+}
+

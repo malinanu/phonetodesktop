@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Lanyard</title>
+<meta name="description" content="Lanyard collects no personal data. Remote control stays on your network; Send files uses a small relay server that never stores files.">
+<link rel="canonical" href="https://lanyard.3logiq.com/privacy.html">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="top" style="position:absolute"><a class="brand" href="./"><img src="assets/favicon.svg" width="40" height="40" alt="">Lanyard</a><nav aria-label="Main"><a class="keep" href="./#download">Download</a></nav></header>
+<main class="doc" id="main">
+  <h1>Privacy Policy</h1>
+  <p class="dim">Last updated: 1 October 2026 (added Send files)</p>
+
+  <p>Lanyard has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> works on your own Wi-Fi: the Lanyard program on your computer serves the page and introduces the two devices, and files go straight between them, so no server of ours is involved. Only if you choose to use a Send files server (your own, for sending over the internet) does a small server introduce devices and, when a direct connection is impossible, relay encrypted data. <b>Unless you choose to create the optional account described below, the developer collects no personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
+
+  <h2>What stays on your devices</h2>
+  <ul>
+    <li><b>Pairing data.</b> The PC keeps a list of phones you have approved (a name and a public key that you can revoke). The phone keeps the key for each PC it is paired with, plus your settings (theme, step sizes and similar). This is stored only on those devices. <code>phone-remote rotate</code> on the PC revokes every phone.</li>
+    <li><b>Media commands.</b> Play, pause, seek, volume and similar commands travel directly between your phone and your PC over your local network, or over Bluetooth. The PC agent also reads the title and playback position of the current media session so the phone can show what's playing. That information is shown on your phone and is not sent anywhere else.</li>
+    <li><b>Logs.</b> The desktop agent (Windows, macOS or Linux) writes a local activity log on the computer (viewable in its dashboard). It is never uploaded.</li>
+    <li><b>Crash screen.</b> If the Android app crashes, it shows the error details on screen so you can choose to copy them into a bug report. Nothing is sent automatically.</li>
+  </ul>
+
+  <h2>Send files: what the server sees (only if you use one)</h2>
+  <p>By default Send files runs on your computer and only on your home network; the points below apply to a Send files server you set up yourself for sending over the internet.</p>
+  <ul>
+    <li><b>File contents.</b> Files travel directly between devices, encrypted (WebRTC/DTLS). They never pass through the server unencrypted and are never stored. When a direct route is impossible the relay forwards the same encrypted traffic without being able to read it.</li>
+    <li><b>Connection setup.</b> To connect two devices, the server forwards short setup messages between them (random device ids and network-address details needed to connect). These are held in memory only while connected and are not written to disk.</li>
+    <li><b>IP addresses.</b> As with any internet service, your IP address is visible to the server and the relay while you are connected. The relay may write connection details (IP addresses and times) to operational logs. Those logs rotate automatically by size and are kept only for a short time (typically days), used only to keep the service running and to deal with abuse.</li>
+    <li><b>Sharing.</b> People you give a room link or code to can see the file names you send them and your device's network address, as with any peer-to-peer transfer. Only share a room with people you trust, and use a room password for sensitive files.</li>
+    <li><b>Who runs the server.</b> The address of the Send files server is set by whoever built or configured your copy of the app (you can change it under Settings → Send files). If you run your own server, only you see this data.</li>
+  </ul>
+
+  <h2>The optional account</h2>
+  <p>You never need an account. If you create one, it is run on a server set up by whoever built your copy of Lanyard (for the public release, the address in Settings → Account). Control of your computer still goes directly between your phone and computer on your own network and never passes through the account server.</p>
+  <ul>
+    <li><b>What the account stores.</b> Your email address; for each device you add, a name, its type (phone or computer), platform (such as Android or Windows), a public key, the date it was added or removed, and, for a computer, the identifier and key fingerprint phones use to recognise it on your network; sign-in sessions (stored as one-way hashes); and the time of the last certificate issued to each device. The account service does not store your files, your media, what you control, or where your devices are.</li>
+    <li><b>What it is used for.</b> Signing you in with an emailed code (or Google or Apple sign-in where offered), showing you your devices, and giving each of your devices a short-lived certificate (about 30 days) that your computers accept, even offline, instead of scanning a code. Computers ask the server every few minutes to hours for the list of removed devices so a lost phone stops working.</li>
+    <li><b>Who sees it.</b> The person running the account server can see the data above. Emails are sent only to deliver your sign-in code. Nothing is sold or shared for advertising.</li>
+    <li><b>Logs.</b> Like any internet service, the server and the reverse proxy in front of it see your IP address when you connect and may keep short-lived operational logs.</li>
+    <li><b>Removing it.</b> You can remove any device, sign out, or <b>delete the whole account</b> (email and every device) at any time from <a href="devices.html">My devices</a> or from the phone app's Settings. Deleting is immediate. Removing a device takes effect on a computer the next time it checks the removal list, normally within 15 minutes, and a computer that is offline keeps accepting a removed phone's existing certificate only until that certificate expires (up to about 30 days, plus a 14-day grace period) unless it has checked the list meanwhile.</li>
+  </ul>
+
+  <h2>Permissions the Android app asks for</h2>
+  <ul>
+    <li><b>Network and Wi-Fi state, multicast.</b> To find your PC on the local network and talk to it. The Files tab opens Send files in your browser, so file transfer itself needs no extra permission.</li>
+    <li><b>Bluetooth (connect, advertise).</b> For Bluetooth mode, where the phone acts as a keyboard / media-key device. Android groups these under "Nearby devices".</li>
+  </ul>
+  <p>The app does not use your camera permission (QR scanning uses the system scanner), location, contacts, microphone or storage.</p>
+
+  <h2>Network traffic</h2>
+  <p>Send files transfers are always encrypted end to end (WebRTC), and a Send files server you set up yourself should use HTTPS. Remote control between your phone and your computer uses an encrypted HTTPS connection that the phone pins to your computer's own key, so other people on the same Wi-Fi cannot read or change it. Phones with an older version of the app use plain HTTP until you switch that off in the computer's dashboard. The computer only accepts connections from private (LAN) addresses and requires a paired device.</p>
+
+  <h2>Children</h2>
+  <p>The app is not directed at children and collects no data from anyone.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new date. Questions: open an issue at <a href="https://github.com/malinanu/phonetodesktop/issues">github.com/malinanu/phonetodesktop/issues</a>.</p>
+</main>
+<footer><div class="foot-note"><span>© Lanyard. Free and open source.</span><a href="./">Back to the home page</a></div></footer>
+</body>
+</html>

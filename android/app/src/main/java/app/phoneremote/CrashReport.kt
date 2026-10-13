@@ -22,7 +22,7 @@ class PhoneRemoteApp : Application() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
-                val trace = "Phone Remote crashed on ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.RELEASE})\n\n" + e.stackTraceToString().take(6000)
+                val trace = "Lanyard crashed on ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.RELEASE})\n\n" + e.stackTraceToString().take(6000)
                 startActivity(Intent(this, CrashActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK).putExtra("trace", trace))
             } catch (_: Throwable) {
             }

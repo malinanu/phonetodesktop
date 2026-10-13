@@ -39,7 +39,14 @@ pub enum ClientMsg {
     /// Legacy: `device` absent, `token` is the shared secret. Otherwise `device` + its own token.
     Auth { token: String, #[serde(default)] device: Option<String> },
     /// First contact with a pairing code from the QR. The PC owner must approve.
-    Pair { code: String, device: String, name: String },
+    /// `pk` (base64url Ed25519 public key) makes it a protocol v2 pairing: the phone then logs in with
+    /// `challenge` + `auth_sig` and the PC never hands it a token.
+    Pair { code: String, device: String, name: String, #[serde(default)] pk: Option<String>, #[serde(default)] platform: Option<String> },
+    /// Protocol v2 login, step 1: the PC answers with `{"t":"challenge","nonce":...}`.
+    Challenge { device: String },
+    /// Protocol v2 login, step 2: base64url Ed25519 signature over `auth::auth_message(pc_id, device, nonce)`.
+    /// An account phone adds its device certificate (docs/ACCOUNTS.md) so it needs no QR pairing.
+    AuthSig { device: String, sig: String, #[serde(default)] cert: Option<String> },
     Cmd(Command),
     Ping,
 }

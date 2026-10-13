@@ -74,7 +74,7 @@ impl Backend for MockBackend {
             id: "mock.player".into(),
             app: "Mock Player".into(),
             title: "Demo Track".into(),
-            artist: "Phone Remote".into(),
+            artist: "Lanyard".into(),
             playing: s.playing,
             pos_ms: s.pos(),
             dur_ms: DUR_MS,
