@@ -67,7 +67,7 @@ pub fn join(base: &str, code: &str, host_name: &str, pc_id: &str, tls_fp: Option
     let mut id = [0u8; 16];
     rand::rng().fill_bytes(&mut id);
     let mut seed = [0u8; 32];
-    rand::rng().fill_bytes(&mut seed);
+    rand::rng().fill_bytes(&mut seed); // only the public half is sent and the seed is dropped with this function
     let device_id: String = id.iter().map(|b| format!("{b:02x}")).collect();
     let pubkey = URL_SAFE_NO_PAD.encode(SigningKey::from_bytes(&seed).verifying_key().to_bytes());
     let platform = match std::env::consts::OS {
@@ -92,7 +92,7 @@ pub fn join(base: &str, code: &str, host_name: &str, pc_id: &str, tls_fp: Option
             keys.insert(kid.to_owned(), pk.to_owned());
         }
     }
-    let trust = AccountTrust { url: base, acct, keys, device_id, device_seed: URL_SAFE_NO_PAD.encode(seed), ..Default::default() };
+    let trust = AccountTrust { url: base, acct, keys, device_id, ..Default::default() };
     // The certificate is checked against the keys we just learned; this catches a broken or mismatched service.
     trust.verify_cert(reply["cert"].as_str().unwrap_or(""), now).map_err(|e| format!("The account service sent a certificate that does not check out ({e:?})."))?;
     Ok(trust)

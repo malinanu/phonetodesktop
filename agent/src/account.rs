@@ -36,12 +36,10 @@ pub struct AccountTrust {
     /// Unix time of the last successful revocation fetch (0 = never).
     #[serde(default)]
     pub revoked_checked: u64,
-    /// This computer's own device id in the account, and the seed of its device key (base64url). The computer
-    /// is listed under "My devices" so the owner can remove it too.
+    /// This computer's own device id in the account (it is listed under "My devices", so the owner can remove it).
+    /// The matching private key is not kept: the computer never needs to prove itself to the service.
     #[serde(default)]
     pub device_id: String,
-    #[serde(default)]
-    pub device_seed: String,
 }
 
 impl Default for AccountTrust {
@@ -56,7 +54,6 @@ impl Default for AccountTrust {
             revoked: vec![],
             revoked_checked: 0,
             device_id: String::new(),
-            device_seed: String::new(),
         }
     }
 }

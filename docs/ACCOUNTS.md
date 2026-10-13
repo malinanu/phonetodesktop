@@ -27,6 +27,40 @@ account service ──signs──▶ device certificate ──presented by──
 - The certificate only says *which key belongs to which account*; the phone still proves it holds that key by
   signing the local login challenge (see [PROTOCOL.md](PROTOCOL.md)).
 
+## Using it
+1. **Phone**: Settings, Account (or "I have an account" on the first screen): type your email, then the code you
+   receive. The phone enrols its existing device key (the private key never leaves the phone) and saves the
+   certificate and a refresh token in the OS keystore. It renews the certificate when under 7 days are left.
+2. **Computer**: on the website's [My devices](https://lanyard.3logiq.com/devices.html) page choose *Get a code*;
+   in the computer's dashboard, Settings, Account (optional), type the service address and the code. The computer
+   enrols itself as a device, publishes how phones find it (its id and the fingerprint of its TLS key) and caches
+   the service keys. It then asks for the removal list at start and every 15 minutes (*Check now* does it at once).
+3. **Phone**: Settings, Account, *Find my computers*. Computers of the account that are on this Wi-Fi are added,
+   pinned to the key fingerprint the account holds. From then on the phone logs in with its certificate and no QR
+   code is needed. Without the account, scanning a QR code still works exactly as before.
+
+The phone learns a computer's TLS fingerprint from the account over HTTPS, not from the local network, so a
+device on your Wi-Fi cannot pretend to be your computer by advertising a different key.
+
+## Threat model
+What the design protects against, and what it does not.
+
+| Situation | What happens |
+| --- | --- |
+| Someone on your Wi-Fi tries to control a computer | Needs a device key the computer knows (paired by QR, or an account certificate **and** the matching private key). A certificate alone is useless: login also signs a per-connection challenge. |
+| Someone on your Wi-Fi impersonates your computer | The phone pins the computer's TLS key (from the QR, or from the account). A different key is refused ("keyChanged"). |
+| A phone is lost or stolen | Remove it on the My devices page. Computers that are online learn within about 15 minutes (poll interval) and drop its live connection; a computer that is **offline** accepts the old certificate until it expires (at most 30 days) plus the grace period (14 days) unless it checks the list earlier. If that gap matters: lower `ACCOUNT_CERT_DAYS`, lower the grace, and use *Remove all phones* on the computer (that only affects QR-paired phones; leave the account to cut account phones off at once). The phone's own screen lock and the OS keystore are the first line of defence. |
+| The account service is down | Nothing local stops working: certificates are checked offline, QR-paired phones are unaffected, the removal list keeps its last copy. Only sign-in, enrolling new devices and renewing certificates wait. |
+| The account service is hacked | The attacker can mint certificates for any account, so any computer that joined can be controlled by whoever also reaches it on the local network and holds a minted key. Mitigations: keys only in the server's `.env`, rotate (add `k2` first, drop `k1`), computers can leave the account (Settings, Account, *Leave*) which also drops every account phone. A phone cannot be controlled remotely over the internet: the control port is only reachable on the local network. |
+| A fake removal list is injected | It is signed with the service key and bound to the account id, so a list from anyone else (or another account) is ignored. An attacker who can block the poll can only delay revocation, not forge it. |
+| Clocks are wrong | A certificate "issued" more than 5 minutes in the future is refused; a computer whose clock is far ahead sees certificates as expired, one far behind sees them as not yet valid. Fixing the clock fixes it; QR-paired phones do not depend on the clock. |
+| Someone guesses a sign-in or link code | Sign-in codes: 5 wrong tries burn the code, per-IP and per-address rate limits. Link codes: 10-minute life, single use, rate limited. The revocation URL contains the unguessable account id and discloses only which device ids were removed. |
+| The service address is a malicious one | Typed by the owner on the computer or phone. Using someone else's service would let them mint certificates for the computer; only join an account service you run or trust. |
+
+Not covered: a stolen **unlocked** phone, malware on the phone or computer, and a computer owner who approves a
+phone they should not. The account does not add end-to-end protection for the media data itself; that is the pinned
+TLS connection.
+
 ## Certificate format
 `cert = base64url(payload) + "." + base64url(signature)`; the signature is Ed25519 over
 `"PRv2-cert" 0x00 || payload_bytes`, made by the service key named in the payload's `kid`. Verify the **exact
