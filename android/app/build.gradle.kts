@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -39,7 +41,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    // compilerOptions replaces kotlinOptions, which Kotlin 2.4 rejects; it works on 2.0 too.
+    kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
     // The guide page, stylesheet and font are shared with the PC agent (repo /shared).
     sourceSets["main"].assets.srcDir("../../shared")
 }
