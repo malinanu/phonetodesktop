@@ -125,3 +125,14 @@ Not changed (upstream FileSync behaviour, worth an upstream issue): `signaling.p
 - [x] Windows dashboard: Send files button opens it; Settings has an on/off switch and an optional own-server address. Android + Flutter Files tabs: scan the code on the computer, or open the page; own server is optional.
 - [ ] Not verified on real devices: phone browser over Wi-Fi to a Windows PC (mDNS/obfuscated ICE candidates, Windows firewall prompt for the new port). Phone-side receiving buffers in memory (HTTP), documented.
 - [ ] Cross-network transfer still needs the optional hosted server (TURN).
+
+## Name, icons, website, macOS and iOS (user request 2026-10-13)
+- [x] Name chosen by the user: **Lanyard** (not trademark-checked). User-visible strings renamed everywhere; internal ids unchanged (binary `phone-remote`, Android id `app.phoneremote`, mDNS `_phoneremote._tcp`, data folders, firewall rule name).
+- [x] Mark: two interlocked loops (`brand/geometry.mjs`), one script renders every icon: Android adaptive (native + Flutter), iOS AppIcon set, macOS 1024 source for `.icns`, Windows `.ico` (+ embedded exe icon via winresource, unverified until the Windows CI run), Linux PNG, tray icon, favicons, OG image.
+- [x] macOS: universal .dmg already built in CI (ad-hoc signed); now uses the new icon. Real signing/notarization needs the owner's Apple Developer ID (docs/RELEASING.md).
+- [x] iOS: Flutter app builds unsigned in CI; icon, Info.plist keys done. TestFlight/App Store need the owner's Apple Developer account.
+- [x] Website `site/` redesigned with the installed design skills (taste-skill direction "one motif", impeccable craft floor): hero, how it works, real screenshots, feature board, downloads from `latest.json`, privacy band, FAQ; inspector findings fixed except defended ones (3-line hero headline, a false positive on a code snippet).
+- [x] `deploy-site.yml` uploads the site to CloudPanel over SSH (needs the 5 secrets in docs/DEPLOYING-WEBSITE.md); `deploy/docker-compose.cloudpanel.yml` for Portainer on the Oracle server (no Caddy) and the Oracle/CloudPanel steps in docs/DEPLOYING-SERVER.md.
+- [ ] Owner: DNS for lanyard.3logiq.com and lanyardfileshare.3logiq.com, CloudPanel sites, SSH deploy key + secrets, open TURN ports on Oracle (VCN + iptables), set repo variable FILES_URL.
+- [ ] Not verified: the Windows exe icon embedding, the deploy workflow against a real server, the Portainer stack on Oracle, and the new icons on real devices.
+

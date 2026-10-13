@@ -38,7 +38,7 @@ async function loadVersion() {
 }
 
 // Address other devices use to reach this page. Normally the page's own origin. When the page is served by
-// the Phone Remote program on a computer, that origin may be "localhost", which a phone cannot open, so the
+// the Lanyard program on a computer, that origin may be "localhost", which a phone cannot open, so the
 // program says which address to put in the link and QR code. Hosted deployments have no such endpoint.
 async function loadShareOrigin() {
   try {
