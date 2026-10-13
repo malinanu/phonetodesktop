@@ -222,3 +222,17 @@ footer { padding: clamp(40px, 6vw, 80px) var(--margin) 28px; }
 .shots figcaption b { display: block; font-size: 1.1875rem; letter-spacing: -.01em; }
 .shots .tall { grid-row: span 2; align-items: center; } .shots .tall img { max-width: 300px; }
 @media (max-width: 900px) { .shots { grid-template-columns: 1fr; } .shots .tall { grid-row: auto; align-items: stretch; } .shots .tall img { max-width: 260px; margin-inline: auto; } }
+
+/* My devices (devices.html) */
+.acct-form { display: grid; gap: 10px; max-width: 460px; margin: 14px 0 20px; }
+.acct-form label { font-weight: 700; }
+.acct-form input { font: inherit; color: var(--ink); background: var(--field); border: 2px solid var(--line); border-radius: 14px; padding: 14px 16px; min-height: 56px; }
+.acct-form input:focus-visible { border-color: var(--focus); }
+.acct-list { list-style: none; padding: 0; margin: 14px 0 22px; display: grid; gap: 12px; }
+.acct-dev { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: var(--field); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+.acct-dev.gone { opacity: .6; }
+.acct-actions { display: flex; gap: 8px; }
+.btn.small { min-height: 44px; padding: 0 18px; font-size: .95rem; }
+.acct-code { font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800; letter-spacing: .12em; background: var(--field); border: 1px dashed var(--line); border-radius: var(--radius); padding: 16px 22px; display: inline-block; user-select: all; }
+.acct-msg { margin-top: 18px; padding: 14px 18px; border-radius: 14px; background: var(--field-2); }
+.acct-msg.bad { color: var(--bad); border: 1px solid var(--bad); background: transparent; }

@@ -15,7 +15,7 @@
   <h1>Privacy Policy</h1>
   <p class="dim">Last updated: 1 October 2026 (added Send files)</p>
 
-  <p>Lanyard has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> works on your own Wi-Fi: the Lanyard program on your computer serves the page and introduces the two devices, and files go straight between them, so no server of ours is involved. Only if you choose to use a Send files server (your own, for sending over the internet) does a small server introduce devices and, when a direct connection is impossible, relay encrypted data. <b>The developer does not collect personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
+  <p>Lanyard has two parts. <b>Remote control</b> (media keys, touchpad, keyboard) works only between your phone and your PC and involves no server. <b>Send files</b> works on your own Wi-Fi: the Lanyard program on your computer serves the page and introduces the two devices, and files go straight between them, so no server of ours is involved. Only if you choose to use a Send files server (your own, for sending over the internet) does a small server introduce devices and, when a direct connection is impossible, relay encrypted data. <b>Unless you choose to create the optional account described below, the developer collects no personal data, and the app contains no analytics, advertising or tracking.</b> Your files are never stored on any server.</p>
 
   <h2>What stays on your devices</h2>
   <ul>
@@ -33,6 +33,16 @@
     <li><b>IP addresses.</b> As with any internet service, your IP address is visible to the server and the relay while you are connected. The relay may write connection details (IP addresses and times) to operational logs. Those logs rotate automatically by size and are kept only for a short time (typically days), used only to keep the service running and to deal with abuse.</li>
     <li><b>Sharing.</b> People you give a room link or code to can see the file names you send them and your device's network address, as with any peer-to-peer transfer. Only share a room with people you trust, and use a room password for sensitive files.</li>
     <li><b>Who runs the server.</b> The address of the Send files server is set by whoever built or configured your copy of the app (you can change it under Settings → Send files). If you run your own server, only you see this data.</li>
+  </ul>
+
+  <h2>The optional account</h2>
+  <p>You never need an account. If you create one, it is run on a server set up by whoever built your copy of Lanyard (for the public release, the address in Settings → Account). Control of your computer still goes directly between your phone and computer on your own network and never passes through the account server.</p>
+  <ul>
+    <li><b>What the account stores.</b> Your email address; for each device you add, a name, its type (phone or computer), platform (such as Android or Windows), a public key, the date it was added or removed, and, for a computer, the identifier and key fingerprint phones use to recognise it on your network; sign-in sessions (stored as one-way hashes); and the time of the last certificate issued to each device. The account service does not store your files, your media, what you control, or where your devices are.</li>
+    <li><b>What it is used for.</b> Signing you in with an emailed code (or Google or Apple sign-in where offered), showing you your devices, and giving each of your devices a short-lived certificate (about 30 days) that your computers accept, even offline, instead of scanning a code. Computers ask the server every few minutes to hours for the list of removed devices so a lost phone stops working.</li>
+    <li><b>Who sees it.</b> The person running the account server can see the data above. Emails are sent only to deliver your sign-in code. Nothing is sold or shared for advertising.</li>
+    <li><b>Logs.</b> Like any internet service, the server and the reverse proxy in front of it see your IP address when you connect and may keep short-lived operational logs.</li>
+    <li><b>Removing it.</b> You can remove any device, sign out, or <b>delete the whole account</b> (email and every device) at any time from <a href="devices.html">My devices</a> or from the phone app's Settings. Deleting is immediate. Removing a device takes effect on a computer the next time it checks the removal list, normally within 15 minutes, and a computer that is offline keeps accepting a removed phone's existing certificate only until that certificate expires (up to about 30 days, plus a 14-day grace period) unless it has checked the list meanwhile.</li>
   </ul>
 
   <h2>Permissions the Android app asks for</h2>
