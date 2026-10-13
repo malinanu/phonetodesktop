@@ -1,17 +1,21 @@
 # Lanyard
 
-Control media on a Windows, macOS or Linux computer from a phone, over the local network (Wi-Fi), or from an Android phone over Bluetooth.
+**Lanyard** ties your phone to your computer: remote, touchpad, keyboard and file sending over your own Wi-Fi (or Bluetooth on Android). Free, private, no account. Website: https://lanyard.3logiq.com
 
 ```
-agent/     Rust desktop agent (Windows GSMTC backend, tray app), serves the phone UI + WebSocket
+agent/     Rust desktop agent (Windows, macOS, Linux), serves the phone UI, WebSocket and the built-in Send files page
 shared/    Design system (base.css, font) and the in-app Guide page, used by both the PC agent and the Android app
-android/   Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
+mobile/    Flutter app for Android and iOS (replaces android/ once it reaches parity)
+android/   Native Android app: Wi-Fi mode (WebView + mDNS discovery + QR pairing) and Bluetooth HID mode
 filesync/  Send files: peer-to-peer WebRTC file transfer (FastAPI signaling + coturn + web UI), imported from github.com/polius/FileSync (MIT)
-deploy/    Production compose + Caddyfile for the FileSync server (see docs/DEPLOYING-SERVER.md)
+deploy/    Optional server stacks (Caddy, or Portainer + CloudPanel) for sending files over the internet (docs/DEPLOYING-SERVER.md)
+site/      The website (deployed to CloudPanel by .github/workflows/deploy-site.yml, docs/DEPLOYING-WEBSITE.md)
+brand/     The mark and the script that renders every icon from it
+account/   Optional account service (docs/ACCOUNTS.md)
 ```
 
 ## Download and releasing
-Downloads, privacy policy and the landing page live in `site/` (published with GitHub Pages). Releases are cut by tagging; see [docs/RELEASING.md](docs/RELEASING.md) for signing, Play Store and website setup. Licensed under [MIT](LICENSE).
+Downloads, privacy policy and the landing page live in `site/` (deployed to https://lanyard.3logiq.com, see [docs/DEPLOYING-WEBSITE.md](docs/DEPLOYING-WEBSITE.md)). Releases are cut by tagging; see [docs/RELEASING.md](docs/RELEASING.md) for signing, Play Store and website setup. Licensed under [MIT](LICENSE).
 
 ## Send files
 Lanyard also sends files between devices, in the browser, with no size limit. **It is built in:** the PC program serves the FileSync page and its small signaling relay on the home network (port + 1, `agent/src/files.rs`), so nothing needs hosting and nothing needs configuring. Click *Send files* on the PC, scan the code with the phone, pick files; they go directly between the devices over encrypted WebRTC. A phone receiving over plain Wi-Fi buffers the file in memory (browsers only stream to disk on HTTPS or localhost), so keep files sent *to a phone* to a few hundred MB; the computer side streams to disk with no limit. Only for sending between different networks (over the internet) do you run your own server (`filesync/`, [docs/DEPLOYING-SERVER.md](docs/DEPLOYING-SERVER.md)) and enter its address. FileSync is by [polius](https://github.com/polius/FileSync) and MIT licensed (see `filesync/LICENSE`).

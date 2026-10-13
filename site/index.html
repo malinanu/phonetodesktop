@@ -3,196 +3,231 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lanyard — control your computer's media from your phone</title>
-<meta name="description" content="Control your Windows, Mac or Linux computer's media from your phone over your own Wi-Fi, and send files of any size between devices. No account required, no tracking.">
-<link rel="stylesheet" href="base.css">
-<style>
-  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 40px; }
-  h1 { font-size: clamp(34px, 7vw, 54px); margin: 10px 0 16px; }
-  .lede { font-size: 19px; color: var(--ink-dim); max-width: 34em; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 8px; }
-  section { margin-top: 56px; }
-  h2 { font-size: 26px; margin-bottom: 14px; }
-  ol, ul { padding-left: 1.2em; } li { margin: 8px 0; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-  .grid h3 { font-size: 18px; margin-bottom: 6px; }
-  footer { border-top: 1px solid var(--line); margin-top: 64px; padding-top: 20px; font-size: 14px; }
-  footer a { margin-right: 16px; }
-  /* downloads */
-  .dl-list { display: grid; gap: 10px; margin-top: 12px; }
-  .dl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
-  .dl-row .what { flex: 1 1 220px; min-width: 0; }
-  .dl-row b { display: block; }
-  .dl-row .meta { font-size: 13px; color: var(--ink-dim); overflow-wrap: anywhere; }
-  .dl-row .btn { padding: 9px 16px; font-size: 15px; }
-  .dl-row[data-mine] { border-color: var(--accent); }
-  .badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
-  .note summary { cursor: pointer; font-weight: 650; padding: 6px 0; }
-  .note p { margin: 4px 0 10px; color: var(--ink-dim); }
-  code { font-size: .92em; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
-  .sums { font-size: 13px; color: var(--ink-dim); }
-</style>
+<title>Lanyard · your phone, tied to your computer</title>
+<meta name="description" content="Lanyard turns your phone into a remote, touchpad, keyboard and file sender for your Windows, Mac or Linux computer, over your own Wi-Fi. Free, private, no account.">
+<link rel="canonical" href="https://lanyard.3logiq.com/">
+<meta name="theme-color" content="#15110e">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lanyard · your phone, tied to your computer">
+<meta property="og:description" content="Remote, touchpad, keyboard and file sending for your computer, over your own Wi-Fi. Free, private, no account.">
+<meta property="og:url" content="https://lanyard.3logiq.com/">
+<meta property="og:image" content="https://lanyard.3logiq.com/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+<!-- Filled in by the deploy workflow when the store listings and the file server exist; otherwise the buttons stay hidden. -->
+<meta name="lanyard:app-store" content="__APP_STORE_URL__">
+<meta name="lanyard:play-store" content="__PLAY_STORE_URL__">
+<link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add("js")</script>
 </head>
 <body>
-<main>
-  <div class="kicker">Lanyard</div>
-  <h1>Your phone is the remote for your computer.</h1>
-  <p class="lede">Play, pause, skip, seek and change volume on your Windows, Mac or Linux computer from your phone, over your own Wi-Fi. Send files of any size between any devices, privately. No ads, no tracking.</p>
-  <div class="cta">
-    <a class="btn primary" id="dl-main" href="#downloads">Download</a>
-    <a class="btn" href="#downloads">All downloads</a>
+<a class="skip" href="#main">Skip to the content</a>
+
+<!-- The mark: two interlocked loops, the phone (upright) and the computer (wide). Colours come from --l1 / --l2. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <clipPath id="over"><rect x="470" y="230" width="210" height="170"/></clipPath>
+    <symbol id="loops" viewBox="0 0 1024 1024">
+      <g fill="none" stroke-width="104" stroke-linecap="round">
+        <rect x="250" y="170" width="320" height="684" rx="160" style="stroke:var(--l1,#ff9a3c)"/>
+        <rect x="400" y="312" width="380" height="400" rx="170" style="stroke:var(--l2,#f6ead8)"/>
+        <rect x="250" y="170" width="320" height="684" rx="160" style="stroke:var(--l1,#ff9a3c)" clip-path="url(#over)"/>
+      </g>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6l9 6-9 6zM17 6h2v12h-2z"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6l-9 6 9 6zM5 6h2v12H5z"/></symbol>
+    <symbol id="i-desktop" viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 0 1 1 1v9H4V6a1 1 0 0 1 1-1zm1 2v6h12V7zM2 17h20v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm1.6 4.4L9.2 12l-3.6 3.6 1.4 1.4 5-5-5-5zM12 15h6v2h-6z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v12h8V5zm4 14.2a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
+    <symbol id="i-bt" viewBox="0 0 24 24"><path d="M12 2l6 5.5-4 3.5 4 3.5L12 20v-6.4l-4 3.4-1.4-1.5 4.6-3.9-4.6-3.9L8 5.1l4 3.4zm2 5.3V9.8l1.7-1.5zm0 6.9v2.5l1.7-1.5z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5z"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <a class="brand" href="/"><img src="assets/favicon.svg" width="40" height="40" alt="">Lanyard</a>
+  <nav aria-label="Main">
+    <a href="#how">How it works</a>
+    <a href="#features">What it does</a>
+    <a href="#faq">Questions</a>
+    <a class="keep" href="#download">Download</a>
+  </nav>
+</header>
+
+<main id="main">
+<!-- ============ hero ============ -->
+<section class="hero">
+  <svg class="loops" aria-hidden="true" viewBox="0 0 1024 1024"><g><use href="#loops" width="1024" height="1024" style="--l1:#ff9a3c;--l2:#f6ead8"/></g></svg>
+  <h1 class="rise">Your phone, <span>tied</span> to your computer.</h1>
+  <p class="lead rise">Lanyard makes your phone a remote, a touchpad, a keyboard and a file sender for your computer. It all happens on your own Wi-Fi. No account, no cloud, no cost.</p>
+  <div class="actions rise">
+    <a class="btn primary" id="dl-main" href="#download">Download</a>
+    <a class="btn line" href="#how">See how it works</a>
   </div>
-  <p class="dim" id="dl-sub">Free and open source. Windows 10/11 · macOS 11+ · Linux · Android 9+</p>
+  <p class="fine rise" id="dl-sub">Free and open source. Windows 10/11, macOS 11+, Linux, Android 9+. iPhone app coming.</p>
 
-  <section>
-    <h2>Get connected in 60 seconds</h2>
-    <ol>
-      <li>Install <b>Lanyard</b> on your computer and open it. A dashboard shows a QR code.</li>
-      <li>Install the phone app, then scan the QR code with it.</li>
-      <li>Approve the phone on your computer. Done — it stays paired until you remove it.</li>
-    </ol>
-    <p class="dim">Both devices must be on the same Wi-Fi. On Android, Bluetooth mode needs no computer software at all: the phone acts as a Bluetooth keyboard with media keys.</p>
-  </section>
-
-  <section id="downloads">
-    <h2>Downloads</h2>
-    <h3 style="font-size:18px;margin:0 0 4px">Computer</h3>
-    <div class="dl-list" id="dl-desktop"><p class="dim" id="dl-loading">Loading the latest version…</p></div>
-    <h3 style="font-size:18px;margin:22px 0 4px">Phone</h3>
-    <div class="badges">
-      <a class="btn" id="get-appstore" href="__APP_STORE_URL__" hidden>Download on the App Store</a>
-      <a class="btn" id="get-play" href="__PLAY_STORE_URL__" hidden>Get it on Google Play</a>
+  <div class="peek rise" data-ui aria-hidden="true">
+    <div class="ui-card">
+      <div class="ui-row"><span class="ui-sub">Now playing on Living room PC</span></div>
+      <div class="ui-title" style="margin-top:6px;font-size:1.375em">Everything In Its Right Place</div>
+      <div class="ui-sub">Radiohead · Spotify</div>
+      <div class="ui-bar"><i></i></div>
+      <div class="ui-row" style="justify-content:space-between"><span class="ui-sub">1:23</span><span class="ui-sub">4:11</span></div>
+      <div class="ui-keys">
+        <span class="ui-key"><svg><use href="#i-prev"/></svg></span>
+        <span class="ui-key main"><svg><use href="#i-play"/></svg></span>
+        <span class="ui-key"><svg><use href="#i-next"/></svg></span>
+      </div>
     </div>
-    <div class="dl-list" id="dl-phone"></div>
-    <p class="sums" id="dl-foot"></p>
+  </div>
+</section>
 
-    <h3 style="font-size:18px;margin:22px 0 4px">First-run notes</h3>
-    <details class="note"><summary>Windows: "Windows protected your PC"</summary><p>The installer is not yet signed by a known publisher, so SmartScreen warns. Choose <b>More info → Run anyway</b>. When it asks, allow access on <b>Private networks</b> so your phone can reach the PC.</p></details>
-    <details class="note"><summary>macOS: "can't be opened" and permissions</summary><p>Open the <code>.dmg</code> and drag Lanyard to Applications. If macOS says it cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings → Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song title and progress are not available on macOS; play, pause, skip and volume work.</p></details>
-    <details class="note"><summary>Linux: install and requirements</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Then open <b>Lanyard</b> from your applications menu, or run <code>phone-remote open</code>. Players that support MPRIS (Spotify, VLC, Firefox, Chromium, Rhythmbox, mpv with the MPRIS script) show title and progress. Mouse and keyboard control needs an X11 session (XWayland also works); a Wayland-only desktop may block it. Volume uses PipeWire (<code>wpctl</code>) or PulseAudio (<code>pactl</code>).</p></details>
-    <details class="note"><summary>Verify a download</summary><p>Every release lists SHA-256 checksums (<code>SHA256SUMS</code>). Compare with <code>sha256sum file</code> (Linux), <code>shasum -a 256 file</code> (macOS) or <code>certutil -hashfile file SHA256</code> (Windows).</p></details>
-  </section>
+<!-- ============ how it works ============ -->
+<section id="how">
+  <div class="wrap">
+    <h2 class="section-head rise">Connected in about a minute.</h2>
+    <p class="strip-lead rise">Do it once. After that your phone finds your computer by itself.</p>
+  </div>
+  <div class="strip">
+    <article class="field">
+      <h3><b>First</b>Install Lanyard on your computer.</h3>
+      <div class="stage"><div data-ui aria-hidden="true"><div class="ui-card">
+        <div class="ui-title">Connect your phone</div>
+        <div class="ui-sub" style="margin:2px 0 12px">Scan this code with the app.</div>
+        <img src="assets/qr-example.svg" width="220" height="220" alt="" style="border-radius:10px;width:100%;height:auto">
+      </div></div></div>
+    </article>
+    <article class="field">
+      <h3><b>Then</b>Open the app on your phone and scan.</h3>
+      <div class="stage"><div data-ui aria-hidden="true"><div class="ui-card">
+        <div class="ui-title" style="font-size:1.375em;line-height:1.1">Control your computer from your phone.</div>
+        <div class="ui-sub" style="margin:10px 0 16px">On your computer, open Lanyard. The window shows a square code.</div>
+        <div class="ui-pill" style="width:100%;min-height:50px">Scan the code on my computer</div>
+      </div></div></div>
+    </article>
+    <article class="field">
+      <h3><b>Next</b>Click Allow on the computer.</h3>
+      <div class="stage"><div data-ui aria-hidden="true"><div class="ui-card">
+        <div class="ui-title">“Pixel 8” wants to control this computer.</div>
+        <div class="ui-sub" style="margin:6px 0 14px">Media, mouse and keyboard.</div>
+        <div class="ui-row"><span class="ui-pill">Allow</span><span class="ui-pill quiet">Deny</span></div>
+      </div></div></div>
+    </article>
+    <article class="field">
+      <h3><b>Done</b>Play something and take the remote.</h3>
+      <div class="stage"><div data-ui aria-hidden="true"><div class="ui-card">
+        <div class="ui-row"><span style="width:12px;height:12px;border-radius:50%;background:var(--good)"></span><span class="ui-title">Your phone is connected</span></div>
+        <div class="ui-bar" style="margin-top:16px"><i style="width:72%"></i></div>
+        <div class="ui-keys">
+          <span class="ui-key"><svg><use href="#i-prev"/></svg></span>
+          <span class="ui-key main"><svg><use href="#i-play"/></svg></span>
+          <span class="ui-key"><svg><use href="#i-next"/></svg></span>
+        </div>
+      </div></div></div>
+    </article>
+  </div>
+</section>
 
-  <section id="files">
-    <h2>Send files, too</h2>
-    <p class="lede" style="font-size:17px">Click Send files on your computer, scan its code with your phone, and pick files. They go straight from device to device over your Wi-Fi, encrypted, with no size limit, nothing to set up and nothing uploaded anywhere.</p>
-    <div class="cta"><a class="btn primary" id="open-files" href="__FILES_URL__" hidden>Open Send files</a></div>
-    <p class="dim">Built on <a href="https://github.com/polius/filesync">FileSync</a> (MIT). It is built into the Lanyard program on your computer. For sending between different networks you can run your own server.</p>
-  </section>
+<!-- ============ what it does ============ -->
+<section id="features">
+  <div class="board" style="margin-top:clamp(72px,11vw,150px)">
+    <div class="tile t-title"><h2 class="rise">Everything your computer needs from a remote.</h2></div>
 
-  <section>
-    <h2>Private by design</h2>
-    <div class="grid">
-      <div class="card"><h3>Stays on your network</h3><p class="dim">Remote-control commands go straight from phone to computer. There is no server in the middle.</p></div>
-      <div class="card"><h3>You approve every phone</h3><p class="dim">Pairing needs your OK on the computer, and any phone can be revoked at any time.</p></div>
-      <div class="card"><h3>No tracking</h3><p class="dim">No ads or analytics. Files are never stored. <a href="privacy.html">Read the privacy policy</a>.</p></div>
-    </div>
-  </section>
+    <article class="tile t-remote">
+      <svg class="big" aria-hidden="true" viewBox="0 0 200 200"><circle cx="100" cy="100" r="96" fill="#1b1006"/><path d="M78 56v88l74-44z" fill="#ff9a3c"/></svg>
+      <h3>Media remote</h3><p>Play, pause, skip, seek and volume for Spotify, VLC, YouTube and more.</p>
+    </article>
+    <article class="tile t-pad">
+      <svg class="big" aria-hidden="true" viewBox="0 0 240 280"><rect x="10" y="10" width="220" height="260" rx="40" fill="#e6d3b6"/><circle cx="92" cy="130" r="26" fill="#1b1006" opacity=".85"/><circle cx="150" cy="150" r="26" fill="#1b1006" opacity=".85"/></svg>
+      <h3>Touchpad and keyboard</h3><p>Move, click, scroll and type on the computer.</p>
+    </article>
 
-  <section>
-    <h2>Good to know</h2>
-    <ul>
-      <li>Phone-to-computer traffic is encrypted and pinned to your computer's own key, and only private (home-network) addresses are accepted. Phones on older app versions use plain HTTP until you switch that off in the computer's dashboard.</li>
-      <li>Bluetooth mode (Android only) can't show what's playing, and seeks with the arrow keys.</li>
-      <li>iPhones cannot act as a Bluetooth keyboard, so the iPhone app works over Wi-Fi only.</li>
-    </ul>
-  </section>
+    <article class="tile t-files">
+      <div class="big" aria-hidden="true" data-ui style="font-size:34px"><div class="ui-card" style="width:300px;padding:14px"><div class="ui-row"><svg width="28" height="28" style="fill:var(--accent)"><use href="#i-file"/></svg><div><div class="ui-title" style="font-size:.7em">holiday.mov</div><div class="ui-sub" style="font-size:.5em">2.4 GB · 63%</div></div></div><div class="ui-bar" style="margin-bottom:0"><i style="width:63%"></i></div></div></div>
+      <h3>Send files of any size</h3><p>Scan a code, pick files. They go straight between your devices.</p>
+    </article>
+    <article class="tile t-bt">
+      <svg class="big" aria-hidden="true" width="150" height="150" style="fill:var(--accent)"><use href="#i-bt"/></svg>
+      <h3>Bluetooth mode</h3><p>Android phones work with any computer, with no software on it.</p>
+    </article>
 
-  <footer class="dim">
-    <a href="https://github.com/malinanu/phonetodesktop">Source code</a>
-    <a href="https://github.com/malinanu/phonetodesktop/issues">Report a problem</a>
-    <a href="privacy.html">Privacy</a>
-  </footer>
+    <article class="tile t-private">
+      <svg class="big" aria-hidden="true" width="150" height="150" style="fill:#1b1006"><use href="#i-lock"/></svg>
+      <h3>Stays on your Wi-Fi</h3><p>Encrypted, and tied to your computer’s own key.</p>
+    </article>
+    <article class="tile t-account">
+      <svg class="big" aria-hidden="true" viewBox="0 0 1024 1024" width="160" height="160"><use href="#loops" width="1024" height="1024" style="--l1:#1b1006;--l2:#f6ead8"/></svg>
+      <h3>No account</h3><p>Nothing to sign up for. Ever required.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ============ downloads ============ -->
+<section id="download">
+  <div class="wrap">
+    <h2 class="section-head rise">Get Lanyard.</h2>
+  </div>
+  <div class="dl" id="dl-list" aria-live="polite">
+    <p class="dim" id="dl-loading">Loading the latest version…</p>
+  </div>
+  <p class="dl-foot" id="dl-foot"></p>
+  <div class="notes">
+    <details><summary>Windows says “Windows protected your PC”</summary><p>The installer is not yet signed by a known publisher, so SmartScreen warns. Choose <b>More info</b>, then <b>Run anyway</b>. When it asks, allow access on <b>Private networks</b> so your phone can reach the computer.</p></details>
+    <details><summary>macOS says it cannot open the app</summary><p>Open the <code>.dmg</code> and drag Lanyard to Applications. If macOS cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings, Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song titles and progress are not available on macOS; play, pause, skip and volume work.</p></details>
+    <details><summary>Linux: how to install</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Media control uses D-Bus (MPRIS); the mouse and keyboard work on X11 and, with a one-time permission, on Wayland.</p></details>
+    <details><summary>Check that a download is genuine</summary><p>Every release lists SHA-256 checksums (<code>SHA256SUMS</code>). Compare with <code>sha256sum file</code> (Linux), <code>shasum -a 256 file</code> (macOS) or <code>certutil -hashfile file SHA256</code> (Windows).</p></details>
+  </div>
+</section>
+
+<!-- ============ privacy ============ -->
+<section class="band">
+  <h2 class="rise">Nothing leaves your network.</h2>
+  <ul class="rise">
+    <li><div><b>Your phone talks to your computer.</b><span>Not to us. There is no Lanyard server in the middle of the remote.</span></div></li>
+    <li><div><b>No account, no tracking, no ads.</b><span>We do not collect your data, because the app never sends it anywhere.</span></div></li>
+    <li><div><b>You approve every phone.</b><span>A new phone must be allowed on the computer, and you can remove it at any time.</span></div></li>
+  </ul>
+</section>
+
+<!-- ============ questions ============ -->
+<section id="faq">
+  <div class="wrap"><h2 class="section-head rise">Questions people ask.</h2></div>
+  <div class="faq" data-one-open>
+    <details open><summary>Do I need to create an account?</summary><p>No. Install the app, scan the code, approve the phone. An optional account is planned for people who want to see all their devices in one place; the remote will always work without it.</p></details>
+    <details><summary>Does it work without internet?</summary><p>Yes. Your phone and computer only need to be on the same Wi-Fi. Bluetooth mode on Android needs no network at all.</p></details>
+    <details><summary>Is it safe on shared Wi-Fi?</summary><p>The connection is encrypted and your phone remembers your computer’s own key, so other people on the network cannot read or change it. Every new phone has to be allowed on the computer first.</p></details>
+    <details><summary>How do I send a file?</summary><p>On the computer, click <b>Send files</b>. A page opens with a square code. On the phone, open the Files tab, scan the code and pick files. They go straight between the two devices over your Wi-Fi, with no size limit when the computer receives. A phone has to hold an incoming file in memory, so keep files sent to a phone to a few hundred MB.</p></details>
+    <details><summary>Can I send files over the internet?</summary><p>Yes, if you run your own Send files server. It is optional and not needed for normal use. The guide in the project explains how.</p></details>
+    <details><summary>Is there an iPhone app?</summary><p>It is being prepared for the App Store. Until then, point the iPhone camera at the code on your computer and use the remote in Safari.</p></details>
+    <details><summary>Is it free?</summary><p>Yes, and the source code is open. Lanyard is built on the MIT-licensed <a href="https://github.com/polius/FileSync">FileSync</a> for file sending.</p></details>
+  </div>
+</section>
+
+<!-- ============ closing ============ -->
+<section class="close">
+  <div><h2 class="rise">Take the remote.</h2><p class="rise">Download it, scan the code, and the sofa is the control room.</p></div>
+  <div class="actions rise" style="justify-content:flex-start"><a class="btn primary" id="dl-close" href="#download">Download Lanyard</a><a class="btn line" href="#how">How it works</a></div>
+</section>
 </main>
-<script>
-(function () {
-  "use strict";
-  var RELEASES = "https://github.com/malinanu/phonetodesktop/releases/latest";
 
-  // ---- store buttons: the links are filled in when the site is built; show only real https links ----
-  ["open-files", "get-appstore", "get-play"].forEach(function (id) {
-    var a = document.getElementById(id);
-    if (a && /^https:\/\//.test(a.getAttribute("href"))) a.hidden = false;
-  });
+<footer>
+  <div class="mark-band" aria-hidden="true">
+    <svg viewBox="0 0 1024 1024" style="--l1:#ff9a3c;--l2:#f6ead8"><use href="#loops" width="1024" height="1024"/></svg>
+    <svg viewBox="0 0 1024 1024" style="--l1:#f6ead8;--l2:#ff9a3c;opacity:.35"><use href="#loops" width="1024" height="1024"/></svg>
+  </div>
+  <nav class="foot-links" aria-label="Footer">
+    <a href="#download">Download</a><a href="privacy.html">Privacy</a>
+    <a href="https://github.com/malinanu/phonetodesktop">Source code</a><a href="https://github.com/malinanu/phonetodesktop/releases/latest">All releases</a>
+  </nav>
+  <div class="foot-note"><span>© Lanyard. Free and open source.</span><span>File sending built on <a href="https://github.com/polius/FileSync">FileSync</a> by polius (MIT).</span></div>
+</footer>
 
-  // ---- which computer / phone is this? ----
-  function detect() {
-    var ua = navigator.userAgent || "";
-    var uaPlatform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
-    var os = "other";
-    if (/android/i.test(ua)) os = "android";
-    else if (/iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(uaPlatform) && navigator.maxTouchPoints > 1)) os = "ios";
-    else if (/Win/i.test(uaPlatform) || /Windows/i.test(ua)) os = "windows";
-    else if (/Mac/i.test(uaPlatform) || /Macintosh/i.test(ua)) os = "macos";
-    else if (/Linux|X11|CrOS/i.test(uaPlatform + ua)) os = "linux";
-    var arm = /aarch64|arm64|armv8/i.test(ua + uaPlatform);
-    return { os: os, arch: arm ? "aarch64" : "x86_64" };
-  }
-  var me = detect();
-
-  function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
-
-  function row(title, sub, a, mine) {
-    var d = document.createElement("div"); d.className = "dl-row"; if (mine) d.setAttribute("data-mine", "");
-    var w = document.createElement("div"); w.className = "what";
-    var b = document.createElement("b"); b.textContent = title;
-    var m = document.createElement("span"); m.className = "meta";
-    m.textContent = sub + " · " + size(a.size) + " · SHA-256 " + a.sha256.slice(0, 12) + "…";
-    w.appendChild(b); w.appendChild(m);
-    var l = document.createElement("a"); l.className = "btn" + (mine ? " primary" : ""); l.textContent = "Download"; l.href = a.url;
-    l.setAttribute("download", "");
-    d.appendChild(w); d.appendChild(l);
-    return d;
-  }
-
-  var LABEL = {
-    "windows/installer": ["Windows", "Installer for Windows 10 and 11 (.exe)"],
-    "macos/installer": ["macOS", "Disk image for Apple silicon and Intel (.dmg)"],
-    "linux/deb": ["Linux · Debian / Ubuntu", "Package (.deb)"],
-    "linux/tarball": ["Linux · other distributions", "Archive with an install script (.tar.gz)"],
-    "android/apk": ["Android", "Direct download (.apk); use Google Play when available"]
-  };
-
-  function render(m) {
-    var desk = document.getElementById("dl-desktop"), phone = document.getElementById("dl-phone");
-    desk.textContent = ""; phone.textContent = "";
-    var assets = ((m && m.assets) || []).slice().sort(function (a, b) { return (a.arch === "aarch64") - (b.arch === "aarch64"); });
-    var order = ["windows/installer", "macos/installer", "linux/deb", "linux/tarball"];
-    var best = null;
-    order.forEach(function (key) {
-      assets.filter(function (a) { return a.platform + "/" + a.kind === key; }).forEach(function (a) {
-        var mine = a.platform === me.os && (a.arch === "universal" || a.arch === me.arch) && (a.platform !== "linux" || a.kind === "deb");
-        var lab = LABEL[key]; var arch = a.arch === "universal" || a.platform !== "linux" ? "" : " · " + (a.arch === "aarch64" ? "ARM64" : "x86-64");
-        if (mine && !best) best = a;
-        desk.appendChild(row(lab[0] + arch, lab[1], a, mine));
-      });
-    });
-    assets.filter(function (a) { return a.platform === "android"; }).forEach(function (a) {
-      phone.appendChild(row(LABEL["android/apk"][0], LABEL["android/apk"][1], a, me.os === "android"));
-    });
-    if (!desk.children.length) {
-      var p = document.createElement("p"); p.className = "dim";
-      p.innerHTML = 'Downloads are on the <a href="' + RELEASES + '">releases page</a>.';
-      desk.appendChild(p);
-    }
-    var main = document.getElementById("dl-main"), sub = document.getElementById("dl-sub");
-    if (best) {
-      var names = { windows: "Windows", macos: "macOS", linux: "Linux" };
-      main.textContent = "Download for " + names[best.platform]; main.href = best.url;
-      sub.textContent = "Version " + m.version + " · " + size(best.size) + " · free and open source";
-    } else if (me.os === "android" || me.os === "ios") {
-      main.textContent = "Get the phone app"; main.href = "#downloads";
-      sub.textContent = "Install Lanyard on your computer too. This page lists every download.";
-    }
-    if (m && m.version) document.getElementById("dl-foot").textContent = "Latest version " + m.version + ". Checksums: SHA256SUMS on the release page.";
-  }
-
-  fetch("latest.json", { cache: "no-cache" })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (m) { render(m && m.assets ? m : null); })
-    .catch(function () { render(null); });
-})();
-</script>
+<script src="app.js"></script>
 </body>
 </html>

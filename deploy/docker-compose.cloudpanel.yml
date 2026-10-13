@@ -1,0 +1,140 @@
+# Send files server for a host that ALREADY runs a web server on ports 80/443 (CloudPanel, Nginx Proxy Manager, ...).
+# Same services as docker-compose.portainer.yml, but without Caddy: the web app is published on 127.0.0.1 only and
+# CloudPanel's nginx (with its Let's Encrypt certificate) proxies https://lanyardfileshare.3logiq.com to it.
+# Self-contained: no bind mounts, so it works pasted into Portainer's web editor (Stacks -> Add stack -> Web editor).
+#
+# Environment variables (Portainer "Environment variables" section):
+#   FILES_DOMAIN      default lanyardfileshare.3logiq.com (used as the TURN realm)
+#   TURN_EXTERNAL_IP  REQUIRED on Oracle Cloud and any host with a private address behind NAT:
+#                     "<public-ip>/<private-ip>" (the instance's public and its private address)
+#   FILES_PORT        default 8080  (127.0.0.1 only; point the CloudPanel reverse proxy here)
+#   ACCOUNT_PORT      default 8081  (only with the "accounts" profile)
+#   FILES_TAG         optional. image tag from a release, default "latest"
+#
+# Open on the firewall (Oracle: VCN security list AND the instance's own iptables): 3478 tcp+udp, 50000-50100 udp.
+# 80/443 stay with CloudPanel. See docs/DEPLOYING-SERVER.md ("Oracle Cloud + Portainer + CloudPanel").
+x-logging: &logging
+  # Operational logs rotate by size, so nothing is kept for long (see the privacy policy).
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  filesync:
+    image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
+    # Before the first release exists, build on this host instead (comment out `image:` above, use the repo as the
+    # Portainer Git source, and replace <branch>):
+    # build: https://github.com/malinanu/phonetodesktop.git#<branch>:filesync
+    container_name: files-app
+    logging: *logging
+    ports:
+      - "127.0.0.1:${FILES_PORT:-8080}:80"
+    environment:
+      - SECRET_FILE=/keys/secret
+    volumes:
+      - keys:/keys:ro
+    depends_on:
+      coturn:
+        condition: service_started
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:alpine
+    container_name: files-coturn
+    logging: *logging
+    entrypoint: ["/bin/sh", "-c"]
+    # Private ranges are denied as relay targets; quotas cap relay sessions (same as deploy/docker-compose.yml).
+    # EXTERNAL_IP is only added when TURN_EXTERNAL_IP is set (needed behind NAT).
+    command:
+      - |
+        secret=$$(cat /keys/secret) && exec turnserver \
+          --fingerprint \
+          --use-auth-secret \
+          --no-multicast-peers \
+          --denied-peer-ip=10.0.0.0-10.255.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --user-quota=10 \
+          --total-quota=200 \
+          --no-cli \
+          --realm=${FILES_DOMAIN:-lanyardfileshare.3logiq.com} \
+          --static-auth-secret="$$secret" \
+          --listening-port=3478 \
+          --min-port=50000 \
+          --max-port=50100 \
+          $${EXTERNAL_IP:+--external-ip=$$EXTERNAL_IP}
+    environment:
+      - EXTERNAL_IP=${TURN_EXTERNAL_IP:-}
+    volumes:
+      - keys:/keys:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "50000-50100:50000-50100/udp"
+    restart: unless-stopped
+
+  # One-shot: creates the shared signing secret on first start (kept in the keys volume).
+  init:
+    image: ghcr.io/malinanu/phonetodesktop-files:${FILES_TAG:-latest}
+    container_name: files-init
+    logging: *logging
+    command: python3 api/init_secret.py
+    volumes:
+      - keys:/keys
+
+  # ---- optional: account service (docker compose --profile accounts up -d) -------------------------------------
+  # Lanyard works without it. See docs/ACCOUNTS.md for the keys and settings it needs. The account service
+  # refuses to start without ACCOUNT_SIGNING_KEYS and ACCOUNT_JWT_SECRET, and the database without a password.
+  account-db:
+    profiles: ["accounts"]
+    image: postgres:16-alpine
+    container_name: files-account-db
+    logging: *logging
+    environment:
+      - POSTGRES_USER=account
+      - POSTGRES_DB=account
+      - POSTGRES_PASSWORD=${ACCOUNT_DB_PASSWORD:-}
+    volumes:
+      - account-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U account -d account"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  account:
+    profiles: ["accounts"]
+    image: ghcr.io/malinanu/phonetodesktop-account:${ACCOUNT_TAG:-latest}
+    container_name: files-account
+    logging: *logging
+    ports:
+      - "127.0.0.1:${ACCOUNT_PORT:-8081}:8000"
+    environment:
+      - DATABASE_URL=postgresql://account:${ACCOUNT_DB_PASSWORD:-}@account-db:5432/account
+      - ACCOUNT_SIGNING_KEYS=${ACCOUNT_SIGNING_KEYS:-}
+      - ACCOUNT_JWT_SECRET=${ACCOUNT_JWT_SECRET:-}
+      - ACCOUNT_TRUST_PROXY=1
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-Lanyard <no-reply@localhost>}
+      - GOOGLE_CLIENT_IDS=${GOOGLE_CLIENT_IDS:-}
+      - APPLE_CLIENT_IDS=${APPLE_CLIENT_IDS:-}
+    depends_on:
+      account-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  account-db:
+  keys:

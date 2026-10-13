@@ -1,0 +1,88 @@
+name: deploy-site
+# Publishes site/ (the Lanyard website) to the CloudPanel server over SSH, and always keeps a zip of it as a
+# workflow artifact so it can also be uploaded by hand. Without the secrets below it only builds the zip.
+#
+# One-time setup (see docs/DEPLOYING-WEBSITE.md): create a static site for lanyard.3logiq.com in CloudPanel, give its
+# site user an SSH key, then add these repository secrets:
+#   SITE_SSH_HOST         server name or IP
+#   SITE_SSH_USER         the CloudPanel site user
+#   SITE_SSH_KEY          private key (OpenSSH format) for that user
+#   SITE_SSH_KNOWN_HOSTS  the server's host key line(s): `ssh-keyscan -t ed25519 <host>` run from a trusted network
+#   SITE_SSH_PATH         /home/<site user>/htdocs/lanyard.3logiq.com
+on:
+  push:
+    # The default branch is currently claude/phone-media-remote-ddrl6t; drop it once the default is renamed to main.
+    branches: [main, claude/phone-media-remote-ddrl6t]
+    paths: ["site/**", ".github/workflows/deploy-site.yml"]
+  release:
+    types: [published]     # rebuild so the page picks up the new latest.json
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SITE_SSH_HOST: ${{ secrets.SITE_SSH_HOST }}
+      SITE_SSH_USER: ${{ secrets.SITE_SSH_USER }}
+      SITE_SSH_PATH: ${{ secrets.SITE_SSH_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Latest release manifest (the page lists the downloads from it)
+        run: |
+          if curl -fsSL "https://github.com/${{ github.repository }}/releases/latest/download/latest.json" -o site/latest.json \
+             && python3 -c "import json; d=json.load(open('site/latest.json')); assert isinstance(d.get('assets'), list)"; then
+            echo "latest.json: $(python3 -c "import json; print(json.load(open('site/latest.json'))['version'])")"
+          else
+            rm -f site/latest.json
+            echo "No release manifest yet; the page shows links to the releases page."
+          fi
+      - name: Fill in the store links (repo variables; a button stays hidden if its variable is unset or invalid)
+        env:
+          APP_STORE_URL: ${{ vars.APP_STORE_URL }}
+          PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          path = "site/index.html"
+          html = open(path, encoding="utf-8").read()
+          rules = {
+              "__APP_STORE_URL__": ("APP_STORE_URL", r"^https://apps\.apple\.com/[A-Za-z0-9._~/?=%-]+$"),
+              "__PLAY_STORE_URL__": ("PLAY_STORE_URL", r"^https://play\.google\.com/store/apps/details\?id=[A-Za-z0-9._]+$"),
+          }
+          for token, (var, rx) in rules.items():
+              value = os.environ.get(var, "")
+              if re.match(rx, value):
+                  html = html.replace(token, value)
+                  print(f"{var}: set")
+              else:
+                  print(f"{var}: not set or not valid, button stays hidden")
+          open(path, "w", encoding="utf-8").write(html)
+          PY
+      - name: Zip for manual upload
+        run: cd site && zip -qr ../lanyard-site.zip . -x "*.DS_Store"
+      - uses: actions/upload-artifact@v4
+        with: { name: lanyard-site, path: lanyard-site.zip }
+      - name: Upload to the server over SSH
+        env:
+          SITE_SSH_KEY: ${{ secrets.SITE_SSH_KEY }}
+          SITE_SSH_KNOWN_HOSTS: ${{ secrets.SITE_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SITE_SSH_HOST" ] || [ -z "$SITE_SSH_USER" ] || [ -z "$SITE_SSH_KEY" ] || [ -z "$SITE_SSH_PATH" ] || [ -z "$SITE_SSH_KNOWN_HOSTS" ]; then
+            echo "Server secrets are not all set: only the zip artifact was built."; exit 0
+          fi
+          # Refuse anything that is not a CloudPanel site folder: the upload deletes files that are no longer in site/.
+          if ! printf '%s' "$SITE_SSH_PATH" | grep -Eq '^/home/[a-z0-9_-]+/htdocs/[A-Za-z0-9.-]+/?$'; then
+            echo "::error::SITE_SSH_PATH must look like /home/<site user>/htdocs/<domain>"; exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SITE_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SITE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          rsync -az --delete --exclude '.well-known/' \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            site/ "$SITE_SSH_USER@$SITE_SSH_HOST:${SITE_SSH_PATH%/}/"
+          rm -f ~/.ssh/deploy_key
+          echo "Uploaded to $SITE_SSH_HOST"

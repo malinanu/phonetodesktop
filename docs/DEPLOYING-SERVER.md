@@ -6,6 +6,51 @@ between the two devices. Deploy this server only if you want Send files **betwee
 internet**: a small signaling server helps two devices find each other, and a TURN relay (coturn) carries the
 encrypted traffic when a direct connection is impossible. File bytes are never stored on the server.
 
+## Oracle Cloud + Portainer + CloudPanel (lanyardfileshare.3logiq.com)
+
+Use this when the server already runs CloudPanel (its nginx owns ports 80 and 443) and Portainer. Use
+`deploy/docker-compose.cloudpanel.yml` instead of the Caddy-based files: it has no web server of its own and publishes
+the app on `127.0.0.1:8080`.
+
+1. **DNS.** Create an `A` record `lanyardfileshare.3logiq.com` pointing at the server's public IP.
+2. **Portainer.** Stacks, Add stack, Web editor, paste `deploy/docker-compose.cloudpanel.yml` (or use the repository with
+   that compose path). Environment variables:
+   - `TURN_EXTERNAL_IP` = `<public IP>/<private IP>` of the Oracle instance. **Required**: Oracle instances only know their private
+     address, and TURN must advertise the public one. Find both in the Oracle console (Instance, Primary VNIC).
+   - `FILES_DOMAIN` is already `lanyardfileshare.3logiq.com`. Change `FILES_TAG` only to pin a release.
+   Deploy. Before the first release of the image exists, use the `build:` line described in the compose file.
+3. **CloudPanel.** Sites, Add Site, **Create a Reverse Proxy**: domain `lanyardfileshare.3logiq.com`, Reverse Proxy URL
+   `http://127.0.0.1:8080`. Then Let's Encrypt certificate (Site, SSL/TLS, New Let's Encrypt Certificate). WebSocket upgrade
+   headers are part of CloudPanel's reverse-proxy template; check `Upgrade` and `Connection` are in the vhost if signaling fails.
+4. **Open the TURN ports, in two places.** Oracle blocks them by default:
+   - Console: VCN, Security Lists (or the network security group), add **ingress** rules, source `0.0.0.0/0`:
+     TCP and UDP `3478`, UDP `50000-50100`.
+   - On the instance (Ubuntu images ship with a restrictive iptables):
+     ```
+     sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
+     sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
+     sudo iptables -I INPUT -p udp --dport 50000:50100 -j ACCEPT
+     sudo netfilter-persistent save
+     ```
+5. **Check.** `https://lanyardfileshare.3logiq.com` shows the Send files page. Open it on two devices on different networks
+   (one on mobile data), share the room link and send a file: that exercises the TURN relay. The browser test in
+   `filesync/e2e/` can also be pointed at it.
+6. **Point the apps at it.** In the GitHub repository settings set the variable `FILES_URL` to
+   `https://lanyardfileshare.3logiq.com`; the next builds then offer it for sending between networks (the built-in
+   local Send files keeps working without it).
+
+Optional account service: add the profile `accounts` (Portainer: enable the profile, or `docker compose --profile accounts up -d`),
+set the keys from `docs/ACCOUNTS.md`, and in the CloudPanel site's **Vhost** add before the default location:
+
+```
+location /account/ {
+    proxy_pass http://127.0.0.1:8081/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
 ## What you need
 - A VPS with a public IPv4 address: 1 vCPU / 1 GB RAM is enough to start; Linux with Docker + Docker Compose v2.
 - A domain you control, e.g. `files.example.com`.
