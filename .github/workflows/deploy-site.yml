@@ -86,3 +86,9 @@ jobs:
             site/ "$SITE_SSH_USER@$SITE_SSH_HOST:${SITE_SSH_PATH%/}/"
           rm -f ~/.ssh/deploy_key
           echo "Uploaded to $SITE_SSH_HOST"
+      - name: Check the live site answers
+        # A warning, not a failure: the DNS record or certificate may not exist yet on the first run.
+        continue-on-error: true
+        run: |
+          if [ -z "$SITE_SSH_HOST" ]; then exit 0; fi
+          curl -fsS --retry 5 --retry-delay 5 -o /dev/null -w "https://lanyard.3logiq.com answered %{http_code}\n" https://lanyard.3logiq.com/

@@ -8,7 +8,7 @@ The site is plain static files (`site/`), so CloudPanel only has to serve a fold
 1. **DNS.** `A` record `lanyard.3logiq.com` to the server's public IP.
 2. **CloudPanel.** Sites, Add Site, **Create a Static Site**, domain `lanyard.3logiq.com`. CloudPanel creates a site user
    and the folder `/home/<site user>/htdocs/lanyard.3logiq.com`. Then SSL/TLS, New Let's Encrypt Certificate.
-3. **An SSH key for deploys.** On your own machine: `ssh-keygen -t ed25519 -f lanyard-deploy -N ""`. In CloudPanel open the
+3. **An SSH key for deploys.** On your own machine: `ssh-keygen -t ed25519 -C "lanyard-site-deploy" -f lanyard-deploy -N ""` (never commit it; `.gitignore` already skips `lanyard-deploy*`). To rotate it later, make a new pair, add the new public key in CloudPanel, replace the `SITE_SSH_KEY` secret, then delete the old public key. In CloudPanel open the
    site, SSH/FTP, and add `lanyard-deploy.pub` under SSH keys for the site user (or append it to
    `~/.ssh/authorized_keys` of that user). This key can only reach that one site user.
 4. **Repository secrets** (Settings, Secrets and variables, Actions):

@@ -1,3 +1,8 @@
 
 # taste-skill working files (direction sheet, inspector renders)
 .taste-skill/
+
+# deploy keys never go in the repository
+lanyard-deploy
+lanyard-deploy.pub
+*.pem
