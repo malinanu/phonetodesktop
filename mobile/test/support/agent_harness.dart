@@ -46,15 +46,19 @@ class AgentUnderTest {
   }
 
   /// The dashboard API, as the owner's browser on this PC would call it.
-  Future<dynamic> api(String method, String path) async {
+  Future<dynamic> api(String method, String path, {Object? body, int expectStatus = 200}) async {
     final client = HttpClient()..findProxy = ((uri) => 'DIRECT');
     final req = await client.openUrl(method, Uri.parse('http://127.0.0.1:$port$path'));
     req.headers.set('x-requested-with', 'phone-remote');
+    if (body != null) {
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode(body));
+    }
     final res = await req.close();
-    final body = await res.transform(utf8.decoder).join();
+    final text = await res.transform(utf8.decoder).join();
     client.close();
-    expect(res.statusCode, 200, reason: '$method $path -> $body');
-    return jsonDecode(body);
+    expect(res.statusCode, expectStatus, reason: '$method $path -> $text');
+    return jsonDecode(text);
   }
 
   /// Be the owner: wait for a pairing request and press Allow.

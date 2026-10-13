@@ -168,3 +168,25 @@ def test_link_codes_need_sign_in_and_wrong_codes_are_rate_limited(world):
     pc = world.new_device(kind="pc", platform="linux")
     codes = [world.client.post("/v1/links/claim", json={**world.body(pc), "code": "AAAA-BBBB"}).status_code for _ in range(12)]
     assert codes[:10] == [401] * 10 and codes[10] == 429
+
+
+FP = "A" * 43
+
+
+def test_a_computer_publishes_how_phones_find_and_check_it(world):
+    t = world.sign_in()
+    pc = {**world.new_device("Desk PC", kind="pc"), "pc_id": "pcid-12345678", "fingerprint": FP}
+    assert enroll(world, t, pc).status_code == 201
+    got = world.client.get("/v1/devices", headers=world.auth(t)).json()["devices"][0]
+    assert (got["pc_id"], got["fingerprint"], got["kind"]) == ("pcid-12345678", FP, "pc")
+    # a phone cannot claim to be a computer's address
+    ph = {**world.new_device("Pixel"), "pc_id": "pcid-87654321", "fingerprint": FP}
+    enroll(world, t, ph)
+    phone = [d for d in world.client.get("/v1/devices", headers=world.auth(t)).json()["devices"] if d["kind"] == "phone"][0]
+    assert phone["pc_id"] is None and phone["fingerprint"] is None
+
+
+def test_a_malformed_fingerprint_or_pc_id_is_rejected(world):
+    t = world.sign_in()
+    for patch in ({"fingerprint": "abc"}, {"fingerprint": "!" * 43}, {"pc_id": "x"}):
+        assert enroll(world, t, {**world.new_device(kind="pc"), **patch}).status_code == 422, patch

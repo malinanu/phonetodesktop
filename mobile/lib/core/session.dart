@@ -7,15 +7,18 @@ import 'protocol.dart';
 
 /// A PC this phone has paired with.
 class PcRecord {
-  const PcRecord({required this.id, required this.name, required this.host, required this.port, required this.fingerprint});
+  const PcRecord({required this.id, required this.name, required this.host, required this.port, required this.fingerprint, this.viaAccount = false});
 
   final String id, name, host, fingerprint;
   final int port;
 
-  PcRecord copyWith({String? name, String? host, int? port}) =>
-      PcRecord(id: id, name: name ?? this.name, host: host ?? this.host, port: port ?? this.port, fingerprint: fingerprint);
+  /// Found through the account instead of a QR code. Signing out of the account forgets these.
+  final bool viaAccount;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'host': host, 'port': port, 'fp': fingerprint};
+  PcRecord copyWith({String? name, String? host, int? port}) =>
+      PcRecord(id: id, name: name ?? this.name, host: host ?? this.host, port: port ?? this.port, fingerprint: fingerprint, viaAccount: viaAccount);
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'host': host, 'port': port, 'fp': fingerprint, if (viaAccount) 'acct': true};
 
   factory PcRecord.fromJson(Map<String, dynamic> j) => PcRecord(
         id: j['id'] as String,
@@ -23,6 +26,7 @@ class PcRecord {
         host: j['host'] as String,
         port: (j['port'] as num).toInt(),
         fingerprint: j['fp'] as String? ?? '',
+        viaAccount: j['acct'] == true,
       );
 
   factory PcRecord.fromPairing(PairingInfo info) =>
@@ -130,7 +134,10 @@ class AgentSession {
 }
 
 /// Log in with the device key: ask for a challenge, sign it, wait for the verdict.
-Future<AgentSession> loginToPc({required PcRecord pc, required DeviceIdentity identity, SocketOpener opener = openPinnedSocket}) async {
+///
+/// With an account, [cert] (this phone's device certificate) goes along, so a PC that never paired with this phone
+/// can still accept it because it belongs to the same account.
+Future<AgentSession> loginToPc({required PcRecord pc, required DeviceIdentity identity, String? cert, SocketOpener opener = openPinnedSocket}) async {
   if (pc.fingerprint.isEmpty) throw InsecurePc();
   final link = AgentLink(await opener(pc.host, pc.port, pc.fingerprint));
   try {
@@ -139,7 +146,7 @@ Future<AgentSession> loginToPc({required PcRecord pc, required DeviceIdentity id
     final nonce = unb64u((await challenge)['nonce'] as String);
     final signature = await identity.sign(authMessage(pc.id, identity.deviceId, nonce));
     final verdict = link.waitFor((m) => m['t'] == 'auth');
-    link.send({'t': 'auth_sig', 'device': identity.deviceId, 'sig': b64u(signature)});
+    link.send({'t': 'auth_sig', 'device': identity.deviceId, 'sig': b64u(signature), 'cert': ?cert});
     final result = await verdict;
     if (result['ok'] != true) throw AuthFailed(result['err']?.toString() ?? 'refused');
     final buffered = link.startStreaming();

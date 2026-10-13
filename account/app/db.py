@@ -67,6 +67,10 @@ class Device(Base):
     platform: Mapped[str] = mapped_column(String(16))
     kind: Mapped[str] = mapped_column(String(8))  # "phone" | "pc"
     pubkey: Mapped[str] = mapped_column(String(64))  # base64url Ed25519
+    # A computer also tells the account how phones find and check it on the local network: its program id (the
+    # `id` in the mDNS advertisement) and the SHA-256 fingerprint of its TLS key, which phones pin.
+    pc_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    fingerprint: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[int] = mapped_column(BigInteger, default=now)
     cert_issued_at: Mapped[int | None] = mapped_column(BigInteger, default=None)
     revoked_at: Mapped[int | None] = mapped_column(BigInteger, default=None, index=True)

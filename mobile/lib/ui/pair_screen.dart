@@ -22,7 +22,7 @@ Future<PairResult> _realPair(PairingInfo info, ConnectionController link, void F
 
 /// First run, or "Add a PC": scan the code shown on the PC, then wait for its owner to allow this phone.
 class PairScreen extends StatefulWidget {
-  const PairScreen({super.key, required this.link, this.onPaired, this.scan = scanQr, this.pair = _realPair, this.onBluetooth});
+  const PairScreen({super.key, required this.link, this.onPaired, this.scan = scanQr, this.pair = _realPair, this.onBluetooth, this.onAccount});
   final ConnectionController link;
   final VoidCallback? onPaired;
   final Scanner scan;
@@ -30,6 +30,9 @@ class PairScreen extends StatefulWidget {
 
   /// Android only: use the phone as a Bluetooth remote instead of pairing over Wi-Fi.
   final VoidCallback? onBluetooth;
+
+  /// Open the account sign-in (Settings), for people who have a Lanyard account instead of a code to scan.
+  final VoidCallback? onAccount;
 
   @override
   State<PairScreen> createState() => _PairScreenState();
@@ -129,6 +132,11 @@ class _PairScreenState extends State<PairScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: TextButton.icon(onPressed: widget.onBluetooth, icon: const Icon(Icons.bluetooth_rounded), label: const Text('Use Bluetooth instead')),
+                ),
+              if (widget.onAccount != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: TextButton.icon(onPressed: widget.onAccount, icon: const Icon(Icons.person_outline_rounded), label: const Text('I have an account')),
                 ),
             ]),
           if (_problem != null)

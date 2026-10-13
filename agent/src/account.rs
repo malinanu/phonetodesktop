@@ -16,7 +16,7 @@ const ENVELOPE_PREFIX: &[u8] = b"PRv2-signed\0";
 const SKEW_S: u64 = 300;
 
 /// What a PC remembers about the account it joined. Stored in the agent config.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AccountTrust {
     /// Base address of the account service, e.g. `https://files.example.com/account`.
     pub url: String,
@@ -42,6 +42,23 @@ pub struct AccountTrust {
     pub device_id: String,
     #[serde(default)]
     pub device_seed: String,
+}
+
+impl Default for AccountTrust {
+    /// An empty account with the usual rules (14 days of grace, phones may use the mouse and keyboard).
+    fn default() -> Self {
+        AccountTrust {
+            url: String::new(),
+            acct: String::new(),
+            keys: BTreeMap::new(),
+            grace_days: default_grace_days(),
+            input_allowed: yes(),
+            revoked: vec![],
+            revoked_checked: 0,
+            device_id: String::new(),
+            device_seed: String::new(),
+        }
+    }
 }
 
 fn default_grace_days() -> u64 {
@@ -184,6 +201,12 @@ mod tests {
             revoked_checked: 0,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_new_account_has_the_usual_rules() {
+        let t = AccountTrust::default();
+        assert_eq!((t.grace_days, t.input_allowed), (14, true));
     }
 
     #[test]

@@ -62,6 +62,23 @@ class DeviceIn(BaseModel):
     platform: str
     kind: Literal["phone", "pc"]
     pubkey: str
+    pc_id: str | None = None
+    fingerprint: str | None = None
+
+    @field_validator("pc_id")
+    @classmethod
+    def _pc_id(cls, v: str | None) -> str | None:
+        if v is not None and not _DEVICE_ID.match(v):
+            raise ValueError("invalid pc id")
+        return v
+
+    @field_validator("fingerprint")
+    @classmethod
+    def _fingerprint(cls, v: str | None) -> str | None:
+        if v is not None:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{43}", v):  # base64url SHA-256, as in the pairing QR
+                raise ValueError("invalid fingerprint")
+        return v
 
     @field_validator("id")
     @classmethod
@@ -173,7 +190,7 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
         }
 
     def device_json(d: Device) -> dict:
-        return {"id": d.id, "name": d.name, "platform": d.platform, "kind": d.kind, "created_at": d.created_at, "revoked": d.revoked_at is not None}
+        return {"id": d.id, "name": d.name, "platform": d.platform, "kind": d.kind, "created_at": d.created_at, "revoked": d.revoked_at is not None, "pc_id": d.pc_id, "fingerprint": d.fingerprint}
 
     def make_cert(db: DbSession, d: Device) -> str:
         t = now()
@@ -193,11 +210,13 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
             if existing.revoked_at is not None:
                 raise HTTPException(403, "This device was removed from the account. Create a new device identity to add it again.")
             existing.name, existing.platform, existing.kind = body.name, body.platform, body.kind
+            if body.kind == "pc":
+                existing.pc_id, existing.fingerprint = body.pc_id, body.fingerprint
             db.commit()
             return existing
         if db.scalar(select(Device).where(Device.user_id == user.id, Device.pubkey == body.pubkey, Device.revoked_at.is_(None))):
             raise HTTPException(409, "That key is already enrolled under another id.")
-        d = Device(id=body.id, user_id=user.id, name=body.name, platform=body.platform, kind=body.kind, pubkey=body.pubkey, created_at=now())
+        d = Device(id=body.id, user_id=user.id, name=body.name, platform=body.platform, kind=body.kind, pubkey=body.pubkey, created_at=now(), pc_id=body.pc_id if body.kind == "pc" else None, fingerprint=body.fingerprint if body.kind == "pc" else None)
         db.add(d)
         db.commit()
         return d

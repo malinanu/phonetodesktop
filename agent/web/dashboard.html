@@ -204,7 +204,7 @@
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><input id="acctUrl" type="text" value="https://lanyardfileshare.3logiq.com/account" autocomplete="off" spellcheck="false" aria-label="Account service address" style="flex:1;min-width:200px"><input id="acctCode" type="text" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Code from your account page" style="width:140px"><button class="btn small" id="acctJoin">Join</button></div>
       <p id="acctErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div></div>
     <div id="acctOn" hidden>
-      <div class="row"><div class="grow"><b>Joined to your account</b><span id="acctInfo"></span></div><button class="btn small danger" id="acctLeave">Leave</button></div>
+      <div class="row"><div class="grow"><b>Joined to your account</b><span id="acctInfo"></span></div><div style="display:flex;gap:8px"><button class="btn small" id="acctCheck">Check now</button><button class="btn small danger" id="acctLeave">Leave</button></div></div>
       <div class="row"><div class="grow"><b>Let account phones use the mouse and keyboard</b><span>Phones paired with a code have their own switch on the Phones page.</span></div><label class="switch"><input type="checkbox" id="acctInput"><i></i></label></div>
     </div>
     <h2>Danger zone</h2>
@@ -268,6 +268,7 @@
     try { await api('/api/account/join', 'POST', { url: $('acctUrl').value, code: $('acctCode').value }); $('acctCode').value = ''; toast('Joined'); refresh(); }
     catch (e) { err.textContent = (e && e.message) || 'Could not join. Check the code and the address.'; err.hidden = false; }
   });
+  $('acctCheck').addEventListener('click', async () => { try { await api('/api/account/refresh', 'POST'); toast('Checked'); refresh(); } catch (e) { toast(e.message); } });
   $('acctLeave').addEventListener('click', async () => {
     if (!confirm('Leave the account? Phones that only signed in with the account will stop working here.')) return;
     await api('/api/account/leave', 'POST'); refresh();

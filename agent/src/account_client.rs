@@ -59,8 +59,8 @@ fn explain(e: ureq::Error) -> String {
 }
 
 /// Join the account that made `code` (Account page, "Add a computer"). Learns the service's keys, enrols this
-/// computer as a device and checks the certificate it gets back.
-pub fn join(base: &str, code: &str, host_name: &str, now: u64) -> Result<AccountTrust, String> {
+/// computer as a device (with the id and TLS fingerprint phones use to find and check it) and checks the certificate it gets back.
+pub fn join(base: &str, code: &str, host_name: &str, pc_id: &str, tls_fp: Option<&str>, now: u64) -> Result<AccountTrust, String> {
     let base = normalize_base(base).ok_or("That address does not look right. It must start with https://")?;
     let a = agent();
 
@@ -80,7 +80,7 @@ pub fn join(base: &str, code: &str, host_name: &str, now: u64) -> Result<Account
 
     let reply: serde_json::Value = a
         .post(&format!("{base}/v1/links/claim"))
-        .send_json(serde_json::json!({"code": code.trim(), "id": device_id, "name": name, "platform": platform, "kind": "pc", "pubkey": pubkey}))
+        .send_json(serde_json::json!({"code": code.trim(), "id": device_id, "name": name, "platform": platform, "kind": "pc", "pubkey": pubkey, "pc_id": pc_id, "fingerprint": tls_fp}))
         .map_err(explain)?
         .into_json()
         .map_err(|_| "The account service gave an answer this program does not understand.")?;

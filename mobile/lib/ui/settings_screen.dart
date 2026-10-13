@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../app/account.dart';
 import '../app/connection.dart';
 import '../app/files_url.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
+import 'account_section.dart';
 import 'files_screen.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.settings, required this.link, this.onAddPc});
+  const SettingsScreen({super.key, required this.settings, required this.link, this.account, this.onAddPc});
   final AppSettings settings;
   final ConnectionController link;
+  final AccountController? account;
   final VoidCallback? onAddPc;
 
   @override
@@ -107,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _row(pc.name, '${pc.host}:${pc.port}${pc.id == widget.link.active?.id ? ' · open now' : ''}', TextButton(onPressed: () => _confirmForget(pc.id, pc.name), child: const Text('Forget'))),
           const SizedBox(height: 10),
           OutlinedButton.icon(onPressed: widget.onAddPc, icon: const Icon(Icons.qr_code_scanner_rounded), label: const Text('Add a PC')),
+          if (widget.account != null) ...[_h('Account (optional)'), AccountSection(account: widget.account!, link: widget.link)],
           const SizedBox(height: 26),
           TextButton(onPressed: () => s.reset(), child: const Text('Reset settings to defaults')),
         ]),

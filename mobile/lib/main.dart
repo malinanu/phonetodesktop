@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'app/account.dart';
 import 'app/connection.dart';
 import 'app/discovery.dart';
 import 'app/pc_store.dart';
@@ -15,7 +16,15 @@ import 'ui/home_shell.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final settings = await AppSettings.load();
-  final link = ConnectionController(pcStore: PrefsPcStore(), identityStore: SecureIdentityStore(), discovery: NsdDiscovery());
+  final identityStore = SecureIdentityStore();
+  final account = AccountController(
+    store: SecureAccountStore(),
+    identityStore: identityStore,
+    deviceName: Platform.isIOS ? 'iPhone' : 'Android phone',
+    platform: Platform.isIOS ? 'ios' : 'android',
+  );
+  await account.load();
+  final link = ConnectionController(pcStore: PrefsPcStore(), identityStore: identityStore, discovery: NsdDiscovery(), certProvider: account.freshCert);
   await link.load();
   void applyAwake() {
     try {
@@ -25,13 +34,14 @@ Future<void> main() async {
 
   settings.addListener(applyAwake);
   applyAwake();
-  runApp(PhoneRemoteApp(settings: settings, link: link, bluetooth: Platform.isAndroid ? BluetoothController(ChannelHidPlatform()) : null));
+  runApp(PhoneRemoteApp(settings: settings, link: link, account: account, bluetooth: Platform.isAndroid ? BluetoothController(ChannelHidPlatform()) : null));
 }
 
 class PhoneRemoteApp extends StatelessWidget {
-  const PhoneRemoteApp({super.key, required this.settings, required this.link, this.bluetooth});
+  const PhoneRemoteApp({super.key, required this.settings, required this.link, this.account, this.bluetooth});
   final AppSettings settings;
   final ConnectionController link;
+  final AccountController? account;
   final BluetoothController? bluetooth;
 
   @override
@@ -48,7 +58,7 @@ class PhoneRemoteApp extends StatelessWidget {
           'light' => ThemeMode.light,
           _ => ThemeMode.system,
         },
-        home: HomeShell(link: link, settings: settings, bluetooth: bluetooth),
+        home: HomeShell(link: link, settings: settings, account: account, bluetooth: bluetooth),
       ),
     );
   }

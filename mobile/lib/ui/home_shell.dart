@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/account.dart';
 import '../app/connection.dart';
 import '../core/hid.dart';
 import '../app/settings.dart';
@@ -12,11 +13,12 @@ import 'settings_screen.dart';
 import 'touchpad_screen.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.link, required this.settings, this.scan = scanQr, this.pair, this.bluetooth});
+  const HomeShell({super.key, required this.link, required this.settings, this.scan = scanQr, this.pair, this.bluetooth, this.account});
   final ConnectionController link;
   final AppSettings settings;
   final Scanner scan;
   final Pairer? pair;
+  final AccountController? account;
 
   /// Present on Android only: iOS cannot act as a Bluetooth keyboard.
   final BluetoothController? bluetooth;
@@ -29,9 +31,9 @@ class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
   bool _btOnly = false; // no PC paired, but the user chose Bluetooth
 
-  PairScreen _pairScreen({VoidCallback? onPaired, VoidCallback? onBluetooth}) => widget.pair == null
-      ? PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, onBluetooth: onBluetooth)
-      : PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, pair: widget.pair!, onBluetooth: onBluetooth);
+  PairScreen _pairScreen({VoidCallback? onPaired, VoidCallback? onBluetooth, VoidCallback? onAccount}) => widget.pair == null
+      ? PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, onBluetooth: onBluetooth, onAccount: onAccount)
+      : PairScreen(link: widget.link, onPaired: onPaired, scan: widget.scan, pair: widget.pair!, onBluetooth: onBluetooth, onAccount: onAccount);
 
   Widget _btOnlyPage(BluetoothController bt) => Scaffold(
         appBar: AppBar(
@@ -47,7 +49,7 @@ class _HomeShellState extends State<HomeShell> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => _pairScreen(onPaired: close)));
   }
 
-  void _openSettings() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(settings: widget.settings, link: widget.link, onAddPc: _openPair)));
+  void _openSettings() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(settings: widget.settings, link: widget.link, account: widget.account, onAddPc: _openPair)));
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +60,7 @@ class _HomeShellState extends State<HomeShell> {
         if (link.pcs.isEmpty) {
           final bt = widget.bluetooth;
           if (bt != null && _btOnly) return _btOnlyPage(bt);
-          return _pairScreen(onBluetooth: bt == null ? null : () => setState(() => _btOnly = true));
+          return _pairScreen(onBluetooth: bt == null ? null : () => setState(() => _btOnly = true), onAccount: widget.account == null ? null : _openSettings);
         }
         final c = context.pr;
         final pc = link.active;

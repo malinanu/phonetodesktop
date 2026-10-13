@@ -37,6 +37,7 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/account/join", post(account_join))
         .route("/api/account/leave", post(account_leave))
         .route("/api/account/input", post(account_input))
+        .route("/api/account/refresh", post(account_refresh))
         .route("/api/log", get(log_tail))
 }
 
@@ -288,9 +289,9 @@ async fn account_join(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App
         Err(r) => return r,
     };
     let (url, code) = (body["url"].as_str().unwrap_or("").to_owned(), body["code"].as_str().unwrap_or("").to_owned());
-    let host = app.host.clone();
+    let (host, pc_id, fp) = (app.host.clone(), app.pc_id.clone(), app.tls_fp.clone());
     let now = crate::auth::now_s();
-    let r = tokio::task::spawn_blocking(move || crate::account_client::join(&url, &code, &host, now)).await;
+    let r = tokio::task::spawn_blocking(move || crate::account_client::join(&url, &code, &host, &pc_id, fp.as_deref(), now)).await;
     match r {
         Ok(Ok(trust)) => {
             app.auth.set_account(Some(trust));
@@ -311,6 +312,23 @@ async fn account_leave(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<Ap
     app.auth.set_account(None);
     crate::log::log("left the account");
     ok()
+}
+
+/// Ask the account service now which devices were removed (the background check runs every 15 minutes).
+async fn account_refresh(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    let Some(trust) = app.auth.account() else {
+        return (StatusCode::BAD_REQUEST, Json(json!({"ok": false, "error": "Not joined to an account."}))).into_response();
+    };
+    match tokio::task::spawn_blocking(move || crate::account_client::fetch_revocations(&trust)).await {
+        Ok(Ok(envelope)) if app.auth.apply_revocations(&envelope) => ok(),
+        Ok(Ok(_)) => (StatusCode::BAD_GATEWAY, Json(json!({"ok": false, "error": "The removed-devices list did not check out."}))).into_response(),
+        Ok(Err(e)) => (StatusCode::BAD_GATEWAY, Json(json!({"ok": false, "error": e}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok": false, "error": "Something went wrong."}))).into_response(),
+    }
 }
 
 /// May the account's phones use the mouse and keyboard?

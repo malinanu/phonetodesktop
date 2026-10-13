@@ -91,6 +91,10 @@ jobs:
         with: { channel: stable, cache: true }
       - name: Build the PC agent (the live tests talk to the real binary)
         run: cargo build --manifest-path agent/Cargo.toml
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: The account service (the live account test runs the real one)
+        run: pip install -r account/requirements.txt
       - run: flutter pub get
         working-directory: mobile
       - run: flutter analyze

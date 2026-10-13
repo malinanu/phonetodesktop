@@ -39,6 +39,7 @@ class ConnectionController extends ChangeNotifier implements InputSink {
     required this.identityStore,
     this.opener = openPinnedSocket,
     this.discovery,
+    this.certProvider,
     this.retryDelays = const [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8), Duration(seconds: 15)],
   });
 
@@ -46,6 +47,9 @@ class ConnectionController extends ChangeNotifier implements InputSink {
   final IdentityStore identityStore;
   final SocketOpener opener;
   final Discovery? discovery;
+
+  /// The account's device certificate to present at login (null without an account).
+  final Future<String?> Function()? certProvider;
   final List<Duration> retryDelays;
 
   DeviceIdentity? _identity;
@@ -91,6 +95,53 @@ class ConnectionController extends ChangeNotifier implements InputSink {
     await pcStore.save(_pcs);
     await pcStore.setActive(pc.id);
     _start();
+  }
+
+  /// Computers of the signed-in account: look for each on this network (by the id it advertises) and remember the
+  /// ones found, pinned to the key fingerprint the account holds. Returns the names found and the names missing.
+  Future<({List<String> found, List<String> missing})> addAccountPcs(List<({String pcId, String name, String fingerprint})> computers) async {
+    final seen = <String, Sighting>{};
+    try {
+      for (final s in await (discovery?.scan() ?? Future.value(<Sighting>[]))) {
+        seen[s.id] = s;
+      }
+    } catch (_) {}
+    final found = <String>[], missing = <String>[];
+    for (final c in computers) {
+      final s = seen[c.pcId];
+      if (s == null) {
+        missing.add(c.name);
+        continue;
+      }
+      final existing = _pcs.where((p) => p.id == c.pcId).firstOrNull;
+      final rec = PcRecord(id: c.pcId, name: c.name, host: s.host, port: s.port, fingerprint: c.fingerprint, viaAccount: existing == null || existing.viaAccount);
+      _pcs = [..._pcs.where((p) => p.id != c.pcId), rec];
+      found.add(c.name);
+    }
+    await pcStore.save(_pcs);
+    if (found.isNotEmpty && _activeId == null) {
+      _activeId = _pcs.first.id;
+      await pcStore.setActive(_activeId);
+      _start();
+    } else {
+      _notify();
+    }
+    return (found: found, missing: missing);
+  }
+
+  /// After signing out of the account: forget the computers that were only known through it.
+  Future<void> forgetAccountPcs() async {
+    final gone = _pcs.where((p) => p.viaAccount).map((p) => p.id).toSet();
+    if (gone.isEmpty) return;
+    _pcs = _pcs.where((p) => !gone.contains(p.id)).toList();
+    await pcStore.save(_pcs);
+    if (gone.contains(_activeId)) {
+      _activeId = _pcs.isEmpty ? null : _pcs.first.id;
+      await pcStore.setActive(_activeId);
+      _start();
+    } else {
+      _notify();
+    }
   }
 
   Future<void> select(String id) async {
@@ -173,7 +224,8 @@ class ConnectionController extends ChangeNotifier implements InputSink {
     while (_current(gen)) {
       try {
         _setStatus(gen, LinkStatus.connecting);
-        final session = await loginToPc(pc: pc, identity: identity, opener: opener);
+        final cert = await certProvider?.call();
+        final session = await loginToPc(pc: pc, identity: identity, cert: cert, opener: opener);
         if (!_current(gen)) {
           await session.close();
           return;
