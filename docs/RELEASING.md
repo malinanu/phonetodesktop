@@ -1,14 +1,14 @@
-# Releasing Phone Remote
+# Releasing Lanyard
 
 Everything ships from one command: `git tag v1.0.0 && git push --tags`.
 `.github/workflows/release.yml` then builds, signs (if secrets exist) and publishes to GitHub Releases:
 
-- `PhoneRemote-Setup-<version>.exe` — Windows installer
-- `PhoneRemote-<version>-macos.dmg` — macOS disk image (universal: Apple silicon + Intel)
+- `Lanyard-Setup-<version>.exe` — Windows installer
+- `Lanyard-<version>-macos.dmg` — macOS disk image (universal: Apple silicon + Intel)
 - `phone-remote_<version>-1_amd64.deb` / `_arm64.deb` and `phone-remote-<version>-linux-x86_64.tar.gz` / `-aarch64.tar.gz` — Linux
 - `latest.json` and `SHA256SUMS` — read by the website, and for verifying downloads
-- `PhoneRemote-<version>.apk` — Android APK (direct download)
-- `PhoneRemote-<version>.aab` — Play Store bundle (workflow artifact only; needs the keystore secrets)
+- `Lanyard-<version>.apk` — Android APK (direct download)
+- `Lanyard-<version>.aab` — Play Store bundle (workflow artifact only; needs the keystore secrets)
 - `ghcr.io/malinanu/phonetodesktop-files:<version>` and `:latest` — the Send files server image (see [DEPLOYING-SERVER.md](DEPLOYING-SERVER.md))
 
 Version numbers come from the tag (`v1.2.3` → versionName `1.2.3`, versionCode `10203`). Never reuse a tag.
@@ -74,7 +74,7 @@ The privacy policy URL for Play is `https://<owner>.github.io/<repo>/privacy.htm
    Data safety answers: *no data collected, no data shared*. This holds because the app itself contacts no server of yours: remote control is phone-to-PC on the LAN,
    and the Files tab only launches the phone's browser for Send files. The privacy policy still describes the file service (see `site/privacy.html`).
    **Re-answer the form if you ever load the Send files page inside the app (WebView), add analytics or crash upload, or send anything else off the device.**
-3. Enrol in **Play App Signing** when uploading the first bundle, and upload `PhoneRemote-<version>.aab` from the release workflow run
+3. Enrol in **Play App Signing** when uploading the first bundle, and upload `Lanyard-<version>.aab` from the release workflow run
    (Actions → run → Artifacts → `android-aab`).
 4. Permissions Play may ask you to justify: Bluetooth connect/advertise (Bluetooth HID remote mode) and local network discovery (finding the PC).
 5. Roll out: internal test → closed test → production. Every upload needs a higher versionCode, which a new tag gives you.

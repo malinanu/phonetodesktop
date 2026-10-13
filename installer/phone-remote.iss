@@ -5,18 +5,19 @@
 
 [Setup]
 AppId={{6B6D5F0E-6E0B-4B85-9C55-1F8E7C2B7A11}
-AppName=Phone Remote
+AppName=Lanyard
 AppVersion={#Version}
-AppPublisher=Phone Remote
-DefaultDirName={autopf}\Phone Remote
-DefaultGroupName=Phone Remote
+AppPublisher=Lanyard
+DefaultDirName={autopf}\Lanyard
+DefaultGroupName=Lanyard
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=PhoneRemote-Setup-{#Version}
+OutputBaseFilename=Lanyard-Setup-{#Version}
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\phone-remote.exe
+SetupIconFile=assets\lanyard.ico
 CloseApplications=force
 WizardStyle=modern
 
@@ -24,13 +25,13 @@ WizardStyle=modern
 Source: "..\agent\target\release\phone-remote.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Phone Remote"; Filename: "{app}\phone-remote.exe"
+Name: "{group}\Lanyard"; Filename: "{app}\phone-remote.exe"
 
 [Run]
 ; Allow phones on private networks to reach the agent (any port, this program only).
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Phone Remote"""; Flags: runhidden
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Phone Remote"" dir=in action=allow protocol=TCP profile=private program=""{app}\phone-remote.exe"""; Flags: runhidden
-Filename: "{app}\phone-remote.exe"; Description: "Start Phone Remote and pair a phone"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\phone-remote.exe"; Description: "Start Lanyard and pair a phone"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/im phone-remote.exe /f"; Flags: runhidden; RunOnceId: "KillAgent"

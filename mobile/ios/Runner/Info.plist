@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Phone Remote</string>
+	<string>Lanyard</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,9 +27,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Phone Remote scans the QR code on your PC to pair with it.</string>
+	<string>Lanyard scans the QR code on your PC to pair with it.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Phone Remote finds your PC on your Wi-Fi and controls it. Nothing is sent over the internet.</string>
+	<string>Lanyard finds your PC on your Wi-Fi and controls it. Nothing is sent over the internet.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_phoneremote._tcp</string>

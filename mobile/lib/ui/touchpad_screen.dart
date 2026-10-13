@@ -134,7 +134,7 @@ class _TouchpadScreenState extends State<TouchpadScreen> {
                 const SizedBox(height: 16),
                 const Text('Mouse and keyboard are off for this phone', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 10),
-                Text('On the PC, open Phone Remote, go to Phones and turn on “Mouse & keyboard” next to this phone.', textAlign: TextAlign.center, style: TextStyle(color: c.dim, fontSize: 16)),
+                Text('On the PC, open Lanyard, go to Phones and turn on “Mouse & keyboard” next to this phone.', textAlign: TextAlign.center, style: TextStyle(color: c.dim, fontSize: 16)),
               ]),
             ),
           );

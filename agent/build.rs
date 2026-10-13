@@ -39,6 +39,18 @@ fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, PathBuf)>) {
 }
 
 fn main() {
+    // Windows: the program icon and version details shown in Explorer, the taskbar and Task Manager.
+    #[cfg(windows)]
+    {
+        println!("cargo:rerun-if-changed=../installer/assets/lanyard.ico");
+        let mut res = winresource::WindowsResource::new();
+        res.set_icon("../installer/assets/lanyard.ico");
+        res.set("ProductName", "Lanyard");
+        res.set("FileDescription", "Lanyard");
+        if let Err(e) = res.compile() {
+            println!("cargo:warning=could not embed the Windows icon: {e}");
+        }
+    }
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../filesync/web");
     println!("cargo:rerun-if-changed=../filesync/web");
     println!("cargo:rerun-if-changed=build.rs");

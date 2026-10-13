@@ -1,6 +1,6 @@
 # Deploying the "Send files" server
 
-**This is optional.** Phone Remote needs no server, and **Send files already works without one**: the PC program
+**This is optional.** Lanyard needs no server, and **Send files already works without one**: the PC program
 serves the FileSync page itself on the home network (port + 1), phones scan its code, and files go directly
 between the two devices. Deploy this server only if you want Send files **between different networks, over the
 internet**: a small signaling server helps two devices find each other, and a TURN relay (coturn) carries the

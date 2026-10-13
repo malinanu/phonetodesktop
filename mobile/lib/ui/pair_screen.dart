@@ -47,7 +47,7 @@ class _PairScreenState extends State<PairScreen> {
     final info = await widget.scan(context);
     if (info == null || !mounted) return;
     if (info.fingerprint.isEmpty) {
-      setState(() => _problem = 'This PC does not offer a secure connection yet. Update Phone Remote on the PC, then scan its new code.');
+      setState(() => _problem = 'This PC does not offer a secure connection yet. Update Lanyard on the PC, then scan its new code.');
       return;
     }
     setState(() {
@@ -60,7 +60,7 @@ class _PairScreenState extends State<PairScreen> {
         if (mounted) setState(() => _step = _Step.waiting);
       });
     } on InsecurePc {
-      _fail('This PC does not offer a secure connection yet. Update Phone Remote on the PC.');
+      _fail('This PC does not offer a secure connection yet. Update Lanyard on the PC.');
       return;
     } catch (_) {
       _fail('Could not reach ${info.name}. Are the phone and the PC on the same Wi-Fi?');
@@ -105,7 +105,7 @@ class _PairScreenState extends State<PairScreen> {
           const SizedBox(height: 14),
           Text('Pause, skip and seek your computer’s media from the couch. Pair once; it reconnects by itself.', style: TextStyle(color: c.dim, fontSize: 17, height: 1.35)),
           const SizedBox(height: 22),
-          for (final (i, t) in ['Open Phone Remote on your computer', 'Open the dashboard and go to Phones', 'Scan the code, then tap Allow on the computer'].indexed)
+          for (final (i, t) in ['Open Lanyard on your computer', 'Open the dashboard and go to Phones', 'Scan the code, then tap Allow on the computer'].indexed)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(children: [
@@ -146,9 +146,9 @@ class _PairScreenState extends State<PairScreen> {
   }
 }
 
-/// Opens the camera and returns the first Phone Remote code it sees.
+/// Opens the camera and returns the first Lanyard code it sees.
 Future<PairingInfo?> scanQr(BuildContext context) => Navigator.of(context).push<PairingInfo>(
-      MaterialPageRoute(builder: (_) => ScanPage<PairingInfo>(accept: PairingInfo.parse, title: 'Scan the code on your PC', notOurs: 'That is not a Phone Remote code')),
+      MaterialPageRoute(builder: (_) => ScanPage<PairingInfo>(accept: PairingInfo.parse, title: 'Scan the code on your PC', notOurs: 'That is not a Lanyard code')),
     );
 
 /// Scans for a QR code whose text [accept] turns into a result (null = not the code we want). Pops with that result.

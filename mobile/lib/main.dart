@@ -39,7 +39,7 @@ class PhoneRemoteApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: settings,
       builder: (context, _) => MaterialApp(
-        title: 'Phone Remote',
+        title: 'Lanyard',
         debugShowCheckedModeBanner: false,
         theme: lightTheme(),
         darkTheme: darkTheme(),

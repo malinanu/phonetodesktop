@@ -27,7 +27,7 @@ class FilesUrl {
     return 'https://${authority.toLowerCase()}$tail';
   }
 
-  /// The built-in Send files page of a PC: the Phone Remote program serves it on its own port plus one.
+  /// The built-in Send files page of a PC: the Lanyard program serves it on its own port plus one.
   /// [host] is the address the phone already uses to reach the PC.
   static String? local(String host, int agentPort) {
     if (!_host.hasMatch(host) || agentPort < 1 || agentPort > 65534) return null;

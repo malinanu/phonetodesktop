@@ -15,9 +15,9 @@ class Mailer:
 
 def _message(sender: str, email: str, code: str, minutes: int) -> EmailMessage:
     m = EmailMessage()
-    m["From"], m["To"], m["Subject"] = sender, email, "Your Phone Remote sign-in code"
+    m["From"], m["To"], m["Subject"] = sender, email, "Your Lanyard sign-in code"
     m.set_content(
-        f"Your Phone Remote sign-in code is:\n\n    {code}\n\n"
+        f"Your Lanyard sign-in code is:\n\n    {code}\n\n"
         f"It works once and expires in {minutes} minutes. If you did not ask for it, ignore this email: nothing happens "
         "unless the code is entered."
     )

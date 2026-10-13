@@ -133,7 +133,7 @@ fn make_cert(key: &rcgen::KeyPair, hostname: &str) -> Result<(Vec<u8>, u64)> {
     let mut params = rcgen::CertificateParams::new(names).map_err(|e| anyhow!("certificate names: {e}"))?;
     params.subject_alt_names.push(rcgen::SanType::IpAddress(IpAddr::from([127, 0, 0, 1])));
     params.subject_alt_names.push(rcgen::SanType::IpAddress(IpAddr::from([0u16, 0, 0, 0, 0, 0, 0, 1])));
-    params.distinguished_name.push(rcgen::DnType::CommonName, "Phone Remote");
+    params.distinguished_name.push(rcgen::DnType::CommonName, "Lanyard");
     let now = time::OffsetDateTime::now_utc();
     params.not_before = now - time::Duration::days(1); // tolerate phones with a slightly wrong clock
     params.not_after = now + time::Duration::days(VALID_DAYS);
@@ -244,7 +244,7 @@ pub fn plain_action(peer: IpAddr, older_phones_allowed: bool) -> PlainAction {
     }
 }
 
-const REFUSED_NOTICE: &str = "HTTP/1.0 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\nCache-Control: no-store\r\n\r\nThis computer only accepts the secure Phone Remote app. Install or update the Phone Remote app on your phone and scan the code again.\n";
+const REFUSED_NOTICE: &str = "HTTP/1.0 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\nCache-Control: no-store\r\n\r\nThis computer only accepts the secure Lanyard app. Install or update the Lanyard app on your phone and scan the code again.\n";
 
 /// Accepts TCP connections, tells TLS from plain HTTP by the first byte, and hands finished connections to
 /// axum. The sniffing and the TLS handshake happen in their own tasks, so one slow or silent client can never

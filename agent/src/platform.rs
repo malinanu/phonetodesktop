@@ -127,7 +127,7 @@ fn desktop_exec_quote(s: &str) -> String {
 #[cfg(unix)]
 pub fn xdg_autostart_entry(exe: &str) -> String {
     format!(
-        "[Desktop Entry]\nType=Application\nName=Phone Remote\nComment=Control this computer's media from your phone\nExec={} serve --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+        "[Desktop Entry]\nType=Application\nName=Lanyard\nComment=Control this computer's media from your phone\nExec={} serve --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
         desktop_exec_quote(exe)
     )
 }

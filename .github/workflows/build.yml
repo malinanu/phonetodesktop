@@ -78,10 +78,10 @@ jobs:
           cargo build --release --manifest-path agent/Cargo.toml --target x86_64-apple-darwin
           lipo -create -output phone-remote-universal agent/target/release/phone-remote agent/target/x86_64-apple-darwin/release/phone-remote
           installer/macos/make-dmg.sh 0.0.0 phone-remote-universal dist
-          hdiutil verify dist/PhoneRemote-0.0.0-macos.dmg
-          hdiutil attach dist/PhoneRemote-0.0.0-macos.dmg -mountpoint /tmp/pr-dmg -nobrowse
-          codesign --verify --deep --strict "/tmp/pr-dmg/Phone Remote.app"
-          plutil -lint "/tmp/pr-dmg/Phone Remote.app/Contents/Info.plist"
+          hdiutil verify dist/Lanyard-0.0.0-macos.dmg
+          hdiutil attach dist/Lanyard-0.0.0-macos.dmg -mountpoint /tmp/pr-dmg -nobrowse
+          codesign --verify --deep --strict "/tmp/pr-dmg/Lanyard.app"
+          plutil -lint "/tmp/pr-dmg/Lanyard.app/Contents/Info.plist"
           hdiutil detach /tmp/pr-dmg
   mobile:
     runs-on: ubuntu-22.04

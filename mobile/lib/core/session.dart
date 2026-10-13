@@ -42,7 +42,7 @@ class AuthFailed implements Exception {
 /// The PC has no secure connection (no key fingerprint in its QR), so there is nothing to pin.
 class InsecurePc implements Exception {
   @override
-  String toString() => 'This PC does not offer a secure connection. Update Phone Remote on the PC.';
+  String toString() => 'This PC does not offer a secure connection. Update Lanyard on the PC.';
 }
 
 enum PairResult { approved, denied, expired, badCode, badKey }

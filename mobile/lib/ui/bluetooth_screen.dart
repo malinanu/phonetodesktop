@@ -36,7 +36,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     if (!mounted) return;
     setState(() {
       _starting = false;
-      if (!ok) _denied = 'Allow “Nearby devices” for Phone Remote in Android settings, then try again.';
+      if (!ok) _denied = 'Allow “Nearby devices” for Lanyard in Android settings, then try again.';
     });
   }
 

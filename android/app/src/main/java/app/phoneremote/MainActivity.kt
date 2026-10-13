@@ -224,7 +224,7 @@ class MainActivity : Activity() {
         col.addView(label("Control your computer from your phone.", 34f, bold = true).apply { setPadding(0, dp(8), 0, dp(10)); setLineSpacing(0f, 0.95f) })
         col.addView(label("Pause, skip and change the volume of videos and music from the couch. You connect once, then it works by itself.", 17f, C.DIM).apply { setPadding(0, 0, 0, dp(20)) })
         listOf(
-            "On your computer, open Phone Remote. The window shows a square code.",
+            "On your computer, open Lanyard. The window shows a square code.",
             "Tap the big button below and point the camera at that code.",
             "On the computer, click Allow. That is all.",
         ).forEachIndexed { i, t ->
@@ -234,7 +234,7 @@ class MainActivity : Activity() {
             col.addView(row)
         }
         col.addView(button("Scan the code on my computer", filled = true) { scanQr() }.apply { minHeight = dp(60); textSize = 17f }, lp().apply { topMargin = dp(20) })
-        col.addView(button("No Phone Remote on the computer? Use Bluetooth") { showMode(true) }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
+        col.addView(button("No Lanyard on the computer? Use Bluetooth") { showMode(true) }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         col.addView(button("Help") { openOverlay("guide", "how") }.apply { background = null; setTextColor(C.DIM) }, lp().apply { topMargin = dp(4) })
         return col
     }
@@ -346,7 +346,7 @@ class MainActivity : Activity() {
                 val m = Regex("^http://([^:/]+):(\\d+)/#(.+)$").find(code.rawValue ?: "")
                 val params = m?.groupValues?.get(3)?.split("&")?.mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 } }?.associate { it[0] to it[1] }
                 val token = params?.get("k")
-                if (m == null || token == null) { Toast.makeText(this, "That is not a Phone Remote code", Toast.LENGTH_SHORT).show(); return@addOnSuccessListener }
+                if (m == null || token == null) { Toast.makeText(this, "That is not a Lanyard code", Toast.LENGTH_SHORT).show(); return@addOnSuccessListener }
                 val host = m.groupValues[1]
                 val port = m.groupValues[2].toInt()
                 val name = params["n"]?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: host

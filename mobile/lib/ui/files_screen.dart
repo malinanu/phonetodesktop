@@ -9,7 +9,7 @@ import 'pair_screen.dart';
 import 'widgets.dart';
 
 /// Send files runs in the phone's browser: receiving big files streams to storage there, which an in-app web view
-/// cannot do. The page comes from the computer itself (built into Phone Remote, nothing to set up); an own server
+/// cannot do. The page comes from the computer itself (built into Lanyard, nothing to set up); an own server
 /// from the build or Settings is only for sending between different networks.
 const buildFilesUrl = String.fromEnvironment('FILES_URL');
 

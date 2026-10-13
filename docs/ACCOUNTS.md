@@ -1,6 +1,6 @@
 # Accounts (optional)
 
-Phone Remote works with **no account**: scan the QR, approve on the computer, done, entirely on your own network.
+Lanyard works with **no account**: scan the QR, approve on the computer, done, entirely on your own network.
 An account is a convenience layer on top, run by you (`account/`, a small FastAPI service):
 
 - a list of **your devices** (phones and computers) with names, so you can see and remove them from one place;

@@ -73,7 +73,7 @@ class _HomeShellState extends State<HomeShell> {
             title: Row(children: [
               Container(width: 10, height: 10, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
               const SizedBox(width: 10),
-              Flexible(child: Text(pc?.name ?? 'Phone Remote', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
+              Flexible(child: Text(pc?.name ?? 'Lanyard', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
             ]),
             actions: [
               if (link.pcs.length > 1)
@@ -138,7 +138,7 @@ class _Banner extends StatelessWidget {
           '$name now has a different security key than when you paired (it may have been reinstalled). Pair again only if you expect that.',
           [TextButton(onPressed: onPairAgain, child: const Text('Pair again')), TextButton(onPressed: () => link.forget(link.active!.id), child: const Text('Forget'))],
         ),
-      LinkStatus.insecure => ('$name needs the newest Phone Remote to connect securely. Update it on the PC.', const <Widget>[]),
+      LinkStatus.insecure => ('$name needs the newest Lanyard to connect securely. Update it on the PC.', const <Widget>[]),
     };
     if (message == null) return const SizedBox.shrink();
     final bad = link.status != LinkStatus.connecting;

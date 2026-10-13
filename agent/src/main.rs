@@ -171,7 +171,7 @@ fn run(cfg: config::Config, ips: Vec<std::net::Ipv4Addr>, mock: bool, no_mdns: b
             log::log(&format!("port {} is already in use by another program", cfg.port));
             say(&format!("Port {} is already in use. Start with --port N to use another.", cfg.port));
             #[cfg(windows)]
-            tray::info("Phone Remote", &format!("Port {} is used by another program, so Phone Remote cannot start.\n\nRun it once from a terminal with: phone-remote --port 8766", cfg.port));
+            tray::info("Lanyard", &format!("Port {} is used by another program, so Lanyard cannot start.\n\nRun it once from a terminal with: phone-remote --port 8766", cfg.port));
             std::process::exit(guardian::EXIT_PORT_BUSY);
         }
         Err(e) => return Err(e.into()),

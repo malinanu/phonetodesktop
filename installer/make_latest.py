@@ -15,13 +15,13 @@ from pathlib import Path
 
 # (regex on the file name, platform, arch, kind)
 PATTERNS = [
-    (r"^PhoneRemote-Setup-.+\.exe$", "windows", "x86_64", "installer"),
-    (r"^PhoneRemote-.+-macos\.dmg$", "macos", "universal", "installer"),
+    (r"^Lanyard-Setup-.+\.exe$", "windows", "x86_64", "installer"),
+    (r"^Lanyard-.+-macos\.dmg$", "macos", "universal", "installer"),
     (r"^phone-remote_.+_amd64\.deb$", "linux", "x86_64", "deb"),
     (r"^phone-remote_.+_arm64\.deb$", "linux", "aarch64", "deb"),
     (r"^phone-remote-.+-linux-x86_64\.tar\.gz$", "linux", "x86_64", "tarball"),
     (r"^phone-remote-.+-linux-aarch64\.tar\.gz$", "linux", "aarch64", "tarball"),
-    (r"^PhoneRemote-[0-9][^/]*\.apk$", "android", "universal", "apk"),
+    (r"^Lanyard-[0-9][^/]*\.apk$", "android", "universal", "apk"),
 ]
 
 

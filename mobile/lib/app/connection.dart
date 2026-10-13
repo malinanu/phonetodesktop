@@ -27,7 +27,7 @@ enum LinkStatus {
   /// pretending to be it). Pair again only if you expect that.
   keyChanged,
 
-  /// The PC offers no secure connection (an old version). Update Phone Remote on the PC.
+  /// The PC offers no secure connection (an old version). Update Lanyard on the PC.
   insecure,
 }
 

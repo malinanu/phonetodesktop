@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build "Phone Remote.app" and a .dmg on macOS.
+# Build "Lanyard.app" and a .dmg on macOS.
 #   make-dmg.sh VERSION UNIVERSAL_BINARY [OUT_DIR]
 # Optional signing and notarization when these environment variables are set (CI secrets):
 #   MACOS_SIGN_IDENTITY   e.g. "Developer ID Application: Name (TEAMID)"; without it the app is ad-hoc signed
@@ -9,7 +9,7 @@ set -euo pipefail
 VERSION=$1; BINARY=$2; OUT=${3:-dist}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
-APP_NAME="Phone Remote"
+APP_NAME="Lanyard"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 APP="$WORK/dmg/$APP_NAME.app"
@@ -24,17 +24,17 @@ exec "$(dirname "$0")/phone-remote" open
 LAUNCH
 chmod 755 "$APP/Contents/MacOS/PhoneRemote"
 
-# Icon: build an .icns from the 512px PNG.
+# Icon: build an .icns from the 1024px artwork (macOS shape: the mark on an inset rounded square).
 ICONSET="$WORK/phone-remote.iconset"
 mkdir -p "$ICONSET"
 for s in 16 32 64 128 256 512; do
-  sips -z $s $s "$ROOT/installer/assets/phone-remote.png" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $s $s "$ROOT/installer/assets/phone-remote-1024.png" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
 done
 cp "$ICONSET/icon_32x32.png"   "$ICONSET/icon_16x16@2x.png"
 cp "$ICONSET/icon_64x64.png"   "$ICONSET/icon_32x32@2x.png"
 cp "$ICONSET/icon_256x256.png" "$ICONSET/icon_128x128@2x.png"
 cp "$ICONSET/icon_512x512.png" "$ICONSET/icon_256x256@2x.png"
-cp "$ROOT/installer/assets/phone-remote.png" "$ICONSET/icon_512x512@2x.png"
+cp "$ROOT/installer/assets/phone-remote-1024.png" "$ICONSET/icon_512x512@2x.png"
 rm "$ICONSET/icon_64x64.png"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/phone-remote.icns"
 
@@ -53,7 +53,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>LSUIElement</key><true/>
-  <key>NSLocalNetworkUsageDescription</key><string>Phone Remote talks to your phone over your local network.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Lanyard talks to your phone over your local network.</string>
   <key>NSBonjourServices</key><array><string>_phoneremote._tcp</string></array>
 </dict>
 </plist>
@@ -70,7 +70,7 @@ else
 fi
 
 ln -s /Applications "$WORK/dmg/Applications"
-DMG="$OUT/PhoneRemote-$VERSION-macos.dmg"
+DMG="$OUT/Lanyard-$VERSION-macos.dmg"
 hdiutil create -volname "$APP_NAME" -srcfolder "$WORK/dmg" -ov -format UDZO "$DMG" >/dev/null
 
 if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then

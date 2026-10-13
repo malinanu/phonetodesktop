@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install Phone Remote for the current user (no root needed). Run from the unpacked folder:
+# Install Lanyard for the current user (no root needed). Run from the unpacked folder:
 #   ./install.sh            install into ~/.local
 #   ./install.sh --remove   remove it again
 set -eu
@@ -13,7 +13,7 @@ ICONS="$PREFIX/share/icons/hicolor/512x512/apps"
 if [ "${1:-}" = "--remove" ]; then
     "$BIN/phone-remote" autostart off >/dev/null 2>&1 || true
     rm -f "$BIN/phone-remote" "$APPS/phone-remote.desktop" "$ICONS/phone-remote.png"
-    echo "Phone Remote removed. Your pairings and settings are kept in ~/.config/phone-remote (delete that folder to forget them)."
+    echo "Lanyard removed. Your pairings and settings are kept in ~/.config/phone-remote (delete that folder to forget them)."
     exit 0
 fi
 

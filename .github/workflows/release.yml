@@ -40,12 +40,12 @@ jobs:
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
         run: |
           $st = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1).FullName
-          Get-ChildItem dist\PhoneRemote-Setup-*.exe | ForEach-Object {
+          Get-ChildItem dist\Lanyard-Setup-*.exe | ForEach-Object {
             & $st sign /f cert.pfx /p $env:WIN_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
             & $st verify /pa $_.FullName
           }
       - uses: actions/upload-artifact@v4
-        with: { name: release-windows, path: dist/PhoneRemote-Setup-*.exe }
+        with: { name: release-windows, path: dist/Lanyard-Setup-*.exe }
   android:
     runs-on: ubuntu-latest
     steps:
@@ -71,9 +71,9 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           IFS=. read -r a b c <<< "$v"
           gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
-      - run: mv android/app/build/outputs/apk/release/app-release.apk PhoneRemote-${GITHUB_REF_NAME#v}.apk
+      - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${GITHUB_REF_NAME#v}.apk
       - uses: actions/upload-artifact@v4
-        with: { name: release-android, path: PhoneRemote-*.apk }
+        with: { name: release-android, path: Lanyard-*.apk }
       # Play Store bundle. Only built with a real keystore (Play rejects debug-signed bundles).
       # Kept as a workflow artifact, not attached to the public release; upload it in Play Console.
       - name: Build release AAB (Play Store)
@@ -86,10 +86,10 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           IFS=. read -r a b c <<< "$v"
           gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
-          mv android/app/build/outputs/bundle/release/app-release.aab PhoneRemote-$v.aab
+          mv android/app/build/outputs/bundle/release/app-release.aab Lanyard-$v.aab
       - uses: actions/upload-artifact@v4
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
-        with: { name: android-aab, path: PhoneRemote-*.aab }
+        with: { name: android-aab, path: Lanyard-*.aab }
   linux:
     strategy:
       fail-fast: false

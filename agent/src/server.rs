@@ -803,8 +803,8 @@ mod tests {
 fn tooltip(app: &App) -> String {
     let n = app.auth.online_count();
     match n {
-        0 => "Phone Remote: no phone connected".to_string(),
-        1 => "Phone Remote: 1 phone connected".to_string(),
-        n => format!("Phone Remote: {n} phones connected"),
+        0 => "Lanyard: no phone connected".to_string(),
+        1 => "Lanyard: 1 phone connected".to_string(),
+        n => format!("Lanyard: {n} phones connected"),
     }
 }

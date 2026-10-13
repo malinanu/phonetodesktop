@@ -28,7 +28,7 @@ class PairingInfo {
   /// SHA-256 of the PC's TLS public key (base64url). Empty for a PC that has no secure connection.
   final String fingerprint;
 
-  /// Null when [text] is not a Phone Remote code.
+  /// Null when [text] is not a Lanyard code.
   static PairingInfo? parse(String? text) {
     if (text == null) return null;
     final uri = Uri.tryParse(text.trim());

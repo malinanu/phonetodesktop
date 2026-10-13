@@ -300,7 +300,7 @@ void main() {
         LinkStatus.offline: 'Can’t reach Living room PC. Same Wi-Fi? Retrying…',
         LinkStatus.revoked: 'Living room PC removed this phone.',
         LinkStatus.keyChanged: 'Living room PC now has a different security key',
-        LinkStatus.insecure: 'Living room PC needs the newest Phone Remote',
+        LinkStatus.insecure: 'Living room PC needs the newest Lanyard',
       };
       for (final e in cases.entries) {
         final link = FakeLink(status: e.key, state: sampleState());

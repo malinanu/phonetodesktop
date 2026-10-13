@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Phone Remote</title>
+<title>Lanyard</title>
 <link rel="stylesheet" href="/base.css">
 <style>
   body { min-height:100vh; display:grid; grid-template-columns:232px minmax(0,1fr); }
@@ -78,7 +78,7 @@
 </head>
 <body>
 <aside>
-  <div class="brand"><span class="kicker">PC agent</span><b>Phone Remote</b></div>
+  <div class="brand"><span class="kicker">PC agent</span><b>Lanyard</b></div>
   <nav>
     <a href="#setup" data-v="setup" id="navSetup" hidden>Finish setup</a>
     <a href="#home" data-v="home">Home</a>
@@ -110,7 +110,7 @@
 
     <div id="step1">
       <div class="qrbox"><div class="qr" id="wQr"></div>
-        <div><p>Connect your phone to the <b>same Wi-Fi</b>, open the <b>Phone Remote</b> app and tap <b>Scan QR code</b>. You can also point the camera at this code.</p>
+        <div><p>Connect your phone to the <b>same Wi-Fi</b>, open the <b>Lanyard</b> app and tap <b>Scan QR code</b>. You can also point the camera at this code.</p>
         <p>A window will ask you to <b>allow</b> the phone.</p></div></div>
       <div class="waiting" id="wWait"><span class="sp"></span>Waiting for your phone…</div>
       <div class="okline" id="wOk">✓ <span id="wOkText">Phone connected</span></div>
@@ -141,7 +141,7 @@
       <p class="lead">It takes about a minute, and you only do it once.</p>
       <div class="qrbox"><div class="qr" id="hQr"></div>
         <ol class="steps">
-          <li><span>1</span><div>Put <b>Phone Remote</b> on your phone and join the <b>same Wi-Fi</b> as this computer.</div></li>
+          <li><span>1</span><div>Put <b>Lanyard</b> on your phone and join the <b>same Wi-Fi</b> as this computer.</div></li>
           <li><span>2</span><div>Open the app and tap <b>Scan QR code</b>.</div></li>
           <li><span>3</span><div>Point the camera at the picture. Then click <b>Allow</b> here.</div></li>
         </ol></div>
@@ -149,7 +149,7 @@
     <!-- Phone paired but not connected right now -->
     <div id="heroWait" hidden>
       <h1>Waiting for your phone</h1>
-      <p class="lead">Open the <b>Phone Remote</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.</p>
+      <p class="lead">Open the <b>Lanyard</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.</p>
       <p><a class="btn" href="#help">My phone does not connect</a></p>
     </div>
     <!-- Connected -->
@@ -173,7 +173,7 @@
     <div id="legacyBox"></div>
     <h2>Connect another phone</h2>
     <div class="qrbox"><div class="qr" id="qr"></div>
-      <div><p>On the same Wi-Fi, open the <b>Phone Remote</b> app and tap <b>Scan QR code</b>, or point the phone camera at this code.</p>
+      <div><p>On the same Wi-Fi, open the <b>Lanyard</b> app and tap <b>Scan QR code</b>, or point the phone camera at this code.</p>
       <p>You will be asked here to <b>allow</b> the new phone. The code works for 15 minutes.</p>
       <button class="btn small" id="newCode">New code</button></div></div>
     <details style="margin-top:18px;color:var(--ink-dim)" id="otherAddrs"><summary>Phone can't connect? Other network addresses</summary><div id="others"></div></details>
@@ -262,7 +262,7 @@
     $('heroWait').hidden = !paired || data.phones_online > 0;
     $('heroOn').hidden = !data.phones_online;
     $('heroWait').querySelector('h1').textContent = 'Waiting for your phone';
-    $('heroWait').querySelector('.lead').innerHTML = 'Open the <b>Phone Remote</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.';
+    $('heroWait').querySelector('.lead').innerHTML = 'Open the <b>Lanyard</b> app on your phone. Make sure it is on the same Wi-Fi as this computer.';
     if (data.phones_online) {
       const names = data.devices.filter(d => d.online).map(d => d.name);
       $('hOnTitle').textContent = data.phones_online === 1 ? 'Your phone is connected' : `${data.phones_online} phones are connected`;
@@ -270,7 +270,7 @@
     }
     $('hFiles').textContent = 'Send files';
     $('hFiles').hidden = !data.files_enabled && !data.files_url;
-    $('hFilesHint').textContent = data.files_enabled || data.files_url ? 'To send files: click Send files here, then open Phone Remote on your phone and tap Files.' : '';
+    $('hFilesHint').textContent = data.files_enabled || data.files_url ? 'To send files: click Send files here, then open Lanyard on your phone and tap Files.' : '';
     $('hNow').hidden = !paired;
     document.querySelector('#home .links').hidden = !paired;
     const box = $('hNow'); box.textContent = '';
@@ -284,7 +284,7 @@
   function renderPhones() {
     const list = $('devList'); list.textContent = '';
     if (!data.devices.length) {
-      const e = el('div', 'emptybox'); e.append(el('b', null, 'No phones yet'), el('span', null, 'Scan the code below with the Phone Remote app to add your first phone.'));
+      const e = el('div', 'emptybox'); e.append(el('b', null, 'No phones yet'), el('span', null, 'Scan the code below with the Lanyard app to add your first phone.'));
       const g = el('a', 'btn', 'How it works'); g.href = '/guide#connect'; g.target = '_blank'; e.append(g); list.append(e);
     }
     data.devices.forEach(d => {
@@ -330,7 +330,7 @@
     const dismissed = (() => { try { return sessionStorage.getItem('restartDismissed') === String(data.restarts); } catch (e) { return false; } })();
     rn.hidden = !data.restarts || dismissed;
     if (data.restarts) {
-      rn.textContent = `Phone Remote had to restart itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} (error ${data.last_exit || 'unknown'}). It is running again; the Activity page has the details. `;
+      rn.textContent = `Lanyard had to restart itself ${data.restarts} time${data.restarts > 1 ? 's' : ''} (error ${data.last_exit || 'unknown'}). It is running again; the Activity page has the details. `;
       const x = el('button', 'btn small', 'Dismiss');
       x.onclick = () => { try { sessionStorage.setItem('restartDismissed', String(data.restarts)); } catch (e) {} rn.hidden = true; };
       rn.append(x);
@@ -338,7 +338,7 @@
     renderApproval(); renderHome(); renderPhones();
   }
 
-  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); } catch (e) { $('heroNew').hidden = true; $('heroOn').hidden = true; $('heroWait').hidden = false; $('heroWait').querySelector('h1').textContent = 'Phone Remote is restarting…'; $('heroWait').querySelector('.lead').textContent = 'This page reconnects by itself in a few seconds.'; } }
+  async function refresh() { try { const first = !data; data = await api('/api/overview'); render(); watchPhones(); wizardTick(); } catch (e) { $('heroNew').hidden = true; $('heroOn').hidden = true; $('heroWait').hidden = false; $('heroWait').querySelector('h1').textContent = 'Lanyard is restarting…'; $('heroWait').querySelector('.lead').textContent = 'This page reconnects by itself in a few seconds.'; } }
 
   async function loadQr() {
     try {

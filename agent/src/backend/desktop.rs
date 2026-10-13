@@ -58,7 +58,7 @@ impl DesktopBackend {
 
 #[cfg(target_os = "macos")]
 fn hint() -> &'static str {
-    " (allow Phone Remote under System Settings > Privacy & Security > Accessibility)"
+    " (allow Lanyard under System Settings > Privacy & Security > Accessibility)"
 }
 
 #[cfg(not(target_os = "macos"))]

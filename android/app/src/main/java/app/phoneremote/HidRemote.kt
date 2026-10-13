@@ -91,7 +91,7 @@ class HidRemote(
                 val h = proxy as BluetoothHidDevice
                 hid = h
                 val sdp = BluetoothHidDeviceAppSdpSettings(
-                    "Phone Remote", "Remote, keyboard and mouse", "PhoneRemote",
+                    "Lanyard", "Remote, keyboard and mouse", "PhoneRemote",
                     BluetoothHidDevice.SUBCLASS1_COMBO, DESCRIPTOR,
                 )
                 h.registerApp(sdp, null, null, executor, callback)

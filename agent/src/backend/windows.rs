@@ -353,7 +353,7 @@ impl Backend for WindowsBackend {
     fn debug(&self) -> String {
         let mut errs = Vec::new();
         let snap = collect(&mut errs, &self.vlc_password);
-        let mut s = String::from("Phone Remote diagnostics (windows-gsmtc)\n\n");
+        let mut s = String::from("Lanyard diagnostics (windows-gsmtc)\n\n");
         match snap {
             Ok(p) if p.is_empty() => s.push_str("No sessions found. Windows reports nothing playing and no app is making sound.\n"),
             Ok(p) => p.iter().for_each(|p| s.push_str(&format!("{p:#?}\n"))),

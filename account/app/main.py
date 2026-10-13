@@ -1,6 +1,6 @@
-"""Phone Remote account service.
+"""Lanyard account service.
 
-Phone Remote works without it. An account only adds: a list of your devices, and short-lived signed certificates
+Lanyard works without it. An account only adds: a list of your devices, and short-lived signed certificates
 that let a PC accept your phone with no QR code (and later, with no internet). Nothing about media control or
 files passes through here.
 """
@@ -124,7 +124,7 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
     limit_claim_ip = RateLimiter(10, 600)
     limit_public_ip = RateLimiter(120, 60)
 
-    app = FastAPI(title="Phone Remote accounts", version="1.0.0", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Lanyard accounts", version="1.0.0", docs_url=None, redoc_url=None)
     app.state.settings, app.state.engine = settings, engine
 
     def now() -> int:

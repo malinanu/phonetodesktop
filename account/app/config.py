@@ -25,7 +25,7 @@ class Settings:
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    smtp_from: str = "Phone Remote <no-reply@localhost>"
+    smtp_from: str = "Lanyard <no-reply@localhost>"
     smtp_starttls: bool = True
     google_client_ids: list[str] = field(default_factory=list)
     apple_client_ids: list[str] = field(default_factory=list)
@@ -75,7 +75,7 @@ class Settings:
             smtp_port=int(env("SMTP_PORT", "587")),
             smtp_user=env("SMTP_USER", ""),
             smtp_password=env("SMTP_PASSWORD", ""),
-            smtp_from=env("SMTP_FROM", "Phone Remote <no-reply@localhost>"),
+            smtp_from=env("SMTP_FROM", "Lanyard <no-reply@localhost>"),
             smtp_starttls=env("SMTP_STARTTLS", "1") != "0",
             google_client_ids=csv("GOOGLE_CLIENT_IDS"),
             apple_client_ids=csv("APPLE_CLIENT_IDS"),

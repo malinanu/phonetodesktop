@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Phone Remote — control your computer's media from your phone</title>
+<title>Lanyard — control your computer's media from your phone</title>
 <meta name="description" content="Control your Windows, Mac or Linux computer's media from your phone over your own Wi-Fi, and send files of any size between devices. No account required, no tracking.">
 <link rel="stylesheet" href="base.css">
 <style>
@@ -36,7 +36,7 @@
 </head>
 <body>
 <main>
-  <div class="kicker">Phone Remote</div>
+  <div class="kicker">Lanyard</div>
   <h1>Your phone is the remote for your computer.</h1>
   <p class="lede">Play, pause, skip, seek and change volume on your Windows, Mac or Linux computer from your phone, over your own Wi-Fi. Send files of any size between any devices, privately. No ads, no tracking.</p>
   <div class="cta">
@@ -48,7 +48,7 @@
   <section>
     <h2>Get connected in 60 seconds</h2>
     <ol>
-      <li>Install <b>Phone Remote</b> on your computer and open it. A dashboard shows a QR code.</li>
+      <li>Install <b>Lanyard</b> on your computer and open it. A dashboard shows a QR code.</li>
       <li>Install the phone app, then scan the QR code with it.</li>
       <li>Approve the phone on your computer. Done — it stays paired until you remove it.</li>
     </ol>
@@ -69,8 +69,8 @@
 
     <h3 style="font-size:18px;margin:22px 0 4px">First-run notes</h3>
     <details class="note"><summary>Windows: "Windows protected your PC"</summary><p>The installer is not yet signed by a known publisher, so SmartScreen warns. Choose <b>More info → Run anyway</b>. When it asks, allow access on <b>Private networks</b> so your phone can reach the PC.</p></details>
-    <details class="note"><summary>macOS: "can't be opened" and permissions</summary><p>Open the <code>.dmg</code> and drag Phone Remote to Applications. If macOS says it cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings → Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song title and progress are not available on macOS; play, pause, skip and volume work.</p></details>
-    <details class="note"><summary>Linux: install and requirements</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Then open <b>Phone Remote</b> from your applications menu, or run <code>phone-remote open</code>. Players that support MPRIS (Spotify, VLC, Firefox, Chromium, Rhythmbox, mpv with the MPRIS script) show title and progress. Mouse and keyboard control needs an X11 session (XWayland also works); a Wayland-only desktop may block it. Volume uses PipeWire (<code>wpctl</code>) or PulseAudio (<code>pactl</code>).</p></details>
+    <details class="note"><summary>macOS: "can't be opened" and permissions</summary><p>Open the <code>.dmg</code> and drag Lanyard to Applications. If macOS says it cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings → Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song title and progress are not available on macOS; play, pause, skip and volume work.</p></details>
+    <details class="note"><summary>Linux: install and requirements</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Then open <b>Lanyard</b> from your applications menu, or run <code>phone-remote open</code>. Players that support MPRIS (Spotify, VLC, Firefox, Chromium, Rhythmbox, mpv with the MPRIS script) show title and progress. Mouse and keyboard control needs an X11 session (XWayland also works); a Wayland-only desktop may block it. Volume uses PipeWire (<code>wpctl</code>) or PulseAudio (<code>pactl</code>).</p></details>
     <details class="note"><summary>Verify a download</summary><p>Every release lists SHA-256 checksums (<code>SHA256SUMS</code>). Compare with <code>sha256sum file</code> (Linux), <code>shasum -a 256 file</code> (macOS) or <code>certutil -hashfile file SHA256</code> (Windows).</p></details>
   </section>
 
@@ -78,7 +78,7 @@
     <h2>Send files, too</h2>
     <p class="lede" style="font-size:17px">Click Send files on your computer, scan its code with your phone, and pick files. They go straight from device to device over your Wi-Fi, encrypted, with no size limit, nothing to set up and nothing uploaded anywhere.</p>
     <div class="cta"><a class="btn primary" id="open-files" href="__FILES_URL__" hidden>Open Send files</a></div>
-    <p class="dim">Built on <a href="https://github.com/polius/filesync">FileSync</a> (MIT). It is built into the Phone Remote program on your computer. For sending between different networks you can run your own server.</p>
+    <p class="dim">Built on <a href="https://github.com/polius/filesync">FileSync</a> (MIT). It is built into the Lanyard program on your computer. For sending between different networks you can run your own server.</p>
   </section>
 
   <section>
@@ -183,7 +183,7 @@
       sub.textContent = "Version " + m.version + " · " + size(best.size) + " · free and open source";
     } else if (me.os === "android" || me.os === "ios") {
       main.textContent = "Get the phone app"; main.href = "#downloads";
-      sub.textContent = "Install Phone Remote on your computer too. This page lists every download.";
+      sub.textContent = "Install Lanyard on your computer too. This page lists every download.";
     }
     if (m && m.version) document.getElementById("dl-foot").textContent = "Latest version " + m.version + ". Checksums: SHA256SUMS on the release page.";
   }

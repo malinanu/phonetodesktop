@@ -54,7 +54,7 @@ object FilesUrl {
     }
 
     /**
-     * The built-in Send files page of a PC: the Phone Remote program serves it on its own port plus one.
+     * The built-in Send files page of a PC: the Lanyard program serves it on its own port plus one.
      * [host] is the address the phone already uses to reach the PC. Null if either part is unusable.
      */
     fun local(host: String, agentPort: Int): String? {
