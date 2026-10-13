@@ -1,10 +1,19 @@
 name: release
-# Tag a version (git tag v1.0.0 && git push --tags) to publish installer + APK on GitHub Releases.
+# Publish installers + APK on GitHub Releases, either by pushing a tag (git tag v1.0.0 && git push --tags) or from
+# the Actions tab: Run workflow with a version such as 1.0.0 (the tag v1.0.0 is then created on the chosen branch).
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the v (for example 0.3.0)"
+        required: true
 permissions:
   contents: write
+env:
+  # The tag being released: from the input when run by hand, else the pushed tag.
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 jobs:
   windows:
     runs-on: windows-latest
@@ -15,7 +24,7 @@ jobs:
       - name: Version from tag
         shell: bash
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
           sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
@@ -68,10 +77,10 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
           gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
-      - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${GITHUB_REF_NAME#v}.apk
+      - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${TAG#v}.apk
       - uses: actions/upload-artifact@v4
         with: { name: release-android, path: Lanyard-*.apk }
       # Play Store bundle. Only built with a real keystore (Play rejects debug-signed bundles).
@@ -83,7 +92,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
           gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
           mv android/app/build/outputs/bundle/release/app-release.aab Lanyard-$v.aab
@@ -105,7 +114,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Version from tag
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
           sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
@@ -130,7 +139,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Version from tag
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
           sed -i '' "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
       - run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
@@ -176,9 +185,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { pattern: "release-*", path: out, merge-multiple: true }
       - name: latest.json and SHA256SUMS (the website reads latest.json)
-        run: python3 installer/make_latest.py out "${GITHUB_REF_NAME#v}" "${{ github.repository }}" --tag "$GITHUB_REF_NAME"
+        run: python3 installer/make_latest.py out "${TAG#v}" "${{ github.repository }}" --tag "$TAG"
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           files: out/*
           generate_release_notes: true
   # FileSync server image for the VPS (see docs/DEPLOYING-SERVER.md). Pushed to GHCR with the
@@ -199,7 +210,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Tags
         id: tag
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: filesync
@@ -224,7 +235,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Tags
         id: tag
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: account
