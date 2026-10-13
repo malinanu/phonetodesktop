@@ -18,11 +18,16 @@ The site is plain static files (`site/`), so CloudPanel only has to serve a fold
    | `SITE_SSH_HOST` | the server's name or IP |
    | `SITE_SSH_USER` | the site user CloudPanel created |
    | `SITE_SSH_KEY` | contents of `lanyard-deploy` (the private key) |
-   | `SITE_SSH_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 <host>`, run from a network you trust, so the job refuses an impostor server |
+   | `SITE_SSH_KNOWN_HOSTS` | one line, `<host> ssh-ed25519 AAAA...`, the server's own host key (see below), so the job refuses an impostor server |
    | `SITE_SSH_PATH` | `/home/<site user>/htdocs/lanyard.3logiq.com` |
 
    Optional repository **variables**: `APP_STORE_URL` and `PLAY_STORE_URL`, once the store listings exist (a button stays hidden
    without them).
+   **Getting the host key.** The most trustworthy way is to read it on the server (CloudPanel's terminal, or any SSH login):
+   `cat /etc/ssh/ssh_host_ed25519_key.pub`, then write the line as `<host> ssh-ed25519 AAAA...` (the same host name or IP you put in
+   `SITE_SSH_HOST`; drop the trailing comment). From a Linux machine or WSL, `ssh-keyscan -t ed25519 <host>` prints that line directly.
+   The ssh-keyscan that ships with Windows is too old for current Ubuntu servers (`unsupported KEX method sntrup761x25519-sha512@openssh.com`),
+   so on Windows use WSL, or the server-side command above.
 5. Run the workflow once (Actions, deploy-site, Run workflow). Without the secrets it only builds the zip; with them it
    uploads. The upload deletes files on the server that are no longer in `site/`, and it refuses any path that is not a
    CloudPanel site folder.
