@@ -37,6 +37,8 @@ class Settings:
     link_minutes: int = 10
     # Behind a reverse proxy the real client address is in X-Forwarded-For; only trust it when asked to.
     trust_proxy: bool = False
+    # Web pages allowed to call the service from a browser (the "My devices" page on the website). Empty = none.
+    cors_origins: list[str] = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -81,4 +83,5 @@ class Settings:
             apple_client_ids=csv("APPLE_CLIENT_IDS"),
             cert_days=int(env("ACCOUNT_CERT_DAYS", "30")),
             trust_proxy=env("ACCOUNT_TRUST_PROXY", "") == "1",
+            cors_origins=csv("ACCOUNT_CORS_ORIGINS"),
         )

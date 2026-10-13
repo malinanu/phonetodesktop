@@ -282,7 +282,7 @@ async fn session(mut sock: WebSocket, app: Arc<App>, peer: SocketAddr) {
                 if changed.is_err() { break; }
                 // A phone removed from the dashboard loses access within a second.
                 if let Some(d) = &login.device {
-                    if !app.auth.devices().iter().any(|(x, _)| &x.id == d) {
+                    if !app.auth.is_device_valid(d) {
                         let _ = sock.send(text(r#"{"t":"auth","ok":false,"err":"revoked"}"#)).await;
                         break;
                     }
@@ -316,7 +316,7 @@ async fn session(mut sock: WebSocket, app: Arc<App>, peer: SocketAddr) {
                     Ok(ClientMsg::Cmd(cmd)) => {
                         // A device removed from the PC loses control immediately.
                         if let Some(d) = &login.device {
-                            if !app.auth.devices().iter().any(|(x, _)| &x.id == d) {
+                            if !app.auth.is_device_valid(d) {
                                 let _ = sock.send(text(r#"{"t":"auth","ok":false,"err":"revoked"}"#)).await;
                                 break;
                             }

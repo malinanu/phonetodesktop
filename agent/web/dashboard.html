@@ -199,6 +199,14 @@
     <div class="row" style="align-items:flex-start"><div class="grow"><b>Use my own Send files server (optional)</b><span>Only needed to send files between different networks, over the internet. Leave it empty for normal use.</span>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><input id="hFilesUrl" type="text" placeholder="files.example.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px"><button class="btn small" id="hFilesSave">Save</button></div>
       <p id="hFilesErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div></div>
+    <h2>Account (optional)</h2>
+    <div class="row" id="acctOff" style="align-items:flex-start"><div class="grow"><b>Use my Lanyard account</b><span>Not needed. If you have an account, phones signed in to it can control this computer without scanning a code. On your account page choose <i>Add a computer</i>, then type the code here.</span>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><input id="acctUrl" type="text" value="https://lanyardfileshare.3logiq.com/account" autocomplete="off" spellcheck="false" aria-label="Account service address" style="flex:1;min-width:200px"><input id="acctCode" type="text" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Code from your account page" style="width:140px"><button class="btn small" id="acctJoin">Join</button></div>
+      <p id="acctErr" style="color:var(--bad);margin:8px 0 0" hidden></p></div></div>
+    <div id="acctOn" hidden>
+      <div class="row"><div class="grow"><b>Joined to your account</b><span id="acctInfo"></span></div><button class="btn small danger" id="acctLeave">Leave</button></div>
+      <div class="row"><div class="grow"><b>Let account phones use the mouse and keyboard</b><span>Phones paired with a code have their own switch on the Phones page.</span></div><label class="switch"><input type="checkbox" id="acctInput"><i></i></label></div>
+    </div>
     <h2>Danger zone</h2>
     <div class="row"><div class="grow"><b>Remove all phones</b><span>Every phone will have to connect again.</span></div><button class="btn small danger" id="unpair">Remove all</button></div>
   </section>
@@ -225,7 +233,7 @@
   const $ = id => document.getElementById(id);
   const api = async (path, method = 'GET', body) => {
     const r = await fetch(path, { method, headers: { 'X-Requested-With': 'phone-remote', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw new Error(path + ' ' + r.status);
+    if (!r.ok) { let m = path + ' ' + r.status; try { const j = await r.json(); if (j && j.error) m = j.error; } catch (e) {} throw new Error(m); }
     return r.json();
   };
   const fmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
@@ -254,6 +262,17 @@
     try { await api('/api/files-url', 'POST', { url: $('hFilesUrl').value }); toast('Saved'); refresh(); }
     catch (e) { err.textContent = 'Use an https:// address, for example files.example.com'; err.hidden = false; }
   });
+
+  $('acctJoin').addEventListener('click', async () => {
+    const err = $('acctErr'); err.hidden = true;
+    try { await api('/api/account/join', 'POST', { url: $('acctUrl').value, code: $('acctCode').value }); $('acctCode').value = ''; toast('Joined'); refresh(); }
+    catch (e) { err.textContent = (e && e.message) || 'Could not join. Check the code and the address.'; err.hidden = false; }
+  });
+  $('acctLeave').addEventListener('click', async () => {
+    if (!confirm('Leave the account? Phones that only signed in with the account will stop working here.')) return;
+    await api('/api/account/leave', 'POST'); refresh();
+  });
+  $('acctInput').addEventListener('change', async e => { await api('/api/account/input', 'POST', { allowed: e.target.checked }); refresh(); });
 
   function renderHome() {
     const now = data.now, p = now && now.players.find(x => x.id === now.current);
@@ -325,6 +344,12 @@
     $('filesOn').checked = !!data.files_enabled;
     if (document.activeElement !== $('hFilesUrl')) $('hFilesUrl').value = data.files_url || '';
     $('allowV1').checked = data.allow_v1;
+    const acct = data.account;
+    $('acctOff').hidden = !!acct; $('acctOn').hidden = !acct;
+    if (acct) {
+      $('acctInfo').textContent = acct.url + (acct.checked ? ' · removed devices last checked ' + new Date(acct.checked * 1000).toLocaleString() : ' · removed devices not checked yet');
+      $('acctInput').checked = !!acct.input;
+    }
     const rn = $('restartNote');
     rn.hidden = !data.restarts;
     const dismissed = (() => { try { return sessionStorage.getItem('restartDismissed') === String(data.restarts); } catch (e) { return false; } })();

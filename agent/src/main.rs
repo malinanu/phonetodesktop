@@ -3,6 +3,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod account;
+mod account_client;
 mod api;
 mod auth;
 mod backend;
@@ -286,6 +287,25 @@ async fn serve(
             let r = tokio::spawn(server::poll_state(poller_app.clone())).await;
             log::log(&format!("state poller stopped ({r:?}); restarting"));
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
+    // Optional account: ask now and then which devices the owner has removed. Silent when not joined or offline.
+    let revoke_app = app.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Some(trust) = revoke_app.auth.account() {
+                let r = tokio::task::spawn_blocking(move || account_client::fetch_revocations(&trust)).await;
+                match r {
+                    Ok(Ok(envelope)) => {
+                        if !revoke_app.auth.apply_revocations(&envelope) {
+                            log::log("account: the revocation list did not verify; ignored");
+                        }
+                    }
+                    Ok(Err(e)) => log::log(&format!("account: could not fetch the revocation list ({e})")),
+                    Err(_) => {}
+                }
+            }
+            tokio::time::sleep(account_client::POLL_EVERY).await;
         }
     });
     // Send files: the same page FileSync serves, built in, on the next port up. Failure to bind is not fatal.

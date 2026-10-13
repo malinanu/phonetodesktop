@@ -36,6 +36,12 @@ pub struct AccountTrust {
     /// Unix time of the last successful revocation fetch (0 = never).
     #[serde(default)]
     pub revoked_checked: u64,
+    /// This computer's own device id in the account, and the seed of its device key (base64url). The computer
+    /// is listed under "My devices" so the owner can remove it too.
+    #[serde(default)]
+    pub device_id: String,
+    #[serde(default)]
+    pub device_seed: String,
 }
 
 fn default_grace_days() -> u64 {
@@ -176,6 +182,7 @@ mod tests {
             input_allowed: true,
             revoked: vec![],
             revoked_checked: 0,
+            ..Default::default()
         }
     }
 

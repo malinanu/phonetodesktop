@@ -77,7 +77,7 @@ pub fn ct_eq(a: &str, b: &str) -> bool {
     diff == 0
 }
 
-fn now_s() -> u64 {
+pub fn now_s() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
@@ -258,6 +258,15 @@ impl Auth {
         self.save(&i);
     }
 
+    /// Allow or forbid mouse and keyboard for the account's phones. False if no account is joined.
+    pub fn set_account_input(&self, allowed: bool) -> bool {
+        let mut i = self.inner.lock().unwrap();
+        let Some(a) = i.cfg.account.as_mut() else { return false };
+        a.input_allowed = allowed;
+        self.save(&i);
+        true
+    }
+
     /// Store a freshly fetched signed revocation list. False if it did not verify.
     pub fn apply_revocations(&self, envelope: &str) -> bool {
         let mut i = self.inner.lock().unwrap();
@@ -269,6 +278,13 @@ impl Auth {
             self.save(&i);
         }
         ok
+    }
+
+    /// Is this device allowed to stay connected? A paired phone is in the trust list; an account phone is valid until
+    /// the account's revocation list says otherwise.
+    pub fn is_device_valid(&self, device: &str) -> bool {
+        let i = self.inner.lock().unwrap();
+        i.cfg.devices.iter().any(|d| d.id == device) || i.account_devices.contains_key(device)
     }
 
     /// Does this device log in with a key (v2)?
@@ -744,6 +760,7 @@ mod tests {
                 input_allowed: true,
                 revoked: vec![],
                 revoked_checked: 0,
+                ..Default::default()
             }));
             a
         }

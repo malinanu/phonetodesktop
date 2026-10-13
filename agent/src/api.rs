@@ -34,6 +34,9 @@ pub fn routes() -> Router<Arc<App>> {
         .route("/api/open-files", post(open_files))
         .route("/api/files-url", post(set_files_url))
         .route("/api/files-enabled", post(set_files_enabled))
+        .route("/api/account/join", post(account_join))
+        .route("/api/account/leave", post(account_leave))
+        .route("/api/account/input", post(account_input))
         .route("/api/log", get(log_tail))
 }
 
@@ -79,6 +82,7 @@ async fn overview(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) 
         "files_url": app.auth.files_url(),
         "files_local_port": app.files_port.load(std::sync::atomic::Ordering::Relaxed),
         "files_enabled": app.files_enabled.load(std::sync::atomic::Ordering::Relaxed),
+        "account": app.auth.account().map(|a| json!({"url": a.url, "input": a.input_allowed, "checked": a.revoked_checked})),
         "phones_online": app.auth.online_count(),
         "restarts": std::env::var("PR_RESTARTS").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
         "last_exit": std::env::var("PR_LAST_EXIT").unwrap_or_default(),
@@ -275,6 +279,51 @@ async fn set_files_enabled(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Ar
     app.files_enabled.store(on, std::sync::atomic::Ordering::Relaxed);
     app.auth.set_files_enabled(on);
     ok()
+}
+
+/// Join an account with a link code. The network call runs on a blocking thread.
+async fn account_join(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    let (url, code) = (body["url"].as_str().unwrap_or("").to_owned(), body["code"].as_str().unwrap_or("").to_owned());
+    let host = app.host.clone();
+    let now = crate::auth::now_s();
+    let r = tokio::task::spawn_blocking(move || crate::account_client::join(&url, &code, &host, now)).await;
+    match r {
+        Ok(Ok(trust)) => {
+            app.auth.set_account(Some(trust));
+            crate::log::log("joined an account");
+            ok()
+        }
+        Ok(Err(e)) => (StatusCode::BAD_REQUEST, Json(json!({"ok": false, "error": e}))).into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok": false, "error": "Something went wrong."}))).into_response(),
+    }
+}
+
+/// Leave the account: its phones stop being accepted here (phones paired with a QR code are not affected).
+async fn account_leave(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    app.auth.set_account(None);
+    crate::log::log("left the account");
+    ok()
+}
+
+/// May the account's phones use the mouse and keyboard?
+async fn account_input(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>, Json(body): Json<Value>) -> Response {
+    let app = match guard(&(c, h, s), &Method::POST) {
+        Ok(a) => a,
+        Err(r) => return r,
+    };
+    if app.auth.set_account_input(body["allowed"].as_bool().unwrap_or(true)) {
+        ok()
+    } else {
+        (StatusCode::BAD_REQUEST, Json(json!({"ok": false, "error": "Not joined to an account."}))).into_response()
+    }
 }
 
 async fn log_tail(c: ConnectInfo<SocketAddr>, h: HeaderMap, s: State<Arc<App>>) -> Response {

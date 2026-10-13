@@ -10,6 +10,7 @@ import time
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -126,6 +127,9 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
 
     app = FastAPI(title="Lanyard accounts", version="1.0.0", docs_url=None, redoc_url=None)
     app.state.settings, app.state.engine = settings, engine
+    if settings.cors_origins:
+        # Bearer tokens travel in a header, not in cookies, so no credentials mode is needed.
+        app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"], max_age=600)
 
     def now() -> int:
         return int(clock())
