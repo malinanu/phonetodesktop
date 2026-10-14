@@ -89,8 +89,17 @@ pub fn ask_allow(name: &str, ip: &str) -> bool {
     }
 }
 
-/// Open `url` as a frameless app window (Edge, then Chrome). False if neither is installed.
+/// Open `url` in its own window: Lanyard's native window, else an Edge/Chrome app window. False if neither works.
 pub fn open_app_window(url: &str, width: u32, height: u32) -> bool {
+    let approval = url.contains("/approve");
+    if crate::window::open(url, if approval { "Lanyard: new phone" } else { "Lanyard" }, width, height, approval) {
+        return true;
+    }
+    open_browser_app(url, width, height)
+}
+
+/// Fallback when WebView2 is missing: a frameless Edge (then Chrome) app window. Shows the browser's own taskbar icon.
+fn open_browser_app(url: &str, width: u32, height: u32) -> bool {
     use std::os::windows::process::CommandExt;
     let pf = std::env::var("ProgramFiles").unwrap_or_default();
     let pf86 = std::env::var("ProgramFiles(x86)").unwrap_or_default();

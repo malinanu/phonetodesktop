@@ -20,6 +20,8 @@ mod server;
 mod tls;
 #[cfg(windows)]
 mod tray;
+#[cfg(windows)]
+mod window;
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
