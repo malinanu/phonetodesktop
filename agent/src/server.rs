@@ -22,6 +22,11 @@ const APPROVE: &str = include_str!("../web/approve.html");
 const GUIDE: &str = include_str!("../../shared/guide.html");
 const BASE_CSS: &str = include_str!("../../shared/base.css");
 const FONT: &[u8] = include_bytes!("../../shared/font.woff2");
+// The Lanyard mark as the pages' icon. An Edge/Chrome app window (the dashboard, the approval window) takes its title bar and
+// taskbar icon from the page's favicon; without one it shows the browser's own icon.
+const FAVICON_SVG: &[u8] = include_bytes!("../assets/favicon.svg");
+const FAVICON_PNG: &[u8] = include_bytes!("../assets/icon-192.png");
+const FAVICON_ICO: &[u8] = include_bytes!("../assets/favicon.ico");
 const PAD_JS: &str = include_str!("../../shared/pad.js");
 const PAD_CSS: &str = include_str!("../../shared/pad.css");
 const SETTINGS_JS: &str = include_str!("../../shared/settings.js");
@@ -148,6 +153,9 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/settings.js", get(|| async { ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], SETTINGS_JS) }))
         .route("/settings", get(|| async { Html(SETTINGS_PAGE) }))
         .route("/pad.css", get(|| async { ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], PAD_CSS) }))
+        .route("/favicon.svg", get(|| async { ([(header::CONTENT_TYPE, "image/svg+xml"), (header::CACHE_CONTROL, "max-age=86400")], FAVICON_SVG) }))
+        .route("/favicon.png", get(|| async { ([(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "max-age=86400")], FAVICON_PNG) }))
+        .route("/favicon.ico", get(|| async { ([(header::CONTENT_TYPE, "image/x-icon"), (header::CACHE_CONTROL, "max-age=86400")], FAVICON_ICO) }))
         .route("/font.woff2", get(|| async { ([(header::CONTENT_TYPE, "font/woff2"), (header::CACHE_CONTROL, "max-age=31536000, immutable")], FONT) }))
         .route("/dashboard", get(dashboard_page))
         .route("/approve", get(approve_page))
@@ -611,6 +619,34 @@ mod tests {
         let nonce = next(&mut c, "challenge").await["nonce"].as_str().unwrap().to_string();
         send(&mut c, serde_json::json!({"t":"auth_sig","device":device,"sig":sign(sk, "pc-test", device, &nonce)})).await;
         next(&mut c, "auth").await
+    }
+
+    #[tokio::test]
+    async fn the_pages_carry_the_lanyard_icon_and_the_agent_serves_it() {
+        // An Edge/Chrome app window takes its taskbar icon from the page's favicon: every page must name one...
+        for (name, page) in [("index", INDEX), ("dashboard", DASHBOARD), ("pair", PAIR_PAGE), ("approve", APPROVE), ("guide", GUIDE), ("settings", SETTINGS_PAGE)] {
+            assert!(page.contains(r#"rel="icon" type="image/svg+xml" href="/favicon.svg""#), "{name} has no icon link");
+            assert!(page.contains(r#"href="/favicon.png""#), "{name} has no png icon link");
+        }
+        // ...and the agent must answer for it.
+        let (_app, port) = start().await;
+        let fetched = tokio::task::spawn_blocking(move || {
+            ["/favicon.svg", "/favicon.png", "/favicon.ico"].map(|path| {
+                let r = ureq::get(&format!("http://127.0.0.1:{port}{path}")).call().unwrap();
+                let ty = r.content_type().to_string();
+                let mut body = Vec::new();
+                std::io::Read::read_to_end(&mut r.into_reader(), &mut body).unwrap();
+                (ty, body)
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(fetched[0].0, "image/svg+xml");
+        assert!(fetched[0].1.starts_with(b"<svg"));
+        assert_eq!(fetched[1].0, "image/png");
+        assert!(fetched[1].1.starts_with(b"\x89PNG"));
+        assert_eq!(fetched[2].0, "image/x-icon");
+        assert_eq!(&fetched[2].1[..4], &[0, 0, 1, 0]);
     }
 
     #[tokio::test]
