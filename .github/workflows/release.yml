@@ -34,7 +34,8 @@ jobs:
         run: |
           v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
-          sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
+          # Only the package's own version (the first "version =" line); a plain sed rewrote the windows dependency's version too.
+          awk -v v="$v" '!done && /^version = "/ { print "version = \"" v "\""; done = 1; next } { print }' agent/Cargo.toml > agent/Cargo.toml.new && mv agent/Cargo.toml.new agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
       - run: cargo build --release --manifest-path agent/Cargo.toml
         env:
@@ -124,7 +125,8 @@ jobs:
         run: |
           v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
-          sed -i "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
+          # Only the package's own version (the first "version =" line); a plain sed rewrote the windows dependency's version too.
+          awk -v v="$v" '!done && /^version = "/ { print "version = \"" v "\""; done = 1; next } { print }' agent/Cargo.toml > agent/Cargo.toml.new && mv agent/Cargo.toml.new agent/Cargo.toml
       - run: cargo test --manifest-path agent/Cargo.toml
       - run: cargo build --release --manifest-path agent/Cargo.toml
         env:
@@ -149,7 +151,8 @@ jobs:
         run: |
           v="${TAG#v}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
-          sed -i '' "s/^version = \".*\"/version = \"$v\"/" agent/Cargo.toml
+          # Only the package's own version (the first "version =" line); a plain sed rewrote the windows dependency's version too.
+          awk -v v="$v" '!done && /^version = "/ { print "version = \"" v "\""; done = 1; next } { print }' agent/Cargo.toml > agent/Cargo.toml.new && mv agent/Cargo.toml.new agent/Cargo.toml
       - run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
       - run: cargo test --manifest-path agent/Cargo.toml
       - name: Build universal binary
