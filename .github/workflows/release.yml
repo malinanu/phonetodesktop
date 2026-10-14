@@ -246,8 +246,8 @@ jobs:
           printf '%s\n' "$SITE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh_cmd="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
           # The files first (never deleting anything), then latest.json, so the page never points at files that are not there yet.
-          rsync -az --mkpath -e "$ssh_cmd" out/ "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/downloads/$VERSION/"
-          rsync -az -e "$ssh_cmd" out/latest.json "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/latest.json"
+          rsync -rltz -O --mkpath -e "$ssh_cmd" out/ "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/downloads/$VERSION/"
+          rsync -rltz -O -e "$ssh_cmd" out/latest.json "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/latest.json"
           # Keep the newest 5 version folders (names are checked, so nothing else can be removed).
           $ssh_cmd "$SITE_SSH_USER@$SITE_SSH_HOST" "cd '$dest/downloads' && ls -1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?\$' | sort -V | head -n -5 | xargs -r -I{} rm -rf -- {}"
           rm -f ~/.ssh/deploy_key

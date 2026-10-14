@@ -73,7 +73,9 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SITE_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SITE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          rsync -az --delete --exclude '.well-known/' --exclude 'downloads/' --exclude '/latest.json' \
+          # -rltz -O instead of -az: the site folder itself belongs to CloudPanel, so rsync must not try to set its times or
+          # owner (that failed with "failed to set times on ." and exit code 23 although every file was copied).
+          rsync -rltz -O --delete --exclude '.well-known/' --exclude 'downloads/' --exclude '/latest.json' \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
             site/ "$SITE_SSH_USER@$SITE_SSH_HOST:${SITE_SSH_PATH%/}/"
           rm -f ~/.ssh/deploy_key
