@@ -37,8 +37,11 @@ Download the `lanyard-site` artifact from the workflow run, unzip it, and upload
 file manager.
 
 ## What the site expects
-- `latest.json` next to `index.html`: the workflow fetches it from the latest GitHub release (`installer/make_latest.py`
-  creates it). Without it the download buttons point at the releases page.
+- `latest.json` next to `index.html` and the files under `downloads/<version>/`: both are written by the **release**
+  workflow (its `server` job, see [RELEASING.md](RELEASING.md)), not by this one. This workflow never deletes them (`downloads/` and
+  `latest.json` are excluded from its clean-up). Without a release the download buttons lead to `downloads.html`, which links to the
+  GitHub releases page.
+- Pages: `index.html` (home), `downloads.html` (all files, checksums, install help), `devices.html`, `privacy.html`.
 - Nothing else: fonts and images are in `site/assets/`, there are no external requests and no analytics.
 
 ## Changing the design or icons

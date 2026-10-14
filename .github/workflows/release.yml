@@ -1,8 +1,13 @@
 name: release
-# Publish installers + APK on GitHub Releases, either by pushing a tag (git tag v1.0.0 && git push --tags) or from
-# the Actions tab: Run workflow with a version such as 1.0.0 (the tag v1.0.0 is then created on the chosen branch).
+# Builds installers + APK and puts them on the website's own server (the `server` job), in three ways:
+#  - push to main that changes the programs (agent, android, installer, shared, brand): a build "0.3.<run number>" goes to the
+#    server automatically, so the download buttons always have files; no GitHub release is made for it;
+#  - push a tag (git tag v1.0.0 && git push --tags): the same, plus a GitHub release, and the server images;
+#  - Actions tab, Run workflow with a version such as 1.0.0: like a tag (the tag v1.0.0 is created on the chosen branch).
 on:
   push:
+    branches: [main]
+    paths: ["agent/**", "android/**", "installer/**", "shared/**", "brand/**", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -12,8 +17,11 @@ on:
 permissions:
   contents: write
 env:
-  # The tag being released: from the input when run by hand, else the pushed tag.
-  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+  # The version being built: from the input when run by hand, the pushed tag, or for pushes to main 0.3.<run number>
+  # (raise the 0.3 when a new minor version starts; real releases should use a higher version).
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || (github.ref_type == 'tag' && github.ref_name) || format('v0.3.{0}', github.run_number) }}
+  # Only tags and manual runs make a GitHub release and publish the server images.
+  IS_RELEASE: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
 jobs:
   windows:
     runs-on: windows-latest
@@ -79,7 +87,7 @@ jobs:
         run: |
           v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
+          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
       - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${TAG#v}.apk
       - uses: actions/upload-artifact@v4
         with: { name: release-android, path: Lanyard-*.apk }
@@ -94,7 +102,7 @@ jobs:
         run: |
           v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
+          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
           mv android/app/build/outputs/bundle/release/app-release.aab Lanyard-$v.aab
       - uses: actions/upload-artifact@v4
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
@@ -178,6 +186,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: release-macos, path: dist/*.dmg }
   publish:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: [windows, android, linux, macos]
     runs-on: ubuntu-latest
     steps:
@@ -192,9 +201,67 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: out/*
           generate_release_notes: true
+  # Copies the finished files to the website's own server (downloads/<version>/ in the CloudPanel site folder) and
+  # writes the latest.json the website reads, so the download buttons point at lanyard.3logiq.com itself. The GitHub
+  # release above stays as a mirror. Uses the same secrets as deploy-site.yml; without them this job does nothing.
+  server:
+    needs: [windows, android, linux, macos]
+    runs-on: ubuntu-latest
+    # One upload at a time, so two quick pushes cannot write the same folders together.
+    concurrency: { group: release-server, cancel-in-progress: false }
+    env:
+      SITE_SSH_HOST: ${{ secrets.SITE_SSH_HOST }}
+      SITE_SSH_USER: ${{ secrets.SITE_SSH_USER }}
+      SITE_SSH_PATH: ${{ secrets.SITE_SSH_PATH }}
+      SITE_URL: https://lanyard.3logiq.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: "release-*", path: out, merge-multiple: true }
+      - name: Version
+        run: |
+          v="${TAG#v}"
+          # The version becomes part of a folder name on the server: only plain version numbers are accepted.
+          printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$' || { echo "::error::Not a version: $v"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: latest.json and SHA256SUMS (the links point at the website's own copy)
+        run: |
+          # Builds from main have no GitHub release, so their files have no GitHub mirror to point at.
+          extra=""; [ "$IS_RELEASE" = "true" ] || extra="--no-github"
+          python3 installer/make_latest.py out "$VERSION" "${{ github.repository }}" --tag "$TAG" --base-url "$SITE_URL/downloads/$VERSION" --page-url "$SITE_URL/downloads.html" $extra
+      - name: Upload to the server over SSH
+        env:
+          SITE_SSH_KEY: ${{ secrets.SITE_SSH_KEY }}
+          SITE_SSH_KNOWN_HOSTS: ${{ secrets.SITE_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SITE_SSH_HOST" ] || [ -z "$SITE_SSH_USER" ] || [ -z "$SITE_SSH_KEY" ] || [ -z "$SITE_SSH_PATH" ] || [ -z "$SITE_SSH_KNOWN_HOSTS" ]; then
+            echo "Server secrets are not all set: the files are only on the GitHub release."; exit 0
+          fi
+          if ! printf '%s' "$SITE_SSH_PATH" | grep -Eq '^/home/[a-z0-9_-]+/htdocs/[A-Za-z0-9.-]+/?$'; then
+            echo "::error::SITE_SSH_PATH must look like /home/<site user>/htdocs/<domain>"; exit 1
+          fi
+          dest="${SITE_SSH_PATH%/}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SITE_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SITE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh_cmd="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          # The files first (never deleting anything), then latest.json, so the page never points at files that are not there yet.
+          rsync -az --mkpath -e "$ssh_cmd" out/ "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/downloads/$VERSION/"
+          rsync -az -e "$ssh_cmd" out/latest.json "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/latest.json"
+          # Keep the newest 5 version folders (names are checked, so nothing else can be removed).
+          $ssh_cmd "$SITE_SSH_USER@$SITE_SSH_HOST" "cd '$dest/downloads' && ls -1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?\$' | sort -V | head -n -5 | xargs -r -I{} rm -rf -- {}"
+          rm -f ~/.ssh/deploy_key
+          echo "Uploaded $VERSION to $SITE_SSH_HOST"
+      - name: Check the live files answer
+        continue-on-error: true
+        run: |
+          if [ -z "$SITE_SSH_HOST" ]; then exit 0; fi
+          curl -fsSIL --retry 5 --retry-delay 5 "$SITE_URL/downloads/$VERSION/SHA256SUMS" | head -1
+          curl -fsS "$SITE_URL/latest.json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('latest.json on the site:', d['version'], len(d['assets']), 'files')"
   # FileSync server image for the VPS (see docs/DEPLOYING-SERVER.md). Pushed to GHCR with the
   # built-in token, so no extra secrets are needed. Image names must be lowercase.
   files-image:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -221,6 +288,7 @@ jobs:
             ghcr.io/malinanu/phonetodesktop-files:${{ steps.tag.outputs.version }}
   # Account service image (optional; see docs/ACCOUNTS.md).
   account-image:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

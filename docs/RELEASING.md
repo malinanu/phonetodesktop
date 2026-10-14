@@ -11,7 +11,26 @@ Everything ships from one command: `git tag v1.0.0 && git push --tags`.
 - `Lanyard-<version>.aab` — Play Store bundle (workflow artifact only; needs the keystore secrets)
 - `ghcr.io/malinanu/phonetodesktop-files:<version>` and `:latest` — the Send files server image (see [DEPLOYING-SERVER.md](DEPLOYING-SERVER.md))
 
-Version numbers come from the tag (`v1.2.3` → versionName `1.2.3`, versionCode `10203`). Never reuse a tag.
+Besides GitHub Releases, the `server` job of the same workflow copies every file to the website's own server, so the
+download buttons on https://lanyard.3logiq.com point at files on your server:
+
+- files go to `<SITE_SSH_PATH>/downloads/<version>/` (with `SHA256SUMS`); the newest 5 versions are kept, older ones are removed;
+- `<SITE_SSH_PATH>/latest.json` is rewritten last, so the site never links to files that are not there yet;
+- the site lists them on the inner page `downloads.html` (every file with size, SHA-256, install help; the Android APK is included), and
+  the buttons on the home page link straight to the files. The GitHub release stays as a mirror ("Mirror on GitHub").
+
+**Automatic builds:** every push to `main` that changes the programs (`agent/`, `android/`, `installer/`, `shared/`, `brand/`, or the
+release workflow) builds all platforms and uploads them as version `0.3.<run number>` (for example `0.3.57`), so the website always has
+downloads without anyone tagging anything. Those builds get no GitHub release and no server images (those are for tags and manual runs).
+Changing only `site/` does not rebuild; it just redeploys the pages and leaves the downloads alone. Raise the `0.3` in the `TAG` line of
+`release.yml` when a new minor version starts, and give real releases a higher version (for example `1.0.0`) than the automatic builds.
+
+It uses the same five `SITE_SSH_*` secrets as the website deploy (see [DEPLOYING-WEBSITE.md](DEPLOYING-WEBSITE.md)) and does nothing when
+they are not set. You can also start it without a tag: **Actions → release → Run workflow**, version `1.2.3`.
+The App Store and Google Play buttons appear on the site when the repository variables `APP_STORE_URL` / `PLAY_STORE_URL` are set;
+until then the page shows "Coming soon" for iPhone and the direct APK for Android.
+
+Version numbers come from the tag (`v1.2.3` → versionName `1.2.3`, versionCode `1002003` = major×1000000 + minor×1000 + patch, so build numbers up to 999 never collide). Never reuse a tag.
 
 ## One-time setup
 

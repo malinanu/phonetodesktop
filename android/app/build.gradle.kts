@@ -12,7 +12,7 @@ android {
         applicationId = "app.phoneremote"
         minSdk = 28 // BluetoothHidDevice needs API 28
         targetSdk = 35
-        // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=10203
+        // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=1002003
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (findProperty("versionName") as String?) ?: "0.1.0"
         // Address of the "Send files" server (docs/DEPLOYING-SERVER.md). Empty = the Files tab asks the user to enter one.
