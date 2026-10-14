@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Downloads — Lanyard</title>
+<meta name="description" content="Download Lanyard for Windows, macOS, Linux and Android, with checksums and install help.">
+<link rel="canonical" href="https://lanyard.3logiq.com/downloads.html">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<!-- Filled in by the deploy workflow when the store listings exist; otherwise the buttons stay hidden. -->
+<meta name="lanyard:app-store" content="__APP_STORE_URL__">
+<meta name="lanyard:play-store" content="__PLAY_STORE_URL__">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-desktop" viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M5 5h14a1 1 0 0 1 1 1v9H4V6a1 1 0 0 1 1-1zm1 2v6h12V7zM2 17h20v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm1.6 4.4L9.2 12l-3.6 3.6 1.4 1.4 5-5-5-5zM12 15h6v2h-6z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v12h8V5zm4 14.2a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2z"/></symbol>
+  </defs>
+</svg>
+<header class="top" style="position:absolute"><a class="brand" href="./"><img src="assets/favicon.svg" width="40" height="40" alt="">Lanyard</a><nav aria-label="Main"><a href="./">Home</a><a class="keep" href="devices.html">My devices</a></nav></header>
+<main class="doc dl-page" id="main">
+  <h1>Downloads</h1>
+  <p class="dim" id="dl-version">Loading the latest version…</p>
+
+  <h2 id="computers">For your computer</h2>
+  <div class="dl" id="dl-computers" aria-live="polite"></div>
+
+  <h2 id="phones">For your phone</h2>
+  <div class="dl" id="dl-phones" aria-live="polite"></div>
+
+  <h2>Install help</h2>
+  <div class="notes">
+    <details id="help-windows"><summary>Windows says “Windows protected your PC”</summary><p>The installer is not yet signed by a known publisher, so SmartScreen warns. Choose <b>More info</b>, then <b>Run anyway</b>. When it asks, allow access on <b>Private networks</b> so your phone can reach the computer.</p></details>
+    <details id="help-macos"><summary>macOS says it cannot open the app</summary><p>Open the <code>.dmg</code> and drag Lanyard to Applications. If macOS cannot verify the app, right-click it and choose <b>Open</b> once. Then allow <b>Accessibility</b> (System Settings, Privacy &amp; Security) so the phone can use the media keys, mouse and keyboard, and allow <b>Local Network</b> when asked. Song titles and progress are not available on macOS; play, pause, skip and volume work.</p></details>
+    <details id="help-linux"><summary>Linux: how to install</summary><p>Debian and Ubuntu: <code>sudo apt install ./phone-remote_*.deb</code>. Other distributions: unpack the <code>.tar.gz</code> and run <code>./install.sh</code>. Media control uses D-Bus (MPRIS); the mouse and keyboard work on X11 and, with a one-time permission, on Wayland.</p></details>
+    <details id="help-android"><summary>Android: installing the .apk</summary><p>Open the downloaded file. Android asks once to allow installs from your browser or files app (<b>Install unknown apps</b>); allow it for that app only. The app needs Android 9 or newer. Then choose <b>Scan the code on my computer</b>.</p></details>
+    <details id="help-verify"><summary>Check that a download is genuine</summary><p>Each file lists its SHA-256 checksum. Compare it with <code>sha256sum file</code> (Linux), <code>shasum -a 256 file</code> (macOS) or <code>certutil -hashfile file SHA256</code> (Windows). The two values must be identical.</p></details>
+  </div>
+  <p class="dim" id="dl-foot"></p>
+</main>
+<footer><div class="foot-note"><span>© Lanyard. Free and open source.</span><a href="privacy.html">Privacy</a><a href="./">Back to the home page</a></div></footer>
+<script src="downloads.js"></script>
+</body>
+</html>

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Write latest.json and SHA256SUMS for a release.
 
-    make_latest.py ASSET_DIR VERSION REPO [--tag vX.Y.Z]
+    make_latest.py ASSET_DIR VERSION REPO [--tag vX.Y.Z] [--base-url URL] [--page-url URL]
 
 Looks at the files in ASSET_DIR, recognises each by its name, and writes ASSET_DIR/latest.json (read by the
 website) and ASSET_DIR/SHA256SUMS. Files it does not recognise are still listed in SHA256SUMS.
+
+By default the download links point at the GitHub release. With --base-url (for example
+https://lanyard.3logiq.com/downloads/1.2.3) they point at the website's own copy of the files instead, the GitHub
+link is kept as "mirror", and --page-url names the page that lists them.
 """
 import hashlib
 import json
@@ -40,7 +44,7 @@ def classify(name: str):
     return None
 
 
-def build(asset_dir: Path, version: str, repo: str, tag: str):
+def build(asset_dir: Path, version: str, repo: str, tag: str, base_url: str = "", page_url: str = ""):
     files = sorted(p for p in asset_dir.iterdir() if p.is_file() and p.name not in ("latest.json", "SHA256SUMS"))
     assets, sums = [], []
     for p in files:
@@ -49,34 +53,45 @@ def build(asset_dir: Path, version: str, repo: str, tag: str):
         found = classify(p.name)
         if found:
             platform, arch, kind = found
-            assets.append({
+            github = f"https://github.com/{repo}/releases/download/{tag}/{p.name}"
+            asset = {
                 "platform": platform,
                 "arch": arch,
                 "kind": kind,
                 "name": p.name,
-                "url": f"https://github.com/{repo}/releases/download/{tag}/{p.name}",
+                "url": f"{base_url.rstrip('/')}/{p.name}" if base_url else github,
                 "sha256": digest,
                 "size": p.stat().st_size,
-            })
+            }
+            if base_url:
+                asset["mirror"] = github
+            assets.append(asset)
     manifest = {
         "version": version,
         "tag": tag,
         "released": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "release_page": f"https://github.com/{repo}/releases/tag/{tag}",
+        "release_page": page_url or f"https://github.com/{repo}/releases/tag/{tag}",
+        "github_release_page": f"https://github.com/{repo}/releases/tag/{tag}",
         "assets": assets,
     }
+    if base_url:
+        manifest["checksums"] = f"{base_url.rstrip('/')}/SHA256SUMS"
     return manifest, "\n".join(sums) + "\n"
 
 
 def main(argv):
-    args = [a for a in argv if not a.startswith("--")]
-    tag = next((argv[i + 1] for i, a in enumerate(argv) if a == "--tag" and i + 1 < len(argv)), None)
+    def option(name):
+        return next((argv[i + 1] for i, a in enumerate(argv) if a == name and i + 1 < len(argv)), None)
+
+    tag, base_url, page_url = option("--tag"), option("--base-url") or "", option("--page-url") or ""
+    values = {tag, base_url, page_url}
+    args = [a for a in argv if not a.startswith("--") and a not in values]
     if len(args) < 3:
         print(__doc__)
         return 2
     asset_dir, version, repo = Path(args[0]), args[1], args[2]
     tag = tag or f"v{version}"
-    manifest, sums = build(asset_dir, version, repo, tag)
+    manifest, sums = build(asset_dir, version, repo, tag, base_url, page_url)
     (asset_dir / "latest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (asset_dir / "SHA256SUMS").write_text(sums)
     print(f"latest.json: {len(manifest['assets'])} recognised file(s)")

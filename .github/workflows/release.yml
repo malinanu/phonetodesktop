@@ -192,6 +192,58 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: out/*
           generate_release_notes: true
+  # Copies the finished files to the website's own server (downloads/<version>/ in the CloudPanel site folder) and
+  # writes the latest.json the website reads, so the download buttons point at lanyard.3logiq.com itself. The GitHub
+  # release above stays as a mirror. Uses the same secrets as deploy-site.yml; without them this job does nothing.
+  server:
+    needs: [windows, android, linux, macos]
+    runs-on: ubuntu-latest
+    env:
+      SITE_SSH_HOST: ${{ secrets.SITE_SSH_HOST }}
+      SITE_SSH_USER: ${{ secrets.SITE_SSH_USER }}
+      SITE_SSH_PATH: ${{ secrets.SITE_SSH_PATH }}
+      SITE_URL: https://lanyard.3logiq.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: "release-*", path: out, merge-multiple: true }
+      - name: Version
+        run: |
+          v="${TAG#v}"
+          # The version becomes part of a folder name on the server: only plain version numbers are accepted.
+          printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$' || { echo "::error::Not a version: $v"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: latest.json and SHA256SUMS (the links point at the website's own copy)
+        run: python3 installer/make_latest.py out "$VERSION" "${{ github.repository }}" --tag "$TAG" --base-url "$SITE_URL/downloads/$VERSION" --page-url "$SITE_URL/downloads.html"
+      - name: Upload to the server over SSH
+        env:
+          SITE_SSH_KEY: ${{ secrets.SITE_SSH_KEY }}
+          SITE_SSH_KNOWN_HOSTS: ${{ secrets.SITE_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SITE_SSH_HOST" ] || [ -z "$SITE_SSH_USER" ] || [ -z "$SITE_SSH_KEY" ] || [ -z "$SITE_SSH_PATH" ] || [ -z "$SITE_SSH_KNOWN_HOSTS" ]; then
+            echo "Server secrets are not all set: the files are only on the GitHub release."; exit 0
+          fi
+          if ! printf '%s' "$SITE_SSH_PATH" | grep -Eq '^/home/[a-z0-9_-]+/htdocs/[A-Za-z0-9.-]+/?$'; then
+            echo "::error::SITE_SSH_PATH must look like /home/<site user>/htdocs/<domain>"; exit 1
+          fi
+          dest="${SITE_SSH_PATH%/}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SITE_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SITE_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh_cmd="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          # The files first (never deleting anything), then latest.json, so the page never points at files that are not there yet.
+          rsync -az --mkpath -e "$ssh_cmd" out/ "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/downloads/$VERSION/"
+          rsync -az -e "$ssh_cmd" out/latest.json "$SITE_SSH_USER@$SITE_SSH_HOST:$dest/latest.json"
+          # Keep the newest 5 version folders (names are checked, so nothing else can be removed).
+          $ssh_cmd "$SITE_SSH_USER@$SITE_SSH_HOST" "cd '$dest/downloads' && ls -1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?\$' | sort -V | head -n -5 | xargs -r -I{} rm -rf -- {}"
+          rm -f ~/.ssh/deploy_key
+          echo "Uploaded $VERSION to $SITE_SSH_HOST"
+      - name: Check the live files answer
+        continue-on-error: true
+        run: |
+          if [ -z "$SITE_SSH_HOST" ]; then exit 0; fi
+          curl -fsSIL --retry 5 --retry-delay 5 "$SITE_URL/downloads/$VERSION/SHA256SUMS" | head -1
+          curl -fsS "$SITE_URL/latest.json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('latest.json on the site:', d['version'], len(d['assets']), 'files')"
   # FileSync server image for the VPS (see docs/DEPLOYING-SERVER.md). Pushed to GHCR with the
   # built-in token, so no extra secrets are needed. Image names must be lowercase.
   files-image:

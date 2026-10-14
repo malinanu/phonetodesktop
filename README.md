@@ -65,7 +65,7 @@ cd filesync && npm ci && npm test            # FileSync web tests; e2e/ drives r
 ```
 Icons: `CHROMIUM_PATH=... node brand/make-icons.mjs` regenerates every icon (needs Node 22, `playwright`, Chromium, ImageMagick).
 
-CI (`.github/workflows`): `build.yml` tests and builds every platform on each push (Windows agent, Linux and macOS agents with packaging, Android APK, Flutter APK and unsigned iOS build, account and FileSync checks); `release.yml` publishes installers, `latest.json` and checksums when a `v*` tag is pushed; `deploy-site.yml` uploads the website to CloudPanel over SSH. See [docs/RELEASING.md](docs/RELEASING.md).
+CI (`.github/workflows`): `build.yml` tests and builds every platform on each push (Windows agent, Linux and macOS agents with packaging, Android APK, Flutter APK and unsigned iOS build, account and FileSync checks); `release.yml` publishes installers, `latest.json` and checksums when a `v*` tag is pushed (or when started by hand with a version) and copies the files to the website server, which serves them from `lanyard.3logiq.com/downloads.html`; `deploy-site.yml` uploads the website to CloudPanel over SSH. See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Status
 Verified in CI and here: agent, relay, Flutter app and account service tests; the builds for Windows, macOS, Linux, Android and unsigned iOS; Send files transfers (Chromium, 20 to 50 MiB, SHA-256 checked) through the built-in server; the website in a real browser at desktop and phone widths.
