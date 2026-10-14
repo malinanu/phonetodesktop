@@ -12,9 +12,10 @@ var user;
 // QR Code
 var qr = new QRious({
   element: document.getElementById('transfer-qr-code'),
-  background: 'transparent',
+  // Dark modules on the white tile in both themes: phone cameras read that best.
+  background: '#ffffff',
   size: 220,
-  foreground: '#adb5db',
+  foreground: '#1b1006',
   level: 'H',
 })
 
@@ -22,7 +23,6 @@ var qr = new QRious({
 if (window.localStorage.getItem('mode') == 'light') {
   dom.theme_text.innerHTML = 'Light'
   dom.comic_img.src = "assets/comic.png"
-  qr.set({foreground: '#212529'});
 }
 
 // Load app version from API. Cosmetic — never let it block or break app boot.
@@ -59,7 +59,7 @@ async function onLoad() {
   // Check WebRTC browser compatibility
   if (typeof RTCPeerConnection === 'undefined') {
     dom.error_div.style.display = 'block'
-    dom.error_message.innerHTML = 'Your browser does not support <a href="https://caniuse.com/?search=webrtc" target="_blank" style="color: inherit; text-decoration: underline;">WebRTC</a>.<br><span style="color: #6c757d; font-size: 14px; margin-top: 10px; display: inline-block;">Please use a modern browser such as Chrome or Firefox.</span>'
+    dom.error_message.innerHTML = 'Your browser does not support <a href="https://caniuse.com/?search=webrtc" target="_blank" style="color: inherit; text-decoration: underline;">WebRTC</a>.<br><span style="color: var(--muted); font-size: 15px; font-weight: 500; margin-top: 10px; display: inline-block;">Please use a modern browser such as Chrome or Firefox.</span>'
     return
   }
 
@@ -148,7 +148,6 @@ function themeClick() {
     document.documentElement.setAttribute('data-bs-theme', 'light')
     window.localStorage.setItem('mode', 'light')
     dom.comic_img.src = "assets/comic.png"
-    qr.set({foreground: '#212529'});
   }
   else if (dom.theme_text.innerHTML == 'Light') {
     dom.theme_text.innerHTML = 'Dark'
@@ -157,7 +156,6 @@ function themeClick() {
     document.documentElement.setAttribute('data-bs-theme', 'dark')
     window.localStorage.setItem('mode', 'dark')
     dom.comic_img.src = "assets/comic-dark.png"
-    qr.set({foreground: '#adb5db'});
   }
 }
 

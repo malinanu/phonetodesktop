@@ -8,39 +8,85 @@ encrypted traffic when a direct connection is impossible. File bytes are never s
 
 ## Oracle Cloud + Portainer + CloudPanel (lanyardfileshare.3logiq.com)
 
-Use this when the server already runs CloudPanel (its nginx owns ports 80 and 443) and Portainer. Use
-`deploy/docker-compose.cloudpanel.yml` instead of the Caddy-based files: it has no web server of its own and publishes
-the app on `127.0.0.1:8080`.
+The setup for the Lanyard server: CloudPanel already owns ports 80 and 443 (its nginx serves the website), so the Send
+files stack runs in Portainer **without a web server of its own** (`deploy/docker-compose.cloudpanel.yml`) and
+CloudPanel forwards `https://lanyardfileshare.3logiq.com` to it. Do the steps in order; each one ends with a check.
 
-1. **DNS.** Create an `A` record `lanyardfileshare.3logiq.com` pointing at the server's public IP.
-2. **Portainer.** Stacks, Add stack, Web editor, paste `deploy/docker-compose.cloudpanel.yml` (or use the repository with
-   that compose path). Environment variables:
-   - `TURN_EXTERNAL_IP` = `<public IP>/<private IP>` of the Oracle instance. **Required**: Oracle instances only know their private
-     address, and TURN must advertise the public one. Find both in the Oracle console (Instance, Primary VNIC).
-   - `FILES_DOMAIN` is already `lanyardfileshare.3logiq.com`. Change `FILES_TAG` only to pin a release.
-   Deploy. Before the first release of the image exists, use the `build:` line described in the compose file.
-3. **CloudPanel.** Sites, Add Site, **Create a Reverse Proxy**: domain `lanyardfileshare.3logiq.com`, Reverse Proxy URL
-   `http://127.0.0.1:8080`. Then Let's Encrypt certificate (Site, SSL/TLS, New Let's Encrypt Certificate). WebSocket upgrade
-   headers are part of CloudPanel's reverse-proxy template; check `Upgrade` and `Connection` are in the vhost if signaling fails.
-4. **Open the TURN ports, in two places.** Oracle blocks them by default:
-   - Console: VCN, Security Lists (or the network security group), add **ingress** rules, source `0.0.0.0/0`:
-     TCP and UDP `3478`, UDP `50000-50100`.
-   - On the instance (Ubuntu images ship with a restrictive iptables):
+**0. The images.** GitHub builds them by itself: the `server-images` workflow runs on every push to `main` that changes
+`filesync/` or `account/`, and pushes `ghcr.io/malinanu/phonetodesktop-files:latest` (and `-account:latest`), for
+both Intel/AMD and Arm (Oracle Ampere) servers. The first time only:
+   1. GitHub, Actions, **server-images**, Run workflow (branch `main`) if it has not run yet. Wait for the green tick.
+   2. GitHub, your profile, **Packages**, `phonetodesktop-files`, Package settings, **Change visibility: Public**.
+      Do the same for `phonetodesktop-account` if you will use accounts. (Or keep them private and add GitHub as a
+      registry in Portainer, Registries, with a token that has `read:packages`.)
+   - Check: `docker pull ghcr.io/malinanu/phonetodesktop-files:latest` works on the server.
+
+**1. DNS.** At your DNS provider add an `A` record: name `lanyardfileshare`, value = the server's public IP.
+   - Check: `ping lanyardfileshare.3logiq.com` answers from that IP (allow a few minutes).
+
+**2. Find the two addresses of the server.** Oracle console, Compute, Instances, your instance, **Primary VNIC**: note
+the *Public IPv4 address* (for example `141.147.10.20`) and the *Private IPv4 address* (for example `10.0.0.25`).
+TURN needs both, because the instance itself only knows the private one.
+
+**3. Open the relay ports, in two places** (Oracle blocks them twice):
+   - Oracle console: Networking, Virtual cloud networks, your VCN, **Security Lists**, Default Security List, Add
+     Ingress Rules, source CIDR `0.0.0.0/0`:
+     | Protocol | Destination port |
+     | --- | --- |
+     | TCP | `3478` |
+     | UDP | `3478` |
+     | UDP | `50000-50100` |
+   - On the server (SSH):
      ```
      sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
      sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
      sudo iptables -I INPUT -p udp --dport 50000:50100 -j ACCEPT
      sudo netfilter-persistent save
      ```
-5. **Check.** `https://lanyardfileshare.3logiq.com` shows the Send files page. Open it on two devices on different networks
-   (one on mobile data), share the room link and send a file: that exercises the TURN relay. The browser test in
-   `filesync/e2e/` can also be pointed at it.
-6. **Point the apps at it.** In the GitHub repository settings set the variable `FILES_URL` to
-   `https://lanyardfileshare.3logiq.com`; the next builds then offer it for sending between networks (the built-in
-   local Send files keeps working without it).
+   - Ports 80 and 443 stay as they are (CloudPanel).
 
-Optional account service: add the profile `accounts` (Portainer: enable the profile, or `docker compose --profile accounts up -d`),
-set the keys from `docs/ACCOUNTS.md`, and in the CloudPanel site's **Vhost** add before the default location:
+**4. Create the stack in Portainer.** Stacks, **Add stack**, name `lanyard-files`, then **Repository**:
+   - Repository URL `https://github.com/malinanu/phonetodesktop`, reference `refs/heads/main`,
+     compose path `deploy/docker-compose.cloudpanel.yml`. (Or **Web editor** and paste that file.)
+   - Environment variables:
+     | Name | Value |
+     | --- | --- |
+     | `TURN_EXTERNAL_IP` | `<public IP>/<private IP>`, for example `141.147.10.20/10.0.0.25` (**required**) |
+     | `FILES_DOMAIN` | `lanyardfileshare.3logiq.com` (already the default) |
+     | `FILES_PORT` | `8080` unless that port is taken on the server |
+   - **Deploy the stack.** `files-init` runs once and stops (that is normal); `files-app` and `files-coturn` stay running.
+   - Check on the server: `curl -s http://127.0.0.1:8080/api/health` prints `{"message":"FileSync API is running!"}`.
+
+**5. Publish it with CloudPanel.** Sites, **Add Site**, **Create a Reverse Proxy**:
+   - Domain Name `lanyardfileshare.3logiq.com`, Reverse Proxy URL `http://127.0.0.1:8080`, Create.
+   - The site, **SSL/TLS**, Actions, **New Let's Encrypt Certificate**, Create and Install.
+   - The site, **Vhost**: make sure the `location /` block passes WebSocket upgrades (Send files uses `/ws`). It must
+     contain these lines; add them if missing and Save:
+     ```
+     proxy_http_version 1.1;
+     proxy_set_header Upgrade $http_upgrade;
+     proxy_set_header Connection "upgrade";
+     proxy_set_header Host $host;
+     proxy_read_timeout 3600s;
+     ```
+   - Check: `https://lanyardfileshare.3logiq.com` shows the Send files page with the padlock, and
+     `https://lanyardfileshare.3logiq.com/api/health` answers.
+
+**6. Test a transfer across networks.** Open the page on a computer, then open the room link on a phone with Wi-Fi
+**off** (mobile data). Send a file both ways. If the phone joins but the file never starts, the relay ports in step 3
+or `TURN_EXTERNAL_IP` in step 4 are wrong.
+
+**7. Point Lanyard at it.** GitHub, the repository, Settings, Secrets and variables, Actions, **Variables**, New
+variable `FILES_URL` = `https://lanyardfileshare.3logiq.com`. The next automatic build of the apps offers it for
+sending between networks. (The Send files built into the PC program keeps working on the home network without it.)
+
+**Updating.** Every push to `main` that changes `filesync/` builds a new `:latest` image. In Portainer open the stack,
+**Pull and redeploy** (tick *Re-pull image*). Nothing else is needed: no files or databases are kept, only the secret
+in the `keys` volume, which survives redeploys.
+
+**Optional accounts** (`docs/ACCOUNTS.md`): in the stack add the environment variables listed there
+(`ACCOUNT_SIGNING_KEYS`, `ACCOUNT_JWT_SECRET`, `ACCOUNT_DB_PASSWORD`, mail settings), enable the `accounts` profile
+(or set `COMPOSE_PROFILES=accounts`), redeploy, and in the CloudPanel site's **Vhost** add before `location /`:
 
 ```
 location /account/ {
@@ -50,6 +96,17 @@ location /account/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+**If something fails**
+| What you see | Likely cause |
+| --- | --- |
+| Portainer: `pull access denied` / `manifest unknown` | Step 0: the image is not built yet or still private |
+| `502 Bad Gateway` from CloudPanel | Stack not running, or `FILES_PORT` differs from the reverse-proxy URL |
+| Page loads but stays on "Connecting..." | WebSocket lines missing in the Vhost (step 5) |
+| Works on the same Wi-Fi, not between networks | Step 3 ports, or `TURN_EXTERNAL_IP` |
+| Let's Encrypt fails | DNS (step 1) not pointing at the server yet |
+
+Logs: Portainer, Containers, `files-app` or `files-coturn`, **Logs**.
 
 ## What you need
 - A VPS with a public IPv4 address: 1 vCPU / 1 GB RAM is enough to start; Linux with Docker + Docker Compose v2.
@@ -77,7 +134,7 @@ docker compose up -d
 docker compose ps            # all running; "init" exits 0 after creating the secret
 curl -fsS https://files.example.com/api/health
 ```
-The image is `ghcr.io/malinanu/phonetodesktop-files`, built and pushed by the release workflow on every `v*` tag.
+The image is `ghcr.io/malinanu/phonetodesktop-files`, built and pushed by the `server-images` workflow on every push to `main` that changes `filesync/` (and by the release workflow on `v*` tags).
 Make the package public once (GitHub → Packages → the image → Package settings → Change visibility), or `docker login ghcr.io` on the server.
 Before the first release exists, build locally instead: `docker build -t ghcr.io/malinanu/phonetodesktop-files:latest filesync`.
 

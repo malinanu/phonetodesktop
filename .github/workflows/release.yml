@@ -1,13 +1,13 @@
 name: release
 # Builds installers + APK and puts them on the website's own server (the `server` job), in three ways:
-#  - push to main that changes the programs (agent, android, installer, shared, brand): a build "0.3.<run number>" goes to the
+#  - push to main that changes the programs (agent, android, installer, shared, brand, filesync/web which the agent embeds): a build "0.3.<run number>" goes to the
 #    server automatically, so the download buttons always have files; no GitHub release is made for it;
 #  - push a tag (git tag v1.0.0 && git push --tags): the same, plus a GitHub release, and the server images;
 #  - Actions tab, Run workflow with a version such as 1.0.0: like a tag (the tag v1.0.0 is created on the chosen branch).
 on:
   push:
     branches: [main]
-    paths: ["agent/**", "android/**", "installer/**", "shared/**", "brand/**", ".github/workflows/release.yml"]
+    paths: ["agent/**", "android/**", "installer/**", "shared/**", "brand/**", "filesync/web/**", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -298,6 +298,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3   # arm64 too, for Oracle Ampere servers
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -311,6 +312,7 @@ jobs:
         with:
           context: account
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/malinanu/phonetodesktop-account:latest
             ghcr.io/malinanu/phonetodesktop-account:${{ steps.tag.outputs.version }}

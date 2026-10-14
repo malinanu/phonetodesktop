@@ -1,0 +1,39 @@
+name: server-images
+# Builds the Docker images for the Send files server (and the optional account service) whenever their code changes
+# on main, and pushes them to GitHub's registry as :latest, so the Portainer stack on the server can pull them
+# (docs/DEPLOYING-SERVER.md). Tagged releases also get a version tag from release.yml.
+on:
+  push:
+    branches: [main]
+    paths: ["filesync/**", "account/**", ".github/workflows/server-images.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency: { group: server-images, cancel-in-progress: true }
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: files, context: filesync, platforms: "linux/amd64,linux/arm64" }
+          - { name: account, context: account, platforms: "linux/amd64,linux/arm64" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3   # the arm64 image (Oracle Ampere servers) is built on an amd64 runner
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          platforms: ${{ matrix.platforms }}
+          tags: |
+            ghcr.io/malinanu/phonetodesktop-${{ matrix.name }}:latest
+            ghcr.io/malinanu/phonetodesktop-${{ matrix.name }}:main-${{ github.sha }}

@@ -738,11 +738,11 @@ export class User {
     const tbody = dom.file_modal_table.querySelector('tbody');
     tbody.innerHTML = '';
     for (let user of Object.values(details)) {
-      const statusColor = user.progress == 100 ? '#198754' : user.aborted ? '#DC3545' : '#0d6efd';
+      const statusColor = user.progress == 100 ? 'var(--good)' : user.aborted ? 'var(--bad)' : 'var(--accent-text)';
       const statusLabel = user.progress == 100 ? 'Completed' : user.aborted ? 'Stopped' : 'In progress';
-      const statusBg    = user.progress == 100 ? 'rgba(25,135,84,0.1)' : user.aborted ? 'rgba(220,53,69,0.1)' : 'rgba(13,110,253,0.1)';
-      const onlineColor = user.online ? '#198754' : '#DC3545';
-      const onlineRing  = user.online ? 'rgba(25,135,84,0.2)' : 'rgba(220,53,69,0.2)';
+      const statusBg    = 'color-mix(in oklab, ' + statusColor + ' 14%, transparent)';
+      const onlineColor = user.online ? 'var(--good)' : 'var(--bad)';
+      const onlineRing  = 'color-mix(in oklab, ' + onlineColor + ' 25%, transparent)';
 
       const tr = document.createElement('tr');
 
@@ -755,7 +755,7 @@ export class User {
       progressTd.style.cssText = 'padding:12px 16px; vertical-align:middle; border-bottom:1px solid var(--color-border); min-width:120px;';
       progressTd.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px;">
-          <div style="flex:1; height:6px; background-color:var(--color-card-header-bg); border-radius:3px; overflow:hidden;">
+          <div style="flex:1; height:6px; background-color:var(--field-2); border-radius:3px; overflow:hidden;">
             <div style="width:${user.progress}%; height:100%; background-color:${statusColor}; border-radius:3px; transition:width 0.3s ease;"></div>
           </div>
           <span style="font-size:13px; font-weight:500; color:var(--color-muted); min-width:32px; text-align:right;">${user.progress}%</span>
