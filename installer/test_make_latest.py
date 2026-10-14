@@ -68,6 +68,17 @@ class MakeLatest(unittest.TestCase):
         self.assertEqual(m["checksums"], "https://site.test/downloads/1.2.3/SHA256SUMS")
         self.assertEqual(m["tag"], "v1.2.3")
 
+    def test_builds_without_a_github_release_have_no_github_links(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "Lanyard-0.3.7.apk").write_bytes(b"x")
+        make_latest.main([str(d), "0.3.7", "me/repo", "--tag", "v0.3.7", "--base-url", "https://site.test/downloads/0.3.7",
+                          "--page-url", "https://site.test/downloads.html", "--no-github"])
+        m = json.loads((d / "latest.json").read_text())
+        self.assertNotIn("mirror", m["assets"][0])
+        self.assertNotIn("github_release_page", m)
+        self.assertEqual(m["assets"][0]["url"], "https://site.test/downloads/0.3.7/Lanyard-0.3.7.apk")
+        self.assertEqual(m["version"], "0.3.7")
+
     def test_without_a_base_url_nothing_changes(self):
         _, m, _ = self.run_in(["Lanyard-1.2.3.apk"])
         self.assertNotIn("mirror", m["assets"][0])

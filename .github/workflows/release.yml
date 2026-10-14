@@ -1,8 +1,13 @@
 name: release
-# Publish installers + APK on GitHub Releases, either by pushing a tag (git tag v1.0.0 && git push --tags) or from
-# the Actions tab: Run workflow with a version such as 1.0.0 (the tag v1.0.0 is then created on the chosen branch).
+# Builds installers + APK and puts them on the website's own server (the `server` job), in three ways:
+#  - push to main that changes the programs (agent, android, installer, shared, brand): a build "0.3.<run number>" goes to the
+#    server automatically, so the download buttons always have files; no GitHub release is made for it;
+#  - push a tag (git tag v1.0.0 && git push --tags): the same, plus a GitHub release, and the server images;
+#  - Actions tab, Run workflow with a version such as 1.0.0: like a tag (the tag v1.0.0 is created on the chosen branch).
 on:
   push:
+    branches: [main]
+    paths: ["agent/**", "android/**", "installer/**", "shared/**", "brand/**", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -12,8 +17,11 @@ on:
 permissions:
   contents: write
 env:
-  # The tag being released: from the input when run by hand, else the pushed tag.
-  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+  # The version being built: from the input when run by hand, the pushed tag, or for pushes to main 0.3.<run number>
+  # (raise the 0.3 when a new minor version starts; real releases should use a higher version).
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || (github.ref_type == 'tag' && github.ref_name) || format('v0.3.{0}', github.run_number) }}
+  # Only tags and manual runs make a GitHub release and publish the server images.
+  IS_RELEASE: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
 jobs:
   windows:
     runs-on: windows-latest
@@ -79,7 +87,7 @@ jobs:
         run: |
           v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
+          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
       - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${TAG#v}.apk
       - uses: actions/upload-artifact@v4
         with: { name: release-android, path: Lanyard-*.apk }
@@ -94,7 +102,7 @@ jobs:
         run: |
           v="${TAG#v}"
           IFS=. read -r a b c <<< "$v"
-          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*10000 + b*100 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
+          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
           mv android/app/build/outputs/bundle/release/app-release.aab Lanyard-$v.aab
       - uses: actions/upload-artifact@v4
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
@@ -178,6 +186,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: release-macos, path: dist/*.dmg }
   publish:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: [windows, android, linux, macos]
     runs-on: ubuntu-latest
     steps:
@@ -198,6 +207,8 @@ jobs:
   server:
     needs: [windows, android, linux, macos]
     runs-on: ubuntu-latest
+    # One upload at a time, so two quick pushes cannot write the same folders together.
+    concurrency: { group: release-server, cancel-in-progress: false }
     env:
       SITE_SSH_HOST: ${{ secrets.SITE_SSH_HOST }}
       SITE_SSH_USER: ${{ secrets.SITE_SSH_USER }}
@@ -214,7 +225,10 @@ jobs:
           printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$' || { echo "::error::Not a version: $v"; exit 1; }
           echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: latest.json and SHA256SUMS (the links point at the website's own copy)
-        run: python3 installer/make_latest.py out "$VERSION" "${{ github.repository }}" --tag "$TAG" --base-url "$SITE_URL/downloads/$VERSION" --page-url "$SITE_URL/downloads.html"
+        run: |
+          # Builds from main have no GitHub release, so their files have no GitHub mirror to point at.
+          extra=""; [ "$IS_RELEASE" = "true" ] || extra="--no-github"
+          python3 installer/make_latest.py out "$VERSION" "${{ github.repository }}" --tag "$TAG" --base-url "$SITE_URL/downloads/$VERSION" --page-url "$SITE_URL/downloads.html" $extra
       - name: Upload to the server over SSH
         env:
           SITE_SSH_KEY: ${{ secrets.SITE_SSH_KEY }}
@@ -247,6 +261,7 @@ jobs:
   # FileSync server image for the VPS (see docs/DEPLOYING-SERVER.md). Pushed to GHCR with the
   # built-in token, so no extra secrets are needed. Image names must be lowercase.
   files-image:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -273,6 +288,7 @@ jobs:
             ghcr.io/malinanu/phonetodesktop-files:${{ steps.tag.outputs.version }}
   # Account service image (optional; see docs/ACCOUNTS.md).
   account-image:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
