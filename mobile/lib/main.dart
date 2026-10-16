@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'app/account.dart';
 import 'app/connection.dart';
 import 'app/discovery.dart';
+import 'app/media_controls.dart';
 import 'app/pc_store.dart';
 import 'app/settings.dart';
 import 'app/theme.dart';
@@ -34,7 +35,12 @@ Future<void> main() async {
 
   settings.addListener(applyAwake);
   applyAwake();
-  runApp(PhoneRemoteApp(settings: settings, link: link, account: account, bluetooth: Platform.isAndroid ? BluetoothController(ChannelHidPlatform()) : null));
+  final bluetooth = Platform.isAndroid ? BluetoothController(ChannelHidPlatform()) : null;
+  // Play, pause and skip from the notification shade and the lock screen (Android), and the lock screen,
+  // Dynamic Island and Control Center (iPhone).
+  final media = ChannelMediaPlatform();
+  MediaControls(link: link, bluetooth: bluetooth, settings: settings, platform: media);
+  runApp(PhoneRemoteApp(settings: settings, link: link, account: account, bluetooth: bluetooth));
 }
 
 class PhoneRemoteApp extends StatelessWidget {
