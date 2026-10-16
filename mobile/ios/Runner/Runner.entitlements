@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The app's own group stays first (the default for its other keychain items); the second is shared with the
+	     LanyardWidgets extension for the lock-screen buttons' login details. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.phoneremote</string>
+		<string>$(AppIdentifierPrefix)app.phoneremote.shared</string>
+	</array>
+</dict>
+</plist>

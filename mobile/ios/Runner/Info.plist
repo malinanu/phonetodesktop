@@ -34,6 +34,21 @@
 	<array>
 		<string>_phoneremote._tcp</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<!-- Only for the optional full lock-screen player (Settings, off by default): iOS shows it only while the app
+		     has an audio session running. -->
+		<string>audio</string>
+	</array>
+	<key>LanyardKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)app.phoneremote.shared</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
