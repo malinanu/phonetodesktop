@@ -7,7 +7,7 @@ Website: https://lanyard.3logiq.com · [Privacy policy](site/privacy.html) · [R
 | | Windows | macOS | Linux | Android | iPhone |
 | --- | --- | --- | --- | --- | --- |
 | Computer app | installer (`.exe`) | disk image (`.dmg`, universal) | `.deb`, `.tar.gz` | | |
-| Phone app | | | | APK (Flutter app and native app), Play Store later | Flutter app builds in CI; App Store needs the owner's Apple account |
+| Phone app | | | | APK (the Flutter app in `mobile/`), Play Store later | Flutter app builds in CI; App Store needs the owner's Apple account |
 
 ## How it works
 1. Install Lanyard on the computer and open it. Its window shows a QR code.

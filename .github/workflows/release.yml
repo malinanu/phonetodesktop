@@ -1,13 +1,13 @@
 name: release
 # Builds installers + APK and puts them on the website's own server (the `server` job), in three ways:
-#  - push to main that changes the programs (agent, android, installer, shared, brand, filesync/web which the agent embeds): a build "0.3.<run number>" goes to the
+#  - push to main that changes the programs (agent, mobile, installer, shared, brand, filesync/web which the agent embeds): a build "0.3.<run number>" goes to the
 #    server automatically, so the download buttons always have files; no GitHub release is made for it;
 #  - push a tag (git tag v1.0.0 && git push --tags): the same, plus a GitHub release, and the server images;
 #  - Actions tab, Run workflow with a version such as 1.0.0: like a tag (the tag v1.0.0 is created on the chosen branch).
 on:
   push:
     branches: [main]
-    paths: ["agent/**", "android/**", "installer/**", "shared/**", "brand/**", "filesync/web/**", ".github/workflows/release.yml"]
+    paths: ["agent/**", "mobile/**", "installer/**", "shared/**", "brand/**", "filesync/web/**", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -64,14 +64,16 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with: { name: release-windows, path: dist/Lanyard-Setup-*.exe }
+  # The phone app is the Flutter app in mobile/ (Wi-Fi remote, touchpad, Bluetooth mode, Send files, and the
+  # notification / lock-screen controls). The old native app in android/ is no longer released.
   android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-      - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: 8.10.2 }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
       - name: Keystore (optional)
         env:
           KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
@@ -80,31 +82,36 @@ jobs:
             echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           fi
+      - name: Version
+        run: |
+          v="${TAG#v}"
+          IFS=. read -r a b c <<< "$v"
+          echo "APP_VERSION=$v" >> "$GITHUB_ENV"
+          echo "APP_BUILD=$((a*1000000 + b*1000 + ${c%%-*}))" >> "$GITHUB_ENV"
       - name: Build release APK
+        working-directory: mobile
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          v="${TAG#v}"
-          IFS=. read -r a b c <<< "$v"
-          gradle -p android assembleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
-      - run: mv android/app/build/outputs/apk/release/app-release.apk Lanyard-${TAG#v}.apk
+          flutter pub get
+          flutter build apk --release --build-name="$APP_VERSION" --build-number="$APP_BUILD" --dart-define=FILES_URL="${{ vars.FILES_URL }}"
+      - run: mv mobile/build/app/outputs/flutter-apk/app-release.apk "Lanyard-$APP_VERSION.apk"
       - uses: actions/upload-artifact@v4
         with: { name: release-android, path: Lanyard-*.apk }
       # Play Store bundle. Only built with a real keystore (Play rejects debug-signed bundles).
       # Kept as a workflow artifact, not attached to the public release; upload it in Play Console.
       - name: Build release AAB (Play Store)
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
+        working-directory: mobile
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          v="${TAG#v}"
-          IFS=. read -r a b c <<< "$v"
-          gradle -p android bundleRelease -PversionName="$v" -PversionCode=$((a*1000000 + b*1000 + ${c%%-*})) -PfilesUrl="${{ vars.FILES_URL }}"
-          mv android/app/build/outputs/bundle/release/app-release.aab Lanyard-$v.aab
+          flutter build appbundle --release --build-name="$APP_VERSION" --build-number="$APP_BUILD" --dart-define=FILES_URL="${{ vars.FILES_URL }}"
+          mv build/app/outputs/bundle/release/app-release.aab "../Lanyard-$APP_VERSION.aab"
       - uses: actions/upload-artifact@v4
         if: ${{ env.ANDROID_KEYSTORE_PATH != '' }}
         with: { name: android-aab, path: Lanyard-*.aab }
