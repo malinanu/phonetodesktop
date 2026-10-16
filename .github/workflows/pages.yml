@@ -17,7 +17,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Latest release manifest (the page lists the downloads from it)
         run: |
           if curl -fsSL "https://github.com/${{ github.repository }}/releases/latest/download/latest.json" -o site/latest.json \
