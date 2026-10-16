@@ -90,6 +90,23 @@ void main() {
     expect(platform.permissionAsks, 1);
   });
 
+  test('after the grace period without the PC the controls go away, and come back with the connection', () async {
+    final link = FakeLink(state: sampleState());
+    final m = MediaControls(link: link, settings: settings, platform: platform, isIOS: false, offlineGrace: const Duration(milliseconds: 50));
+    addTearDown(m.dispose);
+    link.update(status: LinkStatus.offline);
+    expect(platform.hides, 0, reason: 'a short drop keeps them');
+    link.update(status: LinkStatus.connecting);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(platform.hides, 1);
+    expect(m.shown, isNull);
+    link.update(status: LinkStatus.connected);
+    expect(m.shown?.connected, isTrue);
+    // a new drop starts a new grace period
+    link.update(status: LinkStatus.offline);
+    expect(m.shown, isNotNull);
+  });
+
   test('buttons control the PC over Wi-Fi, with the user’s skip and volume steps', () async {
     await settings.set('skip', 15);
     await settings.set('volStep', 5);

@@ -140,7 +140,14 @@ class ChannelMediaPlatform implements MediaPlatform {
 /// Wi-Fi (the PC agent) wins over Bluetooth: it knows the song and can seek. The controls stay up while the app is
 /// (re)connecting to a paired PC, so the system keeps the app running and the connection comes back by itself.
 class MediaControls {
-  MediaControls({required this.link, required this.settings, required this.platform, this.bluetooth, bool? isIOS}) : _isIOS = isIOS ?? Platform.isIOS {
+  MediaControls({
+    required this.link,
+    required this.settings,
+    required this.platform,
+    this.bluetooth,
+    bool? isIOS,
+    this.offlineGrace = const Duration(minutes: 2),
+  }) : _isIOS = isIOS ?? Platform.isIOS {
     link.addListener(_refresh);
     bluetooth?.addListener(_refresh);
     settings.addListener(_onSettings);
@@ -154,6 +161,12 @@ class MediaControls {
   final AppSettings settings;
   final MediaPlatform platform;
   final bool _isIOS;
+
+  /// How long the controls stay while the PC cannot be reached (a short drop, the PC restarting). After that they
+  /// go away, so a phone that has left home does not keep the app running and retrying; opening the app brings them back.
+  final Duration offlineGrace;
+  DateTime? _lostAt;
+  Timer? _graceTimer;
   late final StreamSubscription<(String, int?)> _sub;
   MediaSnapshot? _shown;
   Map<String, Object>? _shownOptions;
@@ -169,7 +182,8 @@ class MediaControls {
     if (!settings.lockControls) return null;
     final pc = link.active;
     final s = link.status;
-    if (pc != null && (s == LinkStatus.connected || s == LinkStatus.connecting || s == LinkStatus.offline)) {
+    final lostTooLong = _lostAt != null && DateTime.now().difference(_lostAt!) >= offlineGrace;
+    if (pc != null && (s == LinkStatus.connected || ((s == LinkStatus.connecting || s == LinkStatus.offline) && !lostTooLong))) {
       final connected = s == LinkStatus.connected;
       final p = connected ? link.state?.nowPlaying : null;
       return MediaSnapshot(
@@ -215,6 +229,7 @@ class MediaControls {
 
   void _refresh() {
     if (_disposed) return;
+    _trackLoss();
     final next = snapshot();
     final options = _options();
     if (next == null) {
@@ -233,6 +248,18 @@ class MediaControls {
       unawaited(platform.show(next, options: options));
     }
     if (_isIOS) unawaited(_syncCredentials(next));
+  }
+
+  /// Starts the grace period when the connection drops, and forgets it once it is back.
+  void _trackLoss() {
+    if (link.status == LinkStatus.connected || link.active == null) {
+      _lostAt = null;
+      _graceTimer?.cancel();
+      _graceTimer = null;
+    } else if (_lostAt == null && _shown != null) {
+      _lostAt = DateTime.now();
+      _graceTimer = Timer(offlineGrace, _refresh);
+    }
   }
 
   /// iPhone only: hand the native buttons what they need to log in to the active PC on their own.
@@ -292,6 +319,7 @@ class MediaControls {
 
   void dispose() {
     _disposed = true;
+    _graceTimer?.cancel();
     link.removeListener(_refresh);
     bluetooth?.removeListener(_refresh);
     settings.removeListener(_onSettings);
