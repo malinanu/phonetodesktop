@@ -137,10 +137,12 @@ pub fn open_dashboard(url: &str) {
 pub fn request_approval(app: std::sync::Arc<crate::server::App>, p: crate::auth::Pending) {
     let id: String = p.id.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect();
     let url = format!("http://127.0.0.1:{}/approve?id={id}", app.port);
-    if open_app_window(&url, 460, 560) {
-        return;
-    }
+    // Off the server's threads: making the window waits for WebView2, and the window then loads its page from
+    // this same server.
     std::thread::spawn(move || {
+        if open_app_window(&url, 460, 560) {
+            return;
+        }
         let allow = ask_allow(&p.name, &p.ip);
         app.auth.decide(&p.id, allow);
         app.poke();
