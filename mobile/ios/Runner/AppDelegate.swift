@@ -12,5 +12,9 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // Lock screen, Dynamic Island and Control Center controls (lib/app/media_controls.dart).
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "LanyardMedia") {
+      MediaBridge.shared = MediaBridge(messenger: registrar.messenger())
+    }
   }
 }

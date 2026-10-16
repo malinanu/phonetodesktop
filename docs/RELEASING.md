@@ -98,6 +98,20 @@ The privacy policy URL for Play is `https://<owner>.github.io/<repo>/privacy.htm
 4. Permissions Play may ask you to justify: Bluetooth connect/advertise (Bluetooth HID remote mode) and local network discovery (finding the PC).
 5. Roll out: internal test → closed test → production. Every upload needs a higher versionCode, which a new tag gives you.
 
+## Store forms for the lock-screen controls
+- **Google Play, App content > Foreground service permissions:** the app declares `FOREGROUND_SERVICE_CONNECTED_DEVICE`
+  (`MediaControlsService`). Describe it as: *"Shows play/pause/skip controls for the user's paired computer in the
+  notification and on the lock screen, and keeps the connection to that computer while the phone is locked. Starts
+  when the user connects to their computer; the user can turn it off in Settings."* Attach a short screen recording
+  of the notification controlling the computer.
+- **App Store review notes:** the `audio` background mode is used only by Settings > *Full lock-screen player*
+  (off by default), which keeps an audio session so iOS shows its lock-screen player for the computer. The Live
+  Activity and Control Center buttons need no background mode. If review rejects the background audio, remove
+  `audio` from `UIBackgroundModes` in `mobile/ios/Runner/Info.plist` and hide that switch; the rest keeps working.
+- **iPhone signing:** enable the *Keychain Sharing* capability for `app.phoneremote` and `app.phoneremote.widgets`
+  with the group `app.phoneremote.shared` (the entitlements files already list it), so the Control Center buttons can
+  read the login details the app stores.
+
 ## Release checklist
 - [ ] CI green on `main` (`build` and `filesync-checks` workflows)
 - [ ] Send files server deployed, `https://<files-domain>/api/health` returns 200, and `FILES_URL` is set

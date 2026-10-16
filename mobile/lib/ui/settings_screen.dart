@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 
 import '../app/account.dart';
@@ -86,6 +88,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _h('Comfort'),
           _switch('Vibration', 'A small buzz when you press a button.', s.vibrate, 'vibrate'),
           _switch('Keep screen on', 'Stops the phone sleeping while the app is open.', s.keepAwake, 'keepAwake'),
+          _h('Lock screen'),
+          _switch(
+            'Media controls',
+            Platform.isIOS
+                ? 'Play, pause and skip on the lock screen and in the Dynamic Island while a PC is connected. Add the Lanyard button to Control Center too.'
+                : 'Play, pause and skip in the notification shade and on the lock screen while a PC is connected.',
+            s.lockControls,
+            'lockControls',
+          ),
+          if (Platform.isIOS && s.lockControls)
+            _switch(
+              'Full lock-screen player',
+              'Shows Lanyard in the iPhone’s own media player too. It keeps the app running in the background, uses more battery, and pauses music playing on this phone.',
+              s.iosNowPlaying,
+              'iosNowPlaying',
+            ),
           _h('Send files'),
           _row(
             'File server',
