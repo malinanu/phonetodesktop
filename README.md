@@ -18,6 +18,7 @@ The phone talks directly to the computer on your Wi-Fi; there is no Lanyard serv
 
 ## What it does
 - **Media remote:** play, pause, skip, seek and volume for the player on the computer (title and progress on Windows and Linux; on macOS the media keys and volume work, but titles are not available).
+- **Lock screen and notification controls:** play/pause, previous and next without opening the app. Android: a media notification and the lock-screen player (also in Bluetooth mode). iPhone: a Live Activity on the lock screen and in the Dynamic Island, Control Center buttons (iOS 18), and optionally the iPhone's own lock-screen player (Settings > Full lock-screen player). They go away after two minutes without the PC.
 - **Touchpad and keyboard:** move, click, scroll and type on the computer. Each phone has its own "mouse and keyboard" permission.
 - **Send files:** built in, no setup (see below).
 - **Bluetooth mode (Android):** keyboard, mouse and media keys over Bluetooth, no software on the computer.
