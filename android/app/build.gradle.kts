@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -10,7 +12,7 @@ android {
         applicationId = "app.phoneremote"
         minSdk = 28 // BluetoothHidDevice needs API 28
         targetSdk = 35
-        // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=10203
+        // CI passes these from the release tag: -PversionName=1.2.3 -PversionCode=1002003
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (findProperty("versionName") as String?) ?: "0.1.0"
         // Address of the "Send files" server (docs/DEPLOYING-SERVER.md). Empty = the Files tab asks the user to enter one.
@@ -39,7 +41,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    // compilerOptions replaces kotlinOptions, which Kotlin 2.4 rejects; it works on 2.0 too.
+    kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
     // The guide page, stylesheet and font are shared with the PC agent (repo /shared).
     sourceSets["main"].assets.srcDir("../../shared")
 }

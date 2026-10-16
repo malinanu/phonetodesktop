@@ -261,6 +261,13 @@ void main() {
       await tester.pump();
       expect(settings.skip, 30);
 
+      // the media-controls switch, then the file server field further down
+      expect(settings.lockControls, isTrue);
+      await tester.scrollUntilVisible(find.text('Media controls'), 300, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.byType(Switch).last);
+      await tester.pump();
+      expect(settings.lockControls, isFalse);
+      await tester.scrollUntilVisible(find.byType(TextField), 300, scrollable: find.byType(Scrollable).first);
       await tester.enterText(find.byType(TextField), 'http://nope.example.com');
       await tester.pump();
       expect(find.textContaining('Use an https:// address'), findsOneWidget);

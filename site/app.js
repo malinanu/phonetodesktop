@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var RELEASES = "https://github.com/malinanu/phonetodesktop/releases/latest";
+  var DOWNLOADS = "downloads.html";
   var NS = "http://www.w3.org/2000/svg";
 
   function meta(name) {
@@ -81,13 +81,13 @@
     if (!box.children.length) {
       // No release manifest yet (or it could not be loaded): every platform still gets a clear way in.
       [["windows", "i-desktop", "Windows", "Windows 10 and 11"], ["macos", "i-laptop", "macOS", "Apple silicon and Intel"], ["linux", "i-terminal", "Linux", "Debian, Ubuntu and others"]].forEach(function (r) {
-        box.appendChild(row(r[0], r[1], r[2], r[3], RELEASES, "See downloads", me.os === r[0]));
+        box.appendChild(row(r[0], r[1], r[2], r[3], DOWNLOADS + "#" + r[0], "See downloads", me.os === r[0]));
       });
     }
     // Phones
     var apk = find(assets, "android", "apk")[0];
     if (PLAY_STORE) box.appendChild(row("android", "i-phone", "Android", "Google Play", PLAY_STORE, "Get it on Google Play", me.os === "android"));
-    if (!apk && !PLAY_STORE) box.appendChild(row("android", "i-phone", "Android", "Android 9 and newer", RELEASES, "See downloads", me.os === "android"));
+    if (!apk && !PLAY_STORE) box.appendChild(row("android", "i-phone", "Android", "Android 9 and newer", DOWNLOADS + "#android", "See downloads", me.os === "android"));
     if (apk) box.appendChild(row("android", "i-phone", PLAY_STORE ? "Android, direct download" : "Android", "Android 9 and newer (.apk) · " + meta(apk), apk.url, "Download", me.os === "android" && !PLAY_STORE));
     box.appendChild(row("ios", "i-phone", "iPhone and iPad", APP_STORE ? "App Store" : "The app is being prepared. For now, open the code on your computer with the iPhone camera and use the remote in Safari.", APP_STORE, APP_STORE ? "Download on the App Store" : "Coming soon", me.os === "ios" && !!APP_STORE));
 
@@ -102,7 +102,7 @@
     } else if (me.os === "android" || me.os === "ios") {
       main.textContent = "Get the phone app"; sub.textContent = "Install Lanyard on your computer too. The list below has every download.";
     }
-    if (m && m.version) document.getElementById("dl-foot").textContent = "Latest version " + m.version + ". Checksums are listed as SHA256SUMS on the release page.";
+    if (m && m.version) document.getElementById("dl-foot").textContent = "Latest version " + m.version + ".";
   }
 
   fetch("latest.json", { cache: "no-cache" })

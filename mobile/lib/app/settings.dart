@@ -17,6 +17,8 @@ class AppSettings extends ChangeNotifier {
     'vibrate': true,
     'keepAwake': false,
     'filesUrl': '',
+    'lockControls': true, // media controls in the notification shade and on the lock screen
+    'iosNowPlaying': false, // iPhone: the full lock-screen player (keeps the app running in the background)
   };
 
   static const _key = 'pr.settings';
@@ -54,6 +56,8 @@ class AppSettings extends ChangeNotifier {
   bool get vibrate => _get('vibrate');
   bool get keepAwake => _get('keepAwake');
   String get filesUrl => _get('filesUrl');
+  bool get lockControls => _get('lockControls');
+  bool get iosNowPlaying => _get('iosNowPlaying');
 
   Future<void> set(String key, Object value) async {
     if (!defaults.containsKey(key)) return;

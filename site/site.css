@@ -236,3 +236,12 @@ footer { padding: clamp(40px, 6vw, 80px) var(--margin) 28px; }
 .acct-code { font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800; letter-spacing: .12em; background: var(--field); border: 1px dashed var(--line); border-radius: var(--radius); padding: 16px 22px; display: inline-block; user-select: all; }
 .acct-msg { margin-top: 18px; padding: 14px 18px; border-radius: 14px; background: var(--field-2); }
 .acct-msg.bad { color: var(--bad); border: 1px solid var(--bad); background: transparent; }
+
+/* Downloads page (downloads.html) */
+.dl-page .dl { padding: 0; max-width: none; margin: 10px 0 8px; }
+.dl-page .dl-row .sha { font-size: .78rem; overflow-wrap: anywhere; user-select: all; }
+.dl-page .dl-row .meta a { text-decoration: underline; }
+.dl-page .notes { padding: 0; margin-top: 8px; }
+.dl-page .dl-row:target, .dl-page .dl-row:focus { outline: 3px solid var(--accent); outline-offset: -3px; }
+.dl-page #dl-foot a { text-decoration: underline; }
+.dl-page .dl-row .meta { display: block; margin-top: 2px; }

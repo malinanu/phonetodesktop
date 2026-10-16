@@ -18,6 +18,7 @@ The phone talks directly to the computer on your Wi-Fi; there is no Lanyard serv
 
 ## What it does
 - **Media remote:** play, pause, skip, seek and volume for the player on the computer (title and progress on Windows and Linux; on macOS the media keys and volume work, but titles are not available).
+- **Lock screen and notification controls:** play/pause, previous and next without opening the app. Android: a media notification and the lock-screen player (also in Bluetooth mode). iPhone: a Live Activity on the lock screen and in the Dynamic Island, Control Center buttons (iOS 18), and optionally the iPhone's own lock-screen player (Settings > Full lock-screen player). They go away after two minutes without the PC.
 - **Touchpad and keyboard:** move, click, scroll and type on the computer. Each phone has its own "mouse and keyboard" permission.
 - **Send files:** built in, no setup (see below).
 - **Bluetooth mode (Android):** keyboard, mouse and media keys over Bluetooth, no software on the computer.
@@ -65,7 +66,7 @@ cd filesync && npm ci && npm test            # FileSync web tests; e2e/ drives r
 ```
 Icons: `CHROMIUM_PATH=... node brand/make-icons.mjs` regenerates every icon (needs Node 22, `playwright`, Chromium, ImageMagick).
 
-CI (`.github/workflows`): `build.yml` tests and builds every platform on each push (Windows agent, Linux and macOS agents with packaging, Android APK, Flutter APK and unsigned iOS build, account and FileSync checks); `release.yml` publishes installers, `latest.json` and checksums when a `v*` tag is pushed; `deploy-site.yml` uploads the website to CloudPanel over SSH. See [docs/RELEASING.md](docs/RELEASING.md).
+CI (`.github/workflows`): `build.yml` tests and builds every platform on each push (Windows agent, Linux and macOS agents with packaging, Android APK, Flutter APK and unsigned iOS build, account and FileSync checks); `release.yml` publishes installers, `latest.json` and checksums when a `v*` tag is pushed (or when started by hand with a version), builds `0.3.<run>` automatically on pushes to `main` that change the programs, and copies the files to the website server, which serves them from `lanyard.3logiq.com/downloads.html`; `deploy-site.yml` uploads the website to CloudPanel over SSH. See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Status
 Verified in CI and here: agent, relay, Flutter app and account service tests; the builds for Windows, macOS, Linux, Android and unsigned iOS; Send files transfers (Chromium, 20 to 50 MiB, SHA-256 checked) through the built-in server; the website in a real browser at desktop and phone widths.
